@@ -1448,7 +1448,7 @@ export default function SaleEdit() {
 
       const prefilledRows = sale?.items?.length > 0
         ? sale.items.map((item, index) => {
-
+            committedItemRef.current[index] = item.Item_Id || "";
           // Original purchase price saved in this purchase line
           const salePrice = Number(item.Sale_Price) || 0;
 
@@ -4210,6 +4210,19 @@ export default function SaleEdit() {
                                     shouldDirty: true,
                                   }
                                 );
+                                // const committedItemId = committedItemRef.current[i] || "";
+
+                                // if (committedItemId) {
+                                //   setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
+
+                                //   setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage", {
+                                //     shouldValidate: true,
+                                //     shouldDirty: true,
+                                //   });
+                                // }
 
                                 // handleRowChange(i, "isHSNLocked", false);
                                 // handleRowChange(i, "isExistingItem", false);
@@ -4318,6 +4331,17 @@ export default function SaleEdit() {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       });
+
+                                      // Clear Sale Discount for non-existing item
+                                      setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                        {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
 
                                       // setValue(`items.${i}.Item_Unit`, "", {
                                       //   shouldValidate: true,
@@ -4460,23 +4484,23 @@ export default function SaleEdit() {
                                     //     Otherwise blank.
                                     // ===================================================
 
-                                    // const masterSaleDiscount =
-                                    //   Number(
-                                    //     matchedItem.Discount_On_Sale_Price
-                                    //   ) > 0
-                                    //     ? matchedItem.Discount_On_Sale_Price
-                                    //     : "";
+                                    const masterSaleDiscount =
+                                      Number(
+                                        matchedItem.Discount_On_Sale_Price
+                                      ) > 0
+                                        ? matchedItem.Discount_On_Sale_Price
+                                        : "";
 
-                                    // const masterSaleDiscountType =
-                                    //   Number(
-                                    //     matchedItem.Discount_On_Sale_Price
-                                    //   ) > 0
-                                    //     ? (
-                                    //       matchedItem
-                                    //         .Discount_Type_On_Sale_Price ||
-                                    //       "Percentage"
-                                    //     )
-                                    //     : "Percentage";
+                                    const masterSaleDiscountType =
+                                      Number(
+                                        matchedItem.Discount_On_Sale_Price
+                                      ) > 0
+                                        ? (
+                                          matchedItem
+                                            .Discount_Type_On_Sale_Price ||
+                                          "Percentage"
+                                        )
+                                        : "Percentage";
 
                                     // const resolvedSaleDiscount =
                                     //   //isSameExistingItem
@@ -4495,6 +4519,13 @@ export default function SaleEdit() {
                                     //       "Percentage"
                                     //     )
                                     //     : masterSaleDiscountType;
+                                    const resolvedSaleDiscount = isSameCommittedItem
+                                      ? currentRow.Discount_On_Sale_Price ?? ""
+                                      : masterSaleDiscount;
+
+                                    const resolvedSaleDiscountType = isSameCommittedItem
+                                      ? currentRow.Discount_Type_On_Sale_Price || "Percentage"
+                                      : masterSaleDiscountType;
 
                                     committedItemRef.current[i] = matchedItem.Item_Id;
                                     // ===================================================
@@ -4559,19 +4590,19 @@ export default function SaleEdit() {
                                         // PRESERVE / RESOLVE SALE DISCOUNT
                                         // ==========================================
 
-                                        // Discount_On_Sale_Price:
-                                        //   resolvedSaleDiscount,
+                                        Discount_On_Sale_Price:
+                                          resolvedSaleDiscount,
 
+                                        Discount_Type_On_Sale_Price:
+                                          resolvedSaleDiscountType,
+
+                                        // Discount_On_Sale_Price: currentRow.Discount_On_Sale_Price ??
+                                        //   "",
+
+                                        // // ✅ add_purchase_items
                                         // Discount_Type_On_Sale_Price:
-                                        //   resolvedSaleDiscountType,
-                                                        
-                                          Discount_On_Sale_Price:currentRow.Discount_On_Sale_Price ??
-                                        "",
-
-                                      // ✅ add_purchase_items
-                                      Discount_Type_On_Sale_Price:
-                                        currentRow.Discount_Type_On_Sale_Price ||
-                                        "Percentage",
+                                        //   currentRow.Discount_Type_On_Sale_Price ||
+                                        //   "Percentage",
                                       };
 
                                       return updated;
@@ -4704,8 +4735,8 @@ export default function SaleEdit() {
 
                                     setValue(
                                       `items.${i}.Discount_On_Sale_Price`,
-                                      //resolvedSaleDiscount,
-                                      currentRow.Discount_On_Sale_Price ?? "",
+                                      resolvedSaleDiscount,
+                                      //currentRow.Discount_On_Sale_Price ?? "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4714,9 +4745,8 @@ export default function SaleEdit() {
 
                                     setValue(
                                       `items.${i}.Discount_Type_On_Sale_Price`,
-                                      //resolvedSaleDiscountType,
-                                      currentRow.Discount_Type_On_Sale_Price ||
-                                      "Percentage",
+                                      resolvedSaleDiscountType,
+                                      //currentRow.Discount_Type_On_Sale_Price ||"Percentage",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4843,19 +4873,19 @@ export default function SaleEdit() {
                                       // RESOLVED SALE DISCOUNT
                                       // ==============================================
 
-                                      // Discount_On_Sale_Price:
-                                      //   resolvedSaleDiscount,
-
-                                      // Discount_Type_On_Sale_Price:
-                                      //   resolvedSaleDiscountType,
                                       Discount_On_Sale_Price:
-                                        currentRow.Discount_On_Sale_Price ??
-                                        "",
+                                        resolvedSaleDiscount,
 
-                                      // ✅ add_purchase_items
                                       Discount_Type_On_Sale_Price:
-                                        currentRow.Discount_Type_On_Sale_Price ||
-                                        "Percentage",
+                                        resolvedSaleDiscountType,
+                                      // Discount_On_Sale_Price:
+                                      //   currentRow.Discount_On_Sale_Price ??
+                                      //   "",
+
+                                      // // ✅ add_purchase_items
+                                      // Discount_Type_On_Sale_Price:
+                                      //   currentRow.Discount_Type_On_Sale_Price ||
+                                      //   "Percentage",
 
                                       // ==============================================
                                       // EXISTING TAX
@@ -4983,6 +5013,16 @@ export default function SaleEdit() {
                                       shouldValidate: true,
                                       shouldDirty: true,
                                     });
+                                    // Clear Sale Discount for non-existing item
+                                    setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                      {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
                                     baseSalePriceRef.current[i] = 0;
                                     baseSaleUnitRef.current[i] = "";
 

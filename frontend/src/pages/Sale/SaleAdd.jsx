@@ -3705,7 +3705,7 @@ export default function SaleAdd() {
                                         shouldDirty: true,
                                       });
 
-                                      setValue(`items.${i}.Purchase_Price`, "", {
+                                      setValue(`items.${i}.Sale_Price`, "", {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       });
@@ -3736,6 +3736,15 @@ export default function SaleAdd() {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       });
+                                       setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                      setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                         {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
 
                                       // setValue(`items.${i}.Item_Unit`, "", {
                                       //   shouldValidate: true,
@@ -3850,15 +3859,15 @@ export default function SaleAdd() {
                                         )
                                         : "Percentage";
 
-                                    // const resolvedSaleDiscount =
-                                    //   isSameCommittedItem
-                                    //     ? currentRow.Discount_On_Sale_Price ?? ""
-                                    //     : masterSaleDiscount;
+                                    const resolvedSaleDiscount =
+                                      isSameCommittedItem
+                                        ? currentRow.Discount_On_Sale_Price ?? ""
+                                        : masterSaleDiscount;
 
-                                    // const resolvedSaleDiscountType =
-                                    //   isSameCommittedItem
-                                    //     ? currentRow.Discount_Type_On_Sale_Price || "Percentage"
-                                    //     : masterSaleDiscountType;
+                                    const resolvedSaleDiscountType =
+                                      isSameCommittedItem
+                                        ? currentRow.Discount_Type_On_Sale_Price || "Percentage"
+                                        : masterSaleDiscountType;
                                     committedItemRef.current[i] = matchedItem.Item_Id;
                                     // =====================================================
                                     // UPDATE REACT ROW
@@ -3927,16 +3936,16 @@ export default function SaleAdd() {
                                         // MASTER SALE DISCOUNT
                                         // ==========================================
 
-                                        //Discount_On_Sale_Price:masterSaleDiscount,
+                                        Discount_On_Sale_Price:masterSaleDiscount,
 
-                                        //Discount_Type_On_Sale_Price:masterSaleDiscountType,
-                                        Discount_On_Sale_Price: currentRow.Discount_On_Sale_Price ??
-                                          "",
+                                        Discount_Type_On_Sale_Price:masterSaleDiscountType,
+                                        // Discount_On_Sale_Price: currentRow.Discount_On_Sale_Price ??
+                                        //   "",
 
-                                        // ✅ add_purchase_items
-                                        Discount_Type_On_Sale_Price:
-                                          currentRow.Discount_Type_On_Sale_Price ||
-                                          "Percentage",
+                                        // // ✅ add_purchase_items
+                                        // Discount_Type_On_Sale_Price:
+                                        //   currentRow.Discount_Type_On_Sale_Price ||
+                                        //   "Percentage",
                                       };
 
                                       return updated;
@@ -4078,8 +4087,8 @@ export default function SaleAdd() {
                                     setValue(
                                       `items.${i}.Discount_On_Sale_Price`,
                                       //masterSaleDiscount,
-                                      //resolvedSaleDiscount,
-                                      currentRow.Discount_On_Sale_Price ?? "",
+                                      resolvedSaleDiscount,
+                                      //currentRow.Discount_On_Sale_Price ?? "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4093,8 +4102,8 @@ export default function SaleAdd() {
                                     setValue(
                                       `items.${i}.Discount_Type_On_Sale_Price`,
                                       //masterSaleDiscountType,
-                                      //resolvedSaleDiscountType,
-                                      currentRow.Discount_Type_On_Sale_Price || "Percentage",
+                                      resolvedSaleDiscountType,
+                                      //currentRow.Discount_Type_On_Sale_Price || "Percentage",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4238,19 +4247,19 @@ export default function SaleAdd() {
                                       // ==============================================
 
 
-                                      // Discount_On_Sale_Price:
-                                      //   resolvedSaleDiscount,
-
-                                      // Discount_Type_On_Sale_Price:
-                                      //   resolvedSaleDiscountType,
                                       Discount_On_Sale_Price:
-                                        currentRow.Discount_On_Sale_Price ??
-                                        "",
+                                        resolvedSaleDiscount,
 
-                                      // ✅ add_purchase_items
                                       Discount_Type_On_Sale_Price:
-                                        currentRow.Discount_Type_On_Sale_Price ||
-                                        "Percentage",
+                                        resolvedSaleDiscountType,
+                                      // Discount_On_Sale_Price:
+                                      //   currentRow.Discount_On_Sale_Price ??
+                                      //   "",
+
+                                      // // ✅ add_purchase_items
+                                      // Discount_Type_On_Sale_Price:
+                                      //   currentRow.Discount_Type_On_Sale_Price ||
+                                      //   "Percentage",
                                       // ==============================================
                                       // TAX
                                       // ==============================================
@@ -4367,6 +4376,16 @@ export default function SaleAdd() {
                                     });
 
                                     setValue(`items.${i}.Tax_Type`, "None", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                      // Clear Sale Discount for non-existing item
+                                      setValue(`items.${i}.Discount_On_Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                      setValue(`items.${i}.Discount_Type_On_Sale_Price`, "Percentage",
+                                         {
                                       shouldValidate: true,
                                       shouldDirty: true,
                                     });
