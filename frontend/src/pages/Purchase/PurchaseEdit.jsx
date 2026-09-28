@@ -1103,8 +1103,8 @@ export default function PurchaseEdit() {
   });
   const originalTaxTypesRef = useRef([]);
   const [showTransactionDiscount, setShowTransactionDiscount] = useState(false);
-   const originalPartyNameRef = useRef("");
-    const partyWasCommittedRef = useRef(false);
+  const originalPartyNameRef = useRef("");
+  const partyWasCommittedRef = useRef(false);
   useEffect(() => {
     if (purchase) {
       originalTaxTypesRef.current = (purchase?.items || []).map(
@@ -1131,7 +1131,7 @@ export default function PurchaseEdit() {
       //setShowBillingName(savedBillingName);
 
       //setHasSeenBillingNameParty(savedBillingName);
-       originalPartyNameRef.current = purchase?.billPurchaseDetails?.Party_Name?.trim() || "";
+      originalPartyNameRef.current = purchase?.billPurchaseDetails?.Party_Name?.trim() || "";
       partyWasCommittedRef.current = false;
       const prefilledRows = purchase?.items?.length > 0
         ? purchase.items.map((item, index) => {
@@ -1950,6 +1950,7 @@ export default function PurchaseEdit() {
     setShowScanCodeModal(false);
   };
   //const partyWasEditedRef = useRef(false);
+  const committedItemRef = useRef({});
   return (
     <>
 
@@ -2348,7 +2349,7 @@ export default function PurchaseEdit() {
                             id="Party_Name"
                             value={partySearch}
 
-                          
+
                             onChange={(e) => {
                               setPartyCursor(null);
 
@@ -2444,7 +2445,7 @@ export default function PurchaseEdit() {
                                 // }
 
                                 //setHasSwitchedParty(true);
-                              
+
                               } else {
                                 setValue("GSTIN", "", {
                                   shouldValidate: true,
@@ -2469,126 +2470,8 @@ export default function PurchaseEdit() {
                               setOpen(true);
                             }}
 
-                          
-                            // onBlur={() => {
-                            //   setTimeout(() => {
-                            //     const typedValue =
-                            //       partySearch?.trim()?.toLowerCase();
-
-                            //     const matchedParty = parties.find(
-                            //       (p) =>
-                            //         p.Party_Name?.toLowerCase() === typedValue
-                            //     );
-                            //     console.log("TYPED:", typedValue);
-                            //     console.log(
-                            //       "MATCHED PARTY:",
-                            //       matchedParty?.Party_Name,
-                            //       matchedParty?.Phone_Number
-                            //     );
 
 
-                            //     if (matchedParty) {
-                            //       setPartyCursor(null);
-
-                            //       setPartySearch(matchedParty.Party_Name);
-
-                            //       setValue("Party_Name", matchedParty.Party_Name, {
-                            //         shouldValidate: true,
-                            //         shouldDirty: true,
-                            //       });
-
-                            //       setValue("GSTIN", matchedParty.GSTIN || "", {
-                            //         shouldValidate: true,
-                            //         shouldDirty: true,
-                            //       });
-
-                            //       // const currentBillPhone = watch("Phone_Number");
-
-                            //       // if (!currentBillPhone?.trim()) {
-                            //       //   setValue(
-                            //       //     "Phone_Number",
-                            //       //     matchedParty.Phone_Number || "",
-                            //       //     {
-                            //       //       shouldValidate: true,
-                            //       //       shouldDirty: true,
-                            //       //     }
-                            //       //   );
-                            //       // }
-                            //       setValue(
-                            //         "Phone_Number",
-                            //         matchedParty.Phone_Number || "",
-                            //         {
-                            //           shouldValidate: true,
-                            //           shouldDirty: true,
-                            //         }
-                            //       );
-
-                            //       // =========================================
-                            //       // BILLING NAME
-                            //       // =========================================
-
-                            //       if (matchedParty.Billing_Name?.trim()) {
-                            //         setValue("Billing_Name", matchedParty.Billing_Name, {
-                            //           shouldValidate: true,
-                            //           shouldDirty: true,
-                            //         });
-
-                            //         setShowBillingName(true);
-                            //         setHasSeenBillingNameParty(true);
-
-                            //       } else if (
-                            //         //hasSwitchedParty &&
-                            //         hasSeenBillingNameParty &&
-                            //         enableBillingNameOfParties
-                            //       ) {
-                            //         setValue("Billing_Name", matchedParty.Party_Name, {
-                            //           shouldValidate: true,
-                            //           shouldDirty: true,
-                            //         });
-
-                            //         setShowBillingName(true);
-
-                            //       } else {
-                            //         setValue("Billing_Name", "", {
-                            //           shouldValidate: true,
-                            //           shouldDirty: true,
-                            //         });
-
-                            //         setShowBillingName(false);
-                            //       }
-
-                            //       setHasSwitchedParty(true);
-
-
-
-                            //     } else {
-                            //       setValue("GSTIN", "", {
-                            //         shouldValidate: true,
-                            //         shouldDirty: true,
-                            //       });
-
-
-
-                            //       setValue("Billing_Name", "", {
-                            //         shouldValidate: true,
-                            //         shouldDirty: true,
-                            //       });
-                            //       // setShowBillingName(
-                            //       //   enableBillingNameOfParties
-                            //       // );
-                            //       setShowBillingName(false);
-                            //       setHasSwitchedParty(true);
-                            //       setValue("Phone_Number", "", {
-                            //         shouldValidate: true,
-                            //         shouldDirty: true,
-                            //       });
-
-                            //       //setShowBillingName(false);
-                            //     }
-
-                            //     setOpen(false);
-                            //   }, 150);
-                            // }}
                             onBlur={() => {
                               setTimeout(() => {
                                 const typedValue =
@@ -2608,7 +2491,7 @@ export default function PurchaseEdit() {
                                 if (matchedParty) {
                                   setPartyCursor(null);
 
-                                  
+
 
                                   setPartySearch(matchedParty.Party_Name);
 
@@ -2633,7 +2516,7 @@ export default function PurchaseEdit() {
                                     partyWasCommittedRef.current ||
                                     !isOriginalParty
                                   ) {
-                                
+
 
                                     // ===================================================
                                     // BILLING NAME → MASTER
@@ -2695,7 +2578,7 @@ export default function PurchaseEdit() {
                                     shouldDirty: true,
                                   });
 
-                                 
+
 
                                   setValue("Phone_Number", "", {
                                     shouldValidate: true,
@@ -2736,7 +2619,7 @@ export default function PurchaseEdit() {
                               hasMore={partiesHasMore}
                               onLoadMore={handlePartyLoadMore}
                               scrollRef={partyScrollRef}
-                              
+
                               onSelectParty={(party) => {
                                 partyWasCommittedRef.current = true;
                                 setPartyCursor(null);
@@ -2752,7 +2635,7 @@ export default function PurchaseEdit() {
                                   shouldValidate: true,
                                   shouldDirty: true,
                                 });
-                                 setValue(
+                                setValue(
                                   "Billing_Name",
                                   party.Billing_Name?.trim()
                                     ? party.Billing_Name
@@ -2816,7 +2699,7 @@ export default function PurchaseEdit() {
                       {showPartyModal && (
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
-                         
+
                           onSave={(newParty) => {
                             setPartyCursor(null);
 
@@ -3217,35 +3100,7 @@ export default function PurchaseEdit() {
                             <input
                               type="text"
                               value={rows[i]?.itemSearch || ""}
-                              // onChange={(e) => {
-                              //   const typedValue = e.target.value;
-                              //   handleRowChange(i, "itemSearch", typedValue);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                              //   handleRowChange(i, "isHSNLocked", false);
-                              //   handleRowChange(i, "isExistingItem", false);
-                              //   handleRowChange(i, "isUnitLocked", false);
-                              //   // ✅ If typed value doesn’t match any existing item → unlock category
-                              //   const exists = items?.items?.find(
-                              //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //   );
-                              //   if (exists) {
-                              //     // ✅ Only store if it's a valid item
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                              //     handleRowChange(i, "isExistingItem", true);
-                              //   } else {
-                              //     // ❌ Clear Item_Name in RHF to trigger error
-                              //     // setValue(`items.${i}.Item_Name`, "", { shouldValidate: true, shouldDirty: true });
-                              //     // handleRowChange(i, "isExistingItem", false);
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true, shouldDirty: true });
-                              //     handleRowChange(i, "isExistingItem", false);
-                              //     handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                              //     handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                              //     handleRowChange(i, "Available_Units", []);
-                              //   }
-                              //   //handleRowChange(i, "isExistingItem", exists); // false if new item
-                              // }}
+
                               onChange={(e) => {
                                 const typedValue = e.target.value;
                                 // 🔹 This row is now the active search row
@@ -3269,83 +3124,16 @@ export default function PurchaseEdit() {
                                   }
                                 );
 
-                                handleRowChange(i, "isHSNLocked", false);
-                                handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "isUnitLocked", false);
+                                // handleRowChange(i, "isHSNLocked", false);
+                                // handleRowChange(i, "isExistingItem", false);
+                                // handleRowChange(i, "isUnitLocked", false);
 
-                                // Clear previously selected item details
-                                handleRowChange(i, "Primary_Unit", null);
-                                handleRowChange(i, "Secondary_Unit", null);
-                                handleRowChange(i, "Available_Units", []);
+                                // // Clear previously selected item details
+                                // handleRowChange(i, "Primary_Unit", null);
+                                // handleRowChange(i, "Secondary_Unit", null);
+                                // handleRowChange(i, "Available_Units", []);
                               }}
-                              // onBlur={() => {
-                              //   setTimeout(() => {
-                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
-                              //     if (!typedValue) return;
-
-                              //     const matchedItem = items?.items?.find(
-                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //     );
-
-                              //     if (matchedItem) {
-                              //       // ✅ auto-fill exactly like clicking from dropdown
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-                              //         updated[i] = {
-                              //           ...updated[i],
-                              //           itemSearch: matchedItem.Item_Name,   // normalize display
-                              //           Item_Category: matchedItem.Item_Category || "",
-                              //           Item_HSN: matchedItem.Item_HSN || "",
-                              //           categorySearch: matchedItem.Item_Category || "",
-                              //           isExistingItem: true,
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-                              //           itemOpen: false,
-                              //           // ✅ CURRENT MASTER
-                              //           Primary_Unit: matchedItem.Primary_Unit || null,
-                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,
-                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
-
-                              //           // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
-                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
-                              //             ? matchedItem.Available_Units
-                              //             : [],
-                              //         };
-                              //         return updated;
-                              //       });
-
-                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Purchase_Price`, matchedItem.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-
-                              //       setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-                              //       basePurchasePriceRef.current[i] = Number(matchedItem.Purchase_Price) || 0;
-                              //       basePurchaseUnitRef.current[i] = matchedItem.Primary_Unit || "";
-                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              //         {
-                              //           ...itemsValues[i],
-                              //           Item_Name: matchedItem.Item_Name,
-                              //           Purchase_Price: matchedItem.Purchase_Price || 0,
-                              //           Quantity: itemsValues[i]?.Quantity || 0,
-                              //         },
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              //       syncTotalsAfterItemChange();
-                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              //     } else {
-                              //       // // no match — close dropdown
-                              //       //      handleRowChange(i, "Primary_Unit", null);      // 🔹 add this
-                              //       // handleRowChange(i, "Secondary_Unit", null);    // 🔹 add this
-                              //       handleRowChange(i, "itemOpen", false);
-                              //     }
-                              //   }, 150); // small delay so click-from-dropdown fires first
-                              // }}
+                            
                               onBlur={() => {
                                 setTimeout(async () => {
                                   const typedValue =
@@ -3364,9 +3152,8 @@ export default function PurchaseEdit() {
                                   // These came from add_purchase_items.
                                   // =====================================================
 
-                                  const currentRow =
-                                    itemsValues[i] || {};
-
+                                  const currentRow = itemsValues[i] || {};
+                                  const committedItemId = committedItemRef.current[i] || "";
                                   try {
                                     // ===================================================
                                     // EXACT ITEM LOOKUP FROM API
@@ -3376,16 +3163,92 @@ export default function PurchaseEdit() {
                                     const response = await getItemByName(typedValue).unwrap();
 
                                     const matchedItem = response?.item;
-                                    const existingItemId =
-                                      currentRow.Item_Id || "";
+                                    if (!matchedItem?.Item_Id) {
+                                      committedItemRef.current[i] = "";
 
-                                    const isSameExistingItem =
-                                      existingItemId &&
-                                      matchedItem.Item_Id === existingItemId;
+                                      setValue(`items.${i}.Item_Id`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
 
+                                      setValue(`items.${i}.Item_Category`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      // setValue(`items.${i}.Item_HSN`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      setValue(`items.${i}.Purchase_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      setValue(`items.${i}.Tax_Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Tax_Type`, "None", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.MRP`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_Unit`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setRows((prev) => {
+                                      //   const updated = [...prev];
+
+                                      //   updated[i] = {
+                                      //     ...updated[i],
+                                      //     Purchase_Price: "",
+                                      //     Tax_Amount: "",
+                                      //   };
+
+                                      //   return updated;
+                                      // });
+
+                                      handleRowChange(i, "isExistingItem", false);
+                                      handleRowChange(i, "Primary_Unit", null);
+                                      handleRowChange(i, "Secondary_Unit", null);
+                                      handleRowChange(i, "Available_Units", []);
+                                      handleRowChange(i, "itemOpen", false);
+
+                                      return;
+                                    }
+                                    // const existingItemId =currentRow.Item_Id || "";
+
+                                    // const isSameExistingItem =
+                                    //   existingItemId &&
+                                    //   matchedItem.Item_Id === existingItemId;
+                                    const isSameCommittedItem =
+                                      committedItemId &&
+                                      String(committedItemId) === String(matchedItem?.Item_Id);
                                     // MRP
                                     const resolvedMRP =
-                                      isSameExistingItem
+                                      //isSameExistingItem
+                                      isSameCommittedItem
                                         ? (currentRow.MRP ?? "")
                                         : (
                                           Number(matchedItem.MRP) > 0
@@ -3396,19 +3259,24 @@ export default function PurchaseEdit() {
                                     // PURCHASE PRICE
                                     // No MRP calculation.
                                     // Just take master Purchase_Price for a different/new item.
+                                    // const resolvedPurchasePrice =
+                                    //   isSameExistingItem
+                                    //     ? (currentRow.Purchase_Price ?? "")
+                                    //     : (matchedItem.Purchase_Price ?? "");
                                     const resolvedPurchasePrice =
-                                      isSameExistingItem
-                                        ? (currentRow.Purchase_Price ?? "")
-                                        : (matchedItem.Purchase_Price ?? "");
+                                      isSameCommittedItem
+                                        ? currentRow.Purchase_Price ?? ""
+                                        : matchedItem.Purchase_Price ?? "";
+                                    // if (!matchedItem?.Item_Id) {
+                                    //   handleRowChange(
+                                    //     i,
+                                    //     "itemOpen",
+                                    //     false
+                                    //   );
+                                    //   return;
+                                    // }
 
-                                    if (!matchedItem?.Item_Id) {
-                                      handleRowChange(
-                                        i,
-                                        "itemOpen",
-                                        false
-                                      );
-                                      return;
-                                    }
+                                    committedItemRef.current[i] = matchedItem.Item_Id;
 
                                     // ===================================================
                                     // UPDATE ROW MASTER INFORMATION
@@ -3420,20 +3288,15 @@ export default function PurchaseEdit() {
                                       updated[i] = {
                                         ...updated[i],
 
-                                        itemSearch:
-                                          matchedItem.Item_Name,
+                                        itemSearch: matchedItem.Item_Name,
 
-                                        Item_Id:
-                                          matchedItem.Item_Id,
+                                        Item_Id: matchedItem.Item_Id,
 
-                                        Item_Category:
-                                          matchedItem.Item_Category || "",
+                                        Item_Category: matchedItem.Item_Category || "",
 
-                                        Item_HSN:
-                                          matchedItem.Item_HSN || "",
+                                        Item_HSN: matchedItem.Item_HSN || "",
 
-                                        categorySearch:
-                                          matchedItem.Item_Category || "",
+                                        categorySearch: matchedItem.Item_Category || "",
 
                                         isExistingItem: true,
 
@@ -3442,14 +3305,11 @@ export default function PurchaseEdit() {
 
                                         itemOpen: false,
 
-                                        Primary_Unit:
-                                          matchedItem.Primary_Unit || null,
+                                        Primary_Unit: matchedItem.Primary_Unit || null,
 
-                                        Secondary_Unit:
-                                          matchedItem.Secondary_Unit || null,
+                                        Secondary_Unit: matchedItem.Secondary_Unit || null,
 
-                                        Conversion_Rate:
-                                          matchedItem.Conversion_Rate ?? null,
+                                        Conversion_Rate: matchedItem.Conversion_Rate ?? null,
 
                                         Available_Units:
                                           Array.isArray(
@@ -3484,18 +3344,41 @@ export default function PurchaseEdit() {
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_Category`,
+                                    //   matchedItem.Item_Category || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_Category`,
-                                      matchedItem.Item_Category || "",
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_HSN`,
+                                    //   matchedItem.Item_HSN || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_HSN`,
-                                      matchedItem.Item_HSN || "",
+
+                                      isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
+
+
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -3618,10 +3501,14 @@ export default function PurchaseEdit() {
                                     //   matchedItem.Primary_Unit ||
                                     //   "";
 
-                                    const selectedUnit =
+                                    // const selectedUnit =
 
-                                      matchedItem.Primary_Unit ||
-                                      "";
+                                    //   matchedItem.Primary_Unit ||
+                                    //   "";
+                                    const selectedUnit =
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Unit || ""
+                                        : matchedItem.Primary_Unit || "";
 
                                     setValue(
                                       `items.${i}.Item_Unit`,
@@ -3631,23 +3518,12 @@ export default function PurchaseEdit() {
                                         shouldDirty: true,
                                       }
                                     );
-                                    // setValue(
-                                    //   `items.${i}.Item_Unit`,
-                                    //   matchedItem.Primary_Unit || "",
-                                    //   {
-                                    //     shouldValidate: true,
-                                    //     shouldDirty: true,
-                                    //   }
-                                    // );
+
 
                                     // ===================================================
                                     // BASE PRICE / UNIT
                                     // ===================================================
 
-                                    // basePurchasePriceRef.current[i] =
-                                    //   Number(
-                                    //     matchedItem.Purchase_Price
-                                    //   ) || 0;
                                     basePurchasePriceRef.current[i] =
                                       Number(resolvedPurchasePrice) || 0;
                                     // basePurchasePriceRef.current[i] =
@@ -3669,11 +3545,19 @@ export default function PurchaseEdit() {
                                       Item_Name:
                                         matchedItem.Item_Name || "",
 
-                                      Item_Category:
-                                        matchedItem.Item_Category || "",
+                                      // Item_Category:
+                                      //   matchedItem.Item_Category || "",
 
-                                      Item_HSN:
-                                        matchedItem.Item_HSN || "",
+                                      // Item_HSN:
+                                      //   matchedItem.Item_HSN || "",
+                                      Item_Category: isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
+
+                                      //Item_HSN: matchedItem.Item_HSN || "",
+                                      Item_HSN: isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
 
                                       // ✅ add_purchase_items
                                       Purchase_Price:
@@ -3746,17 +3630,71 @@ export default function PurchaseEdit() {
                                       false
                                     );
 
-                                  } catch (error) {
+                                  } 
+                                  catch (error) {
                                     console.error(
                                       "❌ Error fetching item by name:",
                                       error
                                     );
 
-                                    handleRowChange(
-                                      i,
-                                      "itemOpen",
-                                      false
-                                    );
+                                    committedItemRef.current[i] = "";
+
+                                    setValue(`items.${i}.Item_Id`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_Category`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    // setValue(`items.${i}.Item_HSN`, "", {
+                                    //   shouldValidate: true,
+                                    //   shouldDirty: true,
+                                    // });
+
+                                    setValue(`items.${i}.Purchase_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Tax_Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Tax_Type`, "None", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.MRP`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    // setValue(`items.${i}.Item_Unit`, "", {
+                                    //   shouldValidate: true,
+                                    //   shouldDirty: true,
+                                    // });
+
+                                    // DO NOT clear Discount
+                                    // DO NOT clear Discount Type
+
+                                    basePurchasePriceRef.current[i] = 0;
+                                    basePurchaseUnitRef.current[i] = "";
+
+                                    handleRowChange(i, "isExistingItem", false);
+                                    handleRowChange(i, "Primary_Unit", null);
+                                    handleRowChange(i, "Secondary_Unit", null);
+                                    handleRowChange(i, "Available_Units", []);
+                                    handleRowChange(i, "itemOpen", false);
                                   }
                                 }, 150);
                               }}
@@ -3808,6 +3746,7 @@ export default function PurchaseEdit() {
                                   setShowItemAddModal(true);
                                 }}
                                 onSelectItem={(it) => {
+                                  committedItemRef.current[i] = it.Item_Id;
                                   setRows((prev) => {
                                     const updated = [...prev];
                                     updated[i] = {
@@ -3890,168 +3829,7 @@ export default function PurchaseEdit() {
                                 }}
                               />
                             )}
-                            {/* {rows[i]?.itemOpen && (
-                            <div
-                              style={{ width: "45rem" }}
-                              className="absolute z-20  w-full bg-white border
-                      border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto"
-                            >
-                       
-                              <div
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  handleRowChange(i, "itemOpen", true);
-                                  setActiveItemRow(i);
-                                  setShowItemAddModal(true);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-2 cursor-pointer"
-                                style={{
-                                  borderBottom: "1px solid #e5e7eb",
-                                  color: "#4CA1AF",
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                  position: "sticky",
-                                  top: 0,
-                                  backgroundColor: "#fff",
-                                  zIndex: 1,
-                                }}
-                              >
-                                <span style={{ fontSize: 17, lineHeight: 1 }}>⊕</span>
-                                Add Item
-                              </div>
-
                             
-                              <table className="w-full text-sm border-collapse">
-                                <thead className="bg-gray-100 border-b">
-                                  <tr>
-                                    <th>Sl.No</th>
-                                    <th className="text-left px-3 py-2">Item Name</th>
-                                    <th className="text-left px-3 py-2">Sale Price</th>
-                                    <th className="text-left px-3 py-2">Purchase Price</th>
-                                    <th className="text-left px-3 py-2">Stock</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {items?.items
-                                    ?.filter((it) =>
-                                      it.Item_Name.toLowerCase().includes(
-                                        (rows[i]?.itemSearch || "").toLowerCase()
-                                      )
-                                    )
-                                    .map((it, idx) => (
-                                      <tr
-                                        key={idx}
-                                        onClick={() => {
-
-                                          setRows((prev) => {
-                                            const updated = [...prev];
-                                            updated[i] = {
-                                              ...updated[i],
-                                              Item_Category: it.Item_Category || "",
-                                              Item_HSN: it.Item_HSN || "",
-                                              categorySearch: it.Item_Category || "", // ✅ sync UI state
-                                              isExistingItem: true,   // lock category
-                                              isHSNLocked: false,      // lock HSN
-                                              isUnitLocked: false,     // lock unit
-                                              Primary_Unit: it.Primary_Unit || null,      // 🔹 add this
-                                              Secondary_Unit: it.Secondary_Unit || null,  // 🔹 add this
-                                              //Available_Units: item.Available_Units || [],
-                                              Conversion_Rate: it.Conversion_Rate || null,
-                                              Available_Units: Array.isArray(it.Available_Units)
-                                                ? it.Available_Units
-                                                : [],
-                                            };
-                                            return updated;
-                                          });
-                                          handleRowChange(i, "itemSearch", it.Item_Name);
-                                          handleRowChange(i, "isExistingItem", true); // ✅ mark as existing
-                                          handleRowChange(i, "CategoryOpen", false);
-                                          handleRowChange(i, "unitOpen", false);
-                                          setValue(`items.${i}.Item_Category`, it.Item_Category, { shouldValidate: true, shouldDirty: true });
-
-                                          setValue(`items.${i}.Item_Name`, it.Item_Name, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_HSN`, it.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Purchase_Price`, it.Purchase_Price || 0, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Quantity`, 1, { shouldValidate: true, shouldDirty: true });
-                                          //setValue(`items.${i}.Item_Unit`, it.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Item_Unit`, it.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-                                          basePurchasePriceRef.current[i] = Number(it.Purchase_Price) || 0;
-                                          basePurchaseUnitRef.current[i] = it.Primary_Unit || "";
-                                          handleRowChange(i, "itemOpen", false);
-
-
-                                          const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                                            {
-                                              ...itemsValues[i],
-                                              Item_Name: it.Item_Name,
-                                              Purchase_Price: it.Purchase_Price || 0,
-                                              Quantity: itemsValues[i]?.Quantity || 0,
-                                              Discount_On_Purchase_Price: itemsValues[i]?.Discount_On_Purchase_Price || 0,
-                                              Discount_Type_On_Purchase_Price: itemsValues[i]?.Discount_Type_On_Purchase_Price,
-                                              Tax_Type: itemsValues[i]?.Tax_Type
-                                            },
-                                            i,
-                                            itemsValues
-                                          );
-
-                                          setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                                          setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                                          syncTotalsAfterItemChange();
-                                          // setValue(`Total_Amount`, Total_Amount, { shouldValidate: true, shouldDirty: true });
-                                          // setValue(`Balance_Due`, Balance_Due, { shouldValidate: true, shouldDirty: true });
-                                        }}
-
-                                        className="hover:bg-gray-100 cursor-pointer border-b"
-                                      >
-                                        <td>{idx + 1}</td>
-                                        <td className="px-3 py-2">
-                                          {it.Item_Name}{" "}
-                                          {it.Item_Code && (
-                                            <span
-                                              style={{
-                                                color: "#9ca3af",
-
-                                                fontWeight: "400",
-                                              }}
-                                            >
-                                              ({it.Item_Code})
-                                            </span>
-                                          )}
-                                          </td>
-                                          <td className="px-3 py-2 text-gray-600">{it.Sale_Price || 0}</td>
-                                         
-                                          <td className="px-3 py-2 text-gray-600">
-                                            {it.Item_Type === "Service" ? "" : (it.Purchase_Price ?? 0)}
-                                          </td>
-
-                                          <td className="px-3 py-2" style={{
-                                            padding: "0.5rem 0.75rem", // same as Tailwind px-3 py-2
-                                            color: it.Stock_Quantity <= 0 ? "red" : "limegreen",
-                                            fontWeight: "500",
-                                          }}>
-                                            {it.Item_Type === "Service"
-                                              ? ""
-                                              : `${it.Stock_Quantity ?? 0} ${it.Primary_Unit || ""}`}
-                                          </td>
-                                      </tr>
-                                    ))}
-
-                                  {items?.items?.filter((it) =>
-                                    it.Item_Name.toLowerCase().includes(
-                                      (rows[i]?.itemSearch || "").toLowerCase()
-                                    )
-                                  ).length === 0 && (
-                                      <tr>
-                                        <td colSpan={4} className="px-3 py-2 text-gray-400 text-center">
-                                          No Item found
-                                        </td>
-                                      </tr>
-                                    )}
-                                </tbody>
-                              </table>
-                            </div>
-                          )} */}
-
 
 
 
@@ -4783,6 +4561,10 @@ export default function PurchaseEdit() {
                                 <select
                                   {...field}
                                   className="form-select bg-gray-100 text-gray-700"
+                                  style={{
+                                    fontSize: shouldShowFreeQuantity ? "10px" : "12px",
+                                    padding: "2px 4px",
+                                  }}
                                   onChange={(e) => {
                                     field.onChange(e);
 

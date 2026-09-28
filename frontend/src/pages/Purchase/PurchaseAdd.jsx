@@ -1663,7 +1663,7 @@ export default function PurchaseAdd() {
   //const originalPartyNameRef = useRef("");
   const partyWasCommittedRef = useRef(false);
   const committedPartyNameRef = useRef("");
-
+  const committedItemRef = useRef({});
   return (
     <>
 
@@ -2614,9 +2614,9 @@ export default function PurchaseAdd() {
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
                           onSave={(newParty) => {
-                          
+
                             committedPartyNameRef.current = newParty.Party_Name?.trim() || "";
-                              setPartyCursor(null);
+                            setPartyCursor(null);
                             // =====================================================
                             // PARTY NAME
                             // =====================================================
@@ -3214,14 +3214,14 @@ export default function PurchaseAdd() {
                                     }
                                   );
 
-                                  handleRowChange(i, "isHSNLocked", false);
-                                  handleRowChange(i, "isExistingItem", false);
-                                  handleRowChange(i, "isUnitLocked", false);
+                                  // handleRowChange(i, "isHSNLocked", false);
+                                  // handleRowChange(i, "isExistingItem", false);
+                                  // handleRowChange(i, "isUnitLocked", false);
 
-                                  // Clear previously selected item details
-                                  handleRowChange(i, "Primary_Unit", null);
-                                  handleRowChange(i, "Secondary_Unit", null);
-                                  handleRowChange(i, "Available_Units", []);
+                                  // // Clear previously selected item details
+                                  // handleRowChange(i, "Primary_Unit", null);
+                                  // handleRowChange(i, "Secondary_Unit", null);
+                                  // handleRowChange(i, "Available_Units", []);
                                 }}
 
                                 onBlur={() => {
@@ -3242,8 +3242,8 @@ export default function PurchaseAdd() {
                                     // These came from add_purchase_items.
                                     // =====================================================
 
-                                    const currentRow =
-                                      itemsValues[i] || {};
+                                    const currentRow = itemsValues[i] || {};
+                                    const committedItemId = committedItemRef.current[i] || "";
 
                                     try {
                                       // ===================================================
@@ -3251,20 +3251,96 @@ export default function PurchaseAdd() {
                                       // Replaces old frontend items.find(...)
                                       // ===================================================
 
-                                      const response =
-                                        await getItemByName(typedValue).unwrap();
+                                      const response = await getItemByName(typedValue).unwrap();
 
-                                      const matchedItem =
-                                        response?.item;
+                                      const matchedItem = response?.item;
+                                      const isSameCommittedItem =
+                                        committedItemId &&
+                                        String(committedItemId) === String(matchedItem?.Item_Id);
 
+                                      // if (!matchedItem?.Item_Id) {
+                                      //   handleRowChange(
+                                      //     i,
+                                      //     "itemOpen",
+                                      //     false
+                                      //   );
+                                      //   return;
+                                      // }
                                       if (!matchedItem?.Item_Id) {
-                                        handleRowChange(
-                                          i,
-                                          "itemOpen",
-                                          false
-                                        );
+                                        committedItemRef.current[i] = "";
+
+                                        setValue(`items.${i}.Item_Id`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        setValue(`items.${i}.Item_Category`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        setValue(`items.${i}.Item_HSN`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        setValue(`items.${i}.Purchase_Price`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+                                        // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                        //   shouldValidate: true,
+                                        //   shouldDirty: true,
+                                        // });
+
+                                        // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                        //   shouldValidate: true,
+                                        //   shouldDirty: true,
+                                        // });
+                                        setValue(`items.${i}.Tax_Amount`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+                                        setValue(`items.${i}.Amount`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        setValue(`items.${i}.Tax_Type`, "None", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        setValue(`items.${i}.MRP`, "", {
+                                          shouldValidate: true,
+                                          shouldDirty: true,
+                                        });
+
+                                        // setValue(`items.${i}.Item_Unit`, "", {
+                                        //   shouldValidate: true,
+                                        //   shouldDirty: true,
+                                        // });
+                                        // setRows((prev) => {
+                                        //   const updated = [...prev];
+
+                                        //   updated[i] = {
+                                        //     ...updated[i],
+                                        //     Purchase_Price: "",
+                                        //     Tax_Amount: "",
+                                        //   };
+
+                                        //   return updated;
+                                        // });
+
+                                        handleRowChange(i, "isExistingItem", false);
+                                        handleRowChange(i, "Primary_Unit", null);
+                                        handleRowChange(i, "Secondary_Unit", null);
+                                        handleRowChange(i, "Available_Units", []);
+                                        handleRowChange(i, "itemOpen", false);
+
                                         return;
                                       }
+                                      committedItemRef.current[i] = matchedItem.Item_Id;
 
                                       // ===================================================
                                       // UPDATE ROW MASTER INFORMATION
@@ -3313,6 +3389,7 @@ export default function PurchaseAdd() {
                                             )
                                               ? matchedItem.Available_Units
                                               : [],
+                                          
                                         };
 
                                         return updated;
@@ -3340,18 +3417,41 @@ export default function PurchaseAdd() {
                                         }
                                       );
 
+                                      // setValue(
+                                      //   `items.${i}.Item_Category`,
+                                      //   matchedItem.Item_Category || "",
+                                      //   {
+                                      //     shouldValidate: true,
+                                      //     shouldDirty: true,
+                                      //   }
+                                      // );
                                       setValue(
                                         `items.${i}.Item_Category`,
-                                        matchedItem.Item_Category || "",
+                                        isSameCommittedItem
+                                          ? currentRow.Item_Category ?? ""
+                                          : matchedItem.Item_Category || "",
                                         {
                                           shouldValidate: true,
                                           shouldDirty: true,
                                         }
                                       );
 
+                                      // setValue(
+                                      //   `items.${i}.Item_HSN`,
+                                      //   matchedItem.Item_HSN || "",
+                                      //   {
+                                      //     shouldValidate: true,
+                                      //     shouldDirty: true,
+                                      //   }
+                                      // );
                                       setValue(
                                         `items.${i}.Item_HSN`,
-                                        matchedItem.Item_HSN || "",
+
+                                        isSameCommittedItem
+                                          ? currentRow.Item_HSN ?? ""
+                                          : matchedItem.Item_HSN || "",
+
+
                                         {
                                           shouldValidate: true,
                                           shouldDirty: true,
@@ -3359,8 +3459,9 @@ export default function PurchaseAdd() {
                                       );
                                       setValue(
                                         `items.${i}.MRP`,
-                                        //matchedItem.MRP ?? "",
-                                        showMRP ? matchedItem.MRP ?? "" : "",
+
+                                        //showMRP ? matchedItem.MRP ?? "" : "",
+                                        isSameCommittedItem ? currentRow.MRP ?? "" : showMRP ? matchedItem.MRP ?? "" : "",
                                         {
                                           shouldValidate: true,
                                           shouldDirty: true,
@@ -3373,9 +3474,19 @@ export default function PurchaseAdd() {
 
                                       // ===================================================
 
+                                      // setValue(
+                                      //   `items.${i}.Purchase_Price`,
+                                      //   matchedItem.Purchase_Price ?? "",
+                                      //   {
+                                      //     shouldValidate: true,
+                                      //     shouldDirty: true,
+                                      //   }
+                                      // );
                                       setValue(
                                         `items.${i}.Purchase_Price`,
-                                        matchedItem.Purchase_Price ?? "",
+                                        isSameCommittedItem
+                                          ? currentRow.Purchase_Price ?? ""
+                                          : matchedItem.Purchase_Price ?? "",
                                         {
                                           shouldValidate: true,
                                           shouldDirty: true,
@@ -3456,10 +3567,14 @@ export default function PurchaseAdd() {
                                       // If there isn't one, use current master primary unit.
                                       // ===================================================
 
+                                      // const selectedUnit =
+                                      //   currentRow.Item_Unit ||
+                                      //   matchedItem.Primary_Unit ||
+                                      //   "";
                                       const selectedUnit =
-                                        currentRow.Item_Unit ||
-                                        matchedItem.Primary_Unit ||
-                                        "";
+                                        isSameCommittedItem
+                                          ? currentRow.Item_Unit || ""
+                                          : matchedItem.Primary_Unit || "";
 
                                       setValue(
                                         `items.${i}.Item_Unit`,
@@ -3474,11 +3589,16 @@ export default function PurchaseAdd() {
                                       // BASE PRICE / UNIT
                                       // ===================================================
 
+                                      // basePurchasePriceRef.current[i] =
+                                      //   Number(
+                                      //     matchedItem.Purchase_Price
+                                      //   ) || 0;
                                       basePurchasePriceRef.current[i] =
                                         Number(
-                                          matchedItem.Purchase_Price
+                                          isSameCommittedItem
+                                            ? currentRow.Purchase_Price ?? matchedItem.Purchase_Price
+                                            : matchedItem.Purchase_Price
                                         ) || 0;
-
                                       basePurchaseUnitRef.current[i] =
                                         selectedUnit;
 
@@ -3489,32 +3609,35 @@ export default function PurchaseAdd() {
                                       const calculatedRow = {
                                         ...currentRow,
 
-                                        Item_Id:
-                                          matchedItem.Item_Id || "",
+                                        Item_Id: matchedItem.Item_Id || "",
 
-                                        Item_Name:
-                                          matchedItem.Item_Name || "",
+                                        Item_Name: matchedItem.Item_Name || "",
 
-                                        Item_Category:
-                                          matchedItem.Item_Category || "",
+                                        //Item_Category: matchedItem.Item_Category || "",
+                                        Item_Category: isSameCommittedItem
+                                          ? currentRow.Item_Category ?? ""
+                                          : matchedItem.Item_Category || "",
 
-                                        Item_HSN:
-                                          matchedItem.Item_HSN || "",
+                                        //Item_HSN: matchedItem.Item_HSN || "",
+                                        Item_HSN: isSameCommittedItem
+                                          ? currentRow.Item_HSN ?? ""
+                                          : matchedItem.Item_HSN || "",
 
                                         // ✅ add_purchase_items
+                                        //Purchase_Price:matchedItem.Purchase_Price ?? "",
                                         Purchase_Price:
-                                          matchedItem.Purchase_Price ?? "",
+                                          isSameCommittedItem
+                                            ? currentRow.Purchase_Price ?? ""
+                                            : matchedItem.Purchase_Price ?? "",
 
                                         // ✅ add_purchase_items
                                         // Purchase_Price_Type:
                                         //   currentRow.Purchase_Price_Type ||
                                         //   "Without_Tax",
 
-                                        Quantity:
-                                          currentRow.Quantity || 1,
+                                        Quantity: currentRow.Quantity || 1,
 
-                                        Item_Unit:
-                                          selectedUnit,
+                                        Item_Unit: selectedUnit,
 
                                         // ✅ add_purchase_items
                                         Discount_On_Purchase_Price:
@@ -3577,11 +3700,62 @@ export default function PurchaseAdd() {
                                         error
                                       );
 
-                                      handleRowChange(
-                                        i,
-                                        "itemOpen",
-                                        false
-                                      );
+
+                                      // Item does not exist → clear old item-specific values
+                                      committedItemRef.current[i] = "";
+
+                                      setValue(`items.${i}.Purchase_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      setValue(`items.${i}.Tax_Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Tax_Type`, "None", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.MRP`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_Category`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      // setValue(`items.${i}.Item_HSN`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      basePurchasePriceRef.current[i] = 0;
+                                      basePurchaseUnitRef.current[i] = "";
+
+                                      handleRowChange(i, "isExistingItem", false);
+                                      handleRowChange(i, "Primary_Unit", null);
+                                    handleRowChange(i, "Secondary_Unit", null);
+                                    handleRowChange(i, "Available_Units", []);
+                                      handleRowChange(i, "itemOpen", false);
+
+                                      
                                     }
                                   }, 150);
                                 }}
@@ -3600,13 +3774,7 @@ export default function PurchaseAdd() {
                                   handleRowChange(i, "unitOpen", false);
                                   handleRowChange(i, "CategoryOpen", false);
                                 }}
-                                // onClick={() => {
-                                //   setActiveItemRow(i);
-                                //   handleRowChange(i, "itemOpen", true);
-                                //   handleRowChange(i, "unitOpen", false);
-                                //   handleRowChange(i, "CategoryOpen", false);
-                                // }}
-                                //onClick={() => handleRowChange(i, "itemOpen", !rows[i]?.itemOpen)}
+
                                 placeholder="Item Name"
                                 className="w-full outline-none border-b-2 text-gray-900"
                               />
@@ -3632,6 +3800,7 @@ export default function PurchaseAdd() {
                                     setShowItemAddModal(true);
                                   }}
                                   onSelectItem={(it) => {
+                                    committedItemRef.current[i] = it.Item_Id;
                                     setRows((prev) => {
                                       const updated = [...prev];
                                       updated[i] = {

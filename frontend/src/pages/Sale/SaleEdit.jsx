@@ -572,9 +572,9 @@ export default function SaleEdit() {
   //   !!currentPartyDetails?.Billing_Name?.trim();
   const billingNameValue = watch("Billing_Name");
 
-const showBillingName =
-  enableBillingNameOfParties ||
-  !!billingNameValue?.trim();
+  const showBillingName =
+    enableBillingNameOfParties ||
+    !!billingNameValue?.trim();
   const hasHistoricaFreeQuantity = sale?.items?.some(
     (item) => item.hasHistoricalFreeQuantity === true
   )
@@ -1121,6 +1121,7 @@ const showBillingName =
       Number(it.Discount_On_Sale_Price) > 0
         ? it.Discount_Type_On_Sale_Price || "Percentage"
         : itemsValues[i]?.Discount_Type_On_Sale_Price || "Percentage";
+    committedItemRef.current[i] = it.Item_Id;
     setRows((prev) => {
       const updated = [...prev];
       updated[i] = {
@@ -2369,6 +2370,7 @@ const showBillingName =
     setShowScanCodeModal(false);
   };
   //const containerRef = useRef(null);
+  const committedItemRef = useRef({});
 
   return (
     <>
@@ -3147,22 +3149,22 @@ const showBillingName =
                           }}
                         />
                       )} */}
-                                           {showPartyModal && (
+                      {showPartyModal && (
                         <PartyAddModal
                           onClose={() => setShowPartyModal(false)}
                           onSave={(newParty) => {
                             setPartyCursor(null);
-                      
+
                             // =====================================================
                             // PARTY NAME
                             // =====================================================
                             setPartySearch(newParty.Party_Name);
-                      
+
                             setValue("Party_Name", newParty.Party_Name, {
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                      
+
                             // =====================================================
                             // GSTIN
                             // =====================================================
@@ -3170,7 +3172,7 @@ const showBillingName =
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                      
+
                             // =====================================================
                             // PHONE
                             // =====================================================
@@ -3178,7 +3180,7 @@ const showBillingName =
                               shouldValidate: true,
                               shouldDirty: true,
                             });
-                             const defaultBilling = newParty.addresses?.find(
+                            const defaultBilling = newParty.addresses?.find(
                               (a) => a.Address_Type === "Billing" && a.Is_Default
                             );
 
@@ -3187,7 +3189,7 @@ const showBillingName =
                               shouldDirty: true,
                             });
 
-                      
+
                             // =====================================================
                             // BILLING NAME
                             // =====================================================
@@ -3210,12 +3212,12 @@ const showBillingName =
                                 shouldDirty: true,
                               });
                             }
-                      
+
                             // =====================================================
                             // CURRENT PARTY
                             // =====================================================
                             setCurrentPartyDetails(newParty);
-                      
+
                             // =====================================================
                             // CLOSE MODAL
                             // =====================================================
@@ -3264,8 +3266,8 @@ const showBillingName =
 
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
-                   
-                     {showBillingName && (
+
+                    {showBillingName && (
                       <div className="flex flex-col gap-2">
                         <span className="whitespace-nowrap active">
                           Billing Name (Optional)
@@ -4190,43 +4192,7 @@ const showBillingName =
                             <input
                               type="text"
                               value={rows[i]?.itemSearch || ""}
-                              // onChange={(e) => {
-                              //   const typedValue = e.target.value;
-                              //   handleRowChange(i, "itemSearch", typedValue);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   // setValue(`items.${i}.Item_Name`, typedValue);
-                              //   handleRowChange(i, "isHSNLocked", false);
-                              //   handleRowChange(i, "isExistingItem", false);
-                              //   handleRowChange(i, "isUnitLocked", false);
 
-                              //   const exists = items?.items?.find(
-                              //     (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //   );
-                              //   if (exists) {
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //     //setValue(`items.${i}.Item_Id`, exists.Item_Id, { shouldValidate: true }); // ✅ re-link if it matches another real item
-                              //     handleRowChange(i, "isExistingItem", true);
-                              //   } else {
-                              //     setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });  // ✅ keep typed value (not "")
-                              //     //setValue(`items.${i}.Item_Id`, "", { shouldValidate: false });           // ✅ detach old Item_Id → backend treats as new item
-                              //     handleRowChange(i, "isExistingItem", false);
-
-                              //     handleRowChange(i, "Primary_Unit", null);
-                              //     handleRowChange(i, "Secondary_Unit", null);
-                              //     handleRowChange(i, "Available_Units", []);
-                              //   }
-                              //   // if (exists) {
-                              //   //   // ✅ Only store if it's a valid item
-                              //   //   setValue(`items.${i}.Item_Name`, typedValue, { shouldValidate: true });
-                              //   //   handleRowChange(i, "isExistingItem", true);
-                              //   // } else {
-                              //   //   // ❌ Clear Item_Name in RHF to trigger error
-                              //   //   setValue(`items.${i}.Item_Name`, "", { shouldValidate: true });
-                              //   //   handleRowChange(i, "isExistingItem", false);
-                              //   // }
-                              //   //handleRowChange(i, "isExistingItem", exists); // false if new item
-                              // }}
                               onChange={(e) => {
                                 const typedValue = e.target.value;
                                 setActiveItemRow(i);
@@ -4245,85 +4211,16 @@ const showBillingName =
                                   }
                                 );
 
-                                handleRowChange(i, "isHSNLocked", false);
-                                handleRowChange(i, "isExistingItem", false);
-                                handleRowChange(i, "isUnitLocked", false);
+                                // handleRowChange(i, "isHSNLocked", false);
+                                // handleRowChange(i, "isExistingItem", false);
+                                // handleRowChange(i, "isUnitLocked", false);
 
-                                // Clear previously selected item details
-                                handleRowChange(i, "Primary_Unit", null);
-                                handleRowChange(i, "Secondary_Unit", null);
-                                handleRowChange(i, "Available_Units", []);
+                                // // Clear previously selected item details
+                                // handleRowChange(i, "Primary_Unit", null);
+                                // handleRowChange(i, "Secondary_Unit", null);
+                                // handleRowChange(i, "Available_Units", []);
                               }}
-                              // onBlur={() => {
-                              //   setTimeout(() => {
-                              //     const typedValue = rows[i]?.itemSearch?.trim() || "";
-                              //     if (!typedValue) return;
 
-                              //     const matchedItem = items?.items?.find(
-                              //       (it) => it.Item_Name.trim().toLowerCase() === typedValue.toLowerCase()
-                              //     );
-
-                              //     if (matchedItem) {
-                              //       // ✅ auto-fill exactly like clicking from dropdown
-                              //       setRows((prev) => {
-                              //         const updated = [...prev];
-                              //         updated[i] = {
-                              //           ...updated[i],
-                              //           itemSearch: matchedItem.Item_Name,   // normalize display
-                              //           Item_Category: matchedItem.Item_Category || "",
-                              //           Item_HSN: matchedItem.Item_HSN || "",
-                              //           categorySearch: matchedItem.Item_Category || "",
-                              //           isExistingItem: true,
-                              //           isHSNLocked: false,
-                              //           isUnitLocked: false,
-                              //           itemOpen: false,
-                              //           Primary_Unit: matchedItem.Primary_Unit || null,
-                              //           Secondary_Unit: matchedItem.Secondary_Unit || null,
-                              //           Conversion_Rate: matchedItem.Conversion_Rate || null,
-
-                              //           // ✅ ONLY CURRENT MASTER AVAILABLE UNITS
-                              //           Available_Units: Array.isArray(matchedItem.Available_Units)
-                              //             ? matchedItem.Available_Units
-                              //             : [],
-                              //         };
-                              //         return updated;
-                              //       });
-
-                              //       setValue(`items.${i}.Item_Name`, matchedItem.Item_Name, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Category`, matchedItem.Item_Category, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_HSN`, matchedItem.Item_HSN, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Sale_Price`, matchedItem.Sale_Price || 0, { shouldValidate: true, shouldDirty: true });
-                              //       //setValue(`items.${i}.Item_Unit`, matchedItem.Item_Unit, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Item_Unit`, matchedItem.Primary_Unit || "", { shouldValidate: true, shouldDirty: true });
-                              //       baseSalePriceRef.current[i] = Number(matchedItem.Sale_Price) || 0;
-                              //       baseSaleUnitRef.current[i] = matchedItem.Primary_Unit || "";
-                              //       const { Tax_Amount, Amount, Total_Amount, Balance_Due } = calculateRowAmount(
-                              //         {
-                              //           ...itemsValues[i],
-                              //           Item_Name: matchedItem.Item_Name,
-                              //           Sale_Price: matchedItem.Sale_Price || 0,
-                              //           Quantity: itemsValues[i]?.Quantity || 1,
-                              //         },
-                              //         i,
-                              //         itemsValues
-                              //       );
-
-                              //       setValue(`items.${i}.Tax_Amount`, Tax_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       setValue(`items.${i}.Amount`, Amount, { shouldValidate: true, shouldDirty: true });
-                              //       syncTotalsAfterItemChange();
-                              //       // setValue("Total_Amount", Total_Amount, { shouldValidate: true, shouldDirty: true });
-                              //       // setValue("Balance_Due", Balance_Due, { shouldValidate: true, shouldDirty: true });
-                              //     } else {
-                              //       // no match — close dropdown
-                              //       handleRowChange(i, "itemOpen", false);
-                              //     }
-                              //   }, 150); // small delay so click-from-dropdown fires first
-                              // }}
-                              // onClick={() => {
-                              //   handleRowChange(i, "itemOpen", true);
-                              //   handleRowChange(i, "unitOpen", false);
-                              //   handleRowChange(i, "CategoryOpen", false);
-                              // }}
                               onBlur={() => {
                                 setTimeout(async () => {
                                   const typedValue =
@@ -4340,22 +4237,19 @@ const showBillingName =
                                   // This preserves existing transaction values.
                                   // =====================================================
 
-                                  const currentRow =
-                                    itemsValues[i] || {};
+                                  const currentRow = itemsValues[i] || {};
 
                                   // Original item currently belonging to this transaction row.
                                   // If the user deletes the name and types the same item again,
                                   // Item_Id lets us recognize that it is the same item.
-                                  const existingItemId =
-                                    currentRow.Item_Id || "";
-
+                                  //const existingItemId =currentRow.Item_Id || "";
+                                  const committedItemId = committedItemRef.current[i] || "";
                                   try {
                                     // ===================================================
                                     // EXACT ITEM LOOKUP FROM BACKEND
                                     // ===================================================
 
-                                    const response =
-                                      await getItemByName(typedValue).unwrap();
+                                    const response = await getItemByName(typedValue).unwrap();
 
                                     const matchedItem = response?.item;
 
@@ -4363,27 +4257,109 @@ const showBillingName =
                                     // NO EXACT ITEM FOUND
                                     // ===================================================
 
-                                    if (!matchedItem?.Item_Id) {
-                                      handleRowChange(
-                                        i,
-                                        "itemOpen",
-                                        false
-                                      );
-                                      return;
-                                    }
+                                    // if (!matchedItem?.Item_Id) {
+                                    //   handleRowChange(
+                                    //     i,
+                                    //     "itemOpen",
+                                    //     false
+                                    //   );
+                                    //   return;
+                                    // }
                                     // masterMrpDiscountRef.current[i] =
                                     //   Number(matchedItem?.Discount_On_MRP_For_Sale) > 0
                                     //     ? Number(matchedItem.Discount_On_MRP_For_Sale)
                                     //     : "";
+                                    if (!matchedItem?.Item_Id) {
+                                      committedItemRef.current[i] = "";
 
+                                      setValue(`items.${i}.Item_Id`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_Category`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Item_HSN`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Sale_Price`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      // setValue(`items.${i}.Discount_On_Purchase_Price`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+
+                                      // setValue(`items.${i}.Discount_Type_On_Purchase_Price`, "Percentage", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      setValue(`items.${i}.Tax_Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+                                      setValue(`items.${i}.Amount`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.Tax_Type`, "None", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      setValue(`items.${i}.MRP`, "", {
+                                        shouldValidate: true,
+                                        shouldDirty: true,
+                                      });
+
+                                      // setValue(`items.${i}.Item_Unit`, "", {
+                                      //   shouldValidate: true,
+                                      //   shouldDirty: true,
+                                      // });
+                                      // setRows((prev) => {
+                                      //   const updated = [...prev];
+
+                                      //   updated[i] = {
+                                      //     ...updated[i],
+                                      //     Purchase_Price: "",
+                                      //     Tax_Amount: "",
+                                      //   };
+
+                                      //   return updated;
+                                      // });
+
+                                      handleRowChange(i, "isExistingItem", false);
+                                      handleRowChange(i, "Primary_Unit", null);
+                                      handleRowChange(i, "Secondary_Unit", null);
+                                      handleRowChange(i, "Available_Units", []);
+                                      handleRowChange(i, "itemOpen", false);
+
+                                      return;
+                                    }
+                                    const isSameCommittedItem =
+                                      committedItemId &&
+                                      String(committedItemId) === String(matchedItem?.Item_Id);
+
+                                    console.log("DISCOUNT DEBUG", {
+                                      committedItemId,
+                                      matchedItemId: matchedItem?.Item_Id,
+                                      isSameCommittedItem,
+                                      transactionDiscount: currentRow.Discount_On_Sale_Price,
+                                      masterDiscount: matchedItem?.Discount_On_Sale_Price,
+                                    })
                                     // ===================================================
                                     // CHECK WHETHER THIS IS THE SAME ITEM
                                     // THAT WAS ALREADY IN THIS TRANSACTION ROW
                                     // ===================================================
 
-                                    const isSameExistingItem =
-                                      existingItemId &&
-                                      matchedItem.Item_Id === existingItemId;
+
 
                                     // ===================================================
                                     // MASTER MRP / MRP DISCOUNT
@@ -4421,7 +4397,7 @@ const showBillingName =
                                     //     ? historicalMRPDiscount
                                     //     : masterMRPDiscount;
                                     const resolvedMRPDiscount =
-                                      isSameExistingItem && historicalMRPDiscount > 0
+                                      isSameCommittedItem && historicalMRPDiscount > 0
                                         ? historicalMRPDiscount
                                         : masterMRPDiscount;
 
@@ -4460,14 +4436,16 @@ const showBillingName =
                                     // ===================================================
 
                                     const resolvedMRP =
-                                      isSameExistingItem
+                                      //isSameExistingItem
+                                      isSameCommittedItem
                                         ? (currentRow.MRP ?? "")
                                         : masterMRP;
 
 
 
                                     const resolvedSalePrice =
-                                      isSameExistingItem
+                                      //isSameExistingItem
+                                      isSameCommittedItem
                                         ? (currentRow.Sale_Price ?? "")
                                         : calculatedMasterSalePrice;
 
@@ -4482,41 +4460,43 @@ const showBillingName =
                                     //     Otherwise blank.
                                     // ===================================================
 
-                                    const masterSaleDiscount =
-                                      Number(
-                                        matchedItem.Discount_On_Sale_Price
-                                      ) > 0
-                                        ? matchedItem.Discount_On_Sale_Price
-                                        : "";
+                                    // const masterSaleDiscount =
+                                    //   Number(
+                                    //     matchedItem.Discount_On_Sale_Price
+                                    //   ) > 0
+                                    //     ? matchedItem.Discount_On_Sale_Price
+                                    //     : "";
 
-                                    const masterSaleDiscountType =
-                                      Number(
-                                        matchedItem.Discount_On_Sale_Price
-                                      ) > 0
-                                        ? (
-                                          matchedItem
-                                            .Discount_Type_On_Sale_Price ||
-                                          "Percentage"
-                                        )
-                                        : "Percentage";
+                                    // const masterSaleDiscountType =
+                                    //   Number(
+                                    //     matchedItem.Discount_On_Sale_Price
+                                    //   ) > 0
+                                    //     ? (
+                                    //       matchedItem
+                                    //         .Discount_Type_On_Sale_Price ||
+                                    //       "Percentage"
+                                    //     )
+                                    //     : "Percentage";
 
-                                    const resolvedSaleDiscount =
-                                      isSameExistingItem
-                                        ? (
-                                          currentRow
-                                            .Discount_On_Sale_Price ?? ""
-                                        )
-                                        : masterSaleDiscount;
+                                    // const resolvedSaleDiscount =
+                                    //   //isSameExistingItem
+                                    //   isSameCommittedItem
+                                    //     ? (
+                                    //       currentRow.Discount_On_Sale_Price ?? ""
+                                    //     )
+                                    //     : masterSaleDiscount;
 
-                                    const resolvedSaleDiscountType =
-                                      isSameExistingItem
-                                        ? (
-                                          currentRow
-                                            .Discount_Type_On_Sale_Price ||
-                                          "Percentage"
-                                        )
-                                        : masterSaleDiscountType;
+                                    // const resolvedSaleDiscountType =
+                                    //   //isSameExistingItem
+                                    //   isSameCommittedItem
+                                    //     ? (
+                                    //       currentRow
+                                    //         .Discount_Type_On_Sale_Price ||
+                                    //       "Percentage"
+                                    //     )
+                                    //     : masterSaleDiscountType;
 
+                                    committedItemRef.current[i] = matchedItem.Item_Id;
                                     // ===================================================
                                     // UPDATE ROW
                                     // ===================================================
@@ -4579,11 +4559,19 @@ const showBillingName =
                                         // PRESERVE / RESOLVE SALE DISCOUNT
                                         // ==========================================
 
-                                        Discount_On_Sale_Price:
-                                          resolvedSaleDiscount,
+                                        // Discount_On_Sale_Price:
+                                        //   resolvedSaleDiscount,
 
-                                        Discount_Type_On_Sale_Price:
-                                          resolvedSaleDiscountType,
+                                        // Discount_Type_On_Sale_Price:
+                                        //   resolvedSaleDiscountType,
+                                                        
+                                          Discount_On_Sale_Price:currentRow.Discount_On_Sale_Price ??
+                                        "",
+
+                                      // ✅ add_purchase_items
+                                      Discount_Type_On_Sale_Price:
+                                        currentRow.Discount_Type_On_Sale_Price ||
+                                        "Percentage",
                                       };
 
                                       return updated;
@@ -4611,18 +4599,41 @@ const showBillingName =
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_Category`,
+                                    //   matchedItem.Item_Category || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_Category`,
-                                      matchedItem.Item_Category || "",
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
                                       }
                                     );
 
+                                    // setValue(
+                                    //   `items.${i}.Item_HSN`,
+                                    //   matchedItem.Item_HSN || "",
+                                    //   {
+                                    //     shouldValidate: true,
+                                    //     shouldDirty: true,
+                                    //   }
+                                    // );
                                     setValue(
                                       `items.${i}.Item_HSN`,
-                                      matchedItem.Item_HSN || "",
+
+                                      isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
+
+
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4652,14 +4663,7 @@ const showBillingName =
                                     // NEW ITEM   → master discount
                                     // ===================================================
 
-                                    // setValue(
-                                    //   `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
-                                    //   resolvedMRPDiscount,
-                                    //   {
-                                    //     shouldValidate: true,
-                                    //     shouldDirty: true,
-                                    //   }
-                                    // );
+
                                     setValue(
                                       `items.${i}.Discount_On_MRP_For_Sale_Percentage`,
                                       showMRP && calculateSalePriceFromMRP
@@ -4700,7 +4704,8 @@ const showBillingName =
 
                                     setValue(
                                       `items.${i}.Discount_On_Sale_Price`,
-                                      resolvedSaleDiscount,
+                                      //resolvedSaleDiscount,
+                                      currentRow.Discount_On_Sale_Price ?? "",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4709,7 +4714,9 @@ const showBillingName =
 
                                     setValue(
                                       `items.${i}.Discount_Type_On_Sale_Price`,
-                                      resolvedSaleDiscountType,
+                                      //resolvedSaleDiscountType,
+                                      currentRow.Discount_Type_On_Sale_Price ||
+                                      "Percentage",
                                       {
                                         shouldValidate: true,
                                         shouldDirty: true,
@@ -4759,10 +4766,14 @@ const showBillingName =
                                     // Otherwise use master primary unit.
                                     // ===================================================
 
+                                    // const selectedUnit =
+                                    //   currentRow.Item_Unit ||
+                                    //   matchedItem.Primary_Unit ||
+                                    //   "";
                                     const selectedUnit =
-                                      currentRow.Item_Unit ||
-                                      matchedItem.Primary_Unit ||
-                                      "";
+                                      isSameCommittedItem
+                                        ? currentRow.Item_Unit || ""
+                                        : matchedItem.Primary_Unit || "";
 
                                     setValue(
                                       `items.${i}.Item_Unit`,
@@ -4798,25 +4809,28 @@ const showBillingName =
                                       Item_Name:
                                         matchedItem.Item_Name || "",
 
-                                      Item_Category:
-                                        matchedItem.Item_Category || "",
+                                      //Item_Category:matchedItem.Item_Category || "",
 
-                                      Item_HSN:
-                                        matchedItem.Item_HSN || "",
+                                      //Item_HSN:matchedItem.Item_HSN || "",
+                                      Item_Category: isSameCommittedItem
+                                        ? currentRow.Item_Category ?? ""
+                                        : matchedItem.Item_Category || "",
 
+
+                                      Item_HSN: isSameCommittedItem
+                                        ? currentRow.Item_HSN ?? ""
+                                        : matchedItem.Item_HSN || "",
                                       // ==============================================
                                       // RESOLVED SALE PRICE
                                       // ==============================================
 
-                                      Sale_Price:
-                                        resolvedSalePrice,
+                                      Sale_Price: resolvedSalePrice,
 
                                       // ==============================================
                                       // EXISTING QUANTITY
                                       // ==============================================
 
-                                      Quantity:
-                                        resolvedQuantity,
+                                      Quantity: resolvedQuantity,
 
                                       // ==============================================
                                       // RESOLVED UNIT
@@ -4829,11 +4843,19 @@ const showBillingName =
                                       // RESOLVED SALE DISCOUNT
                                       // ==============================================
 
-                                      Discount_On_Sale_Price:
-                                        resolvedSaleDiscount,
+                                      // Discount_On_Sale_Price:
+                                      //   resolvedSaleDiscount,
 
+                                      // Discount_Type_On_Sale_Price:
+                                      //   resolvedSaleDiscountType,
+                                      Discount_On_Sale_Price:
+                                        currentRow.Discount_On_Sale_Price ??
+                                        "",
+
+                                      // ✅ add_purchase_items
                                       Discount_Type_On_Sale_Price:
-                                        resolvedSaleDiscountType,
+                                        currentRow.Discount_Type_On_Sale_Price ||
+                                        "Percentage",
 
                                       // ==============================================
                                       // EXISTING TAX
@@ -4898,17 +4920,77 @@ const showBillingName =
                                       false
                                     );
 
-                                  } catch (err) {
-                                    console.error(
-                                      "❌ Item name lookup failed:",
-                                      err
-                                    );
+                                  }
+                                  // catch (err) {
+                                  //   console.error(
+                                  //     "❌ Item name lookup failed:",
+                                  //     err
+                                  //   );
 
-                                    handleRowChange(
-                                      i,
-                                      "itemOpen",
-                                      false
-                                    );
+                                  //   handleRowChange(
+                                  //     i,
+                                  //     "itemOpen",
+                                  //     false
+                                  //   );
+                                  // }
+                                  catch (err) {
+                                    console.error("❌ Item name lookup failed:", err);
+
+                                    committedItemRef.current[i] = "";
+
+                                    setValue(`items.${i}.Item_Id`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_Category`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Item_HSN`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+
+                                    setValue(`items.${i}.Sale_Price`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.MRP`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    // setValue(`items.${i}.Item_Unit`, "", {
+                                    //   shouldValidate: true,
+                                    //   shouldDirty: true,
+                                    // });
+
+                                    setValue(`items.${i}.Tax_Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Amount`, "", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+
+                                    setValue(`items.${i}.Tax_Type`, "None", {
+                                      shouldValidate: true,
+                                      shouldDirty: true,
+                                    });
+                                    baseSalePriceRef.current[i] = 0;
+                                    baseSaleUnitRef.current[i] = "";
+
+                                    handleRowChange(i, "isExistingItem", false);
+                                    handleRowChange(i, "Primary_Unit", null);
+                                    handleRowChange(i, "Secondary_Unit", null);
+                                    handleRowChange(i, "Available_Units", []);
+                                    handleRowChange(i, "itemOpen", false);
                                   }
                                 }, 150);
                               }}
@@ -4986,6 +5068,7 @@ const showBillingName =
                                     calculateSalePriceFromMRP && mrp > 0
                                       ? (mrp - (mrp * mrpDiscount) / 100).toFixed(2)
                                       : (it.Sale_Price || 0);
+                                  committedItemRef.current[i] = it.Item_Id;
                                   setRows((prev) => {
                                     const updated = [...prev];
                                     updated[i] = {
@@ -6474,6 +6557,10 @@ const showBillingName =
                                 <select
                                   {...field}
                                   className="form-select bg-gray-100 text-gray-700"
+                                  style={{
+                                    fontSize: showFreeQuantity ? "10px" : "12px",
+                                    padding: "2px 4px",
+                                  }}
                                   onChange={(e) => {
                                     field.onChange(e);
 
