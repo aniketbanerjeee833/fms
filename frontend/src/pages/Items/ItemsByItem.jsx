@@ -538,7 +538,7 @@ export default function ItemsByItem() {
             }
 
             toast.success(res?.message || "Deleted successfully");
-
+            //setCursor(null);   // right-side transactions cursor
             setDeleteTarget(null);
             dispatch(partyApi.util.invalidateTags(["Party"]));
 

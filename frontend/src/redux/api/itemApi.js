@@ -357,7 +357,10 @@ moveItemsToCategory: builder.mutation({
     if (!arg.cursor) {
       return newData;
     }
-
+  // const seen = new Set(currentCache.items.map((it) => it.Item_Id));
+  // newData.items.forEach((it) => {
+  //   if (!seen.has(it.Item_Id)) currentCache.items.push(it);
+  // });
     currentCache.items.push(...newData.items);
     currentCache.hasMore = newData.hasMore;
     currentCache.nextCursor = newData.nextCursor;
@@ -393,7 +396,11 @@ getItemsByCode: builder.query({
         if (!arg.cursor) {
           return newData;
         }
-        currentCache.transactions.push(...newData.transactions);
+        // currentCache.transactions.push(...newData.transactions);
+         const seen = new Set(currentCache.transactions.map((t) => t.Ledger_Id));
+  newData.transactions.forEach((t) => {
+    if (!seen.has(t.Ledger_Id)) currentCache.transactions.push(t);
+  });
         currentCache.nextCursor = newData.nextCursor;
         currentCache.hasMore = newData.hasMore;
         if (newData.item) {

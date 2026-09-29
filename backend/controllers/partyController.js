@@ -1166,13 +1166,7 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
       return res.status(400).json({ success: false, message: "Party Id is required" });
     }
 
-    // const [partyDetails] = await connection.query(
-    //   `SELECT * FROM add_party WHERE Party_Id = ?`,
-    //   [Party_Id]
-    // );
-    // if (!partyDetails.length) {
-    //   return res.status(404).json({ success: false, message: "Party not found" });
-    // }
+    
     // ─────────────────────────────────────────────
     // PARTY DETAILS
     // ─────────────────────────────────────────────
@@ -1323,6 +1317,7 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
       pl.Balance_Due,
       pl.Running_Balance,
       pl.Txn_Date,
+       DATE_FORMAT(pl.Txn_Date, '%Y-%m-%d %H:%i:%s') AS Txn_Date_Raw,
 
       CASE pl.Txn_Type
         WHEN 'Sale' THEN s.Sale_Id
@@ -1360,7 +1355,8 @@ const getSinglePartyDetailsSalesPurchases = async (req, res, next) => {
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: last.Txn_Date,
+          //date: last.Txn_Date,
+          date: last.Txn_Date_Raw,
           id: last.id,
         })
       ).toString("base64");

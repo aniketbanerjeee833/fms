@@ -178,146 +178,7 @@ ORDER BY ba.Account_Display_Name;
 ═══════════════════════════════════════ */
 
 
-// const getBankAccountById = async (req, res, next) => {
-//   try {
-//     const { Bank_Account_Id } = req.params;
-//     const limit = Math.min(parseInt(req.query.limit, 10) || 10, 200);
-//     //const limit = Number(req.query.limit) || 10;
 
-//     // 🔹 decode cursor
-//     let cursorId = null;
-//     const cursorRaw = req.query.cursor || null;
-
-//     if (cursorRaw) {
-//       try {
-//         const decoded = JSON.parse(
-//           Buffer.from(cursorRaw, "base64").toString("utf8")
-//         );
-//         cursorId = decoded.id ? Number(decoded.id) : null;
-//       } catch {
-//         return res.status(400).json({
-//           success: false,
-//           message: "Invalid cursor.",
-//         });
-//       }
-//     }
-
-//     const [[account]] = await db.query(
-//       `SELECT
-//          id AS Bank_Account_Id,
-//          Account_Display_Name,
-//          Bank_Name,
-//          Account_Holder_Name,
-//          Account_Number,
-//          IFSC_Code,
-//          UPI_Id,
-//          Opening_Balance,
-//          As_Of_Date
-//        FROM bank_accounts
-//        WHERE id = ?`,
-//       [Bank_Account_Id]
-//     );
-
-//     if (!account) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Bank account not found",
-//       });
-//     }
-
-//     // 🔹 cursor condition — fetch rows with id < cursorId
-//     const cursorSQL = cursorId ? `AND bt.id < ?` : "";
-//     const queryParams = cursorId
-//       ? [Bank_Account_Id, cursorId, limit + 1]
-//       : [Bank_Account_Id, limit + 1];
-
-//     const [transactions] = await db.query(
-//       `WITH txn AS (
-//          SELECT
-//            bt.*,
-//            ps.Source_Type,
-//            ps.Source_Id
-//          FROM bank_transactions bt
-//          LEFT JOIN payment_splits ps
-//            ON bt.Reference_Id = ps.id
-//            AND bt.Txn_Type IN (
-//              'Sale', 'Purchase', 'Sale_Return', 'Purchase_Return',
-//              'Payment_In', 'Payment_Out', 'Expense'
-//            )
-//          WHERE bt.Bank_Account_Id = ?
-//            ${cursorSQL}
-//        )
-//        SELECT
-//          txn.*,
-//          CASE txn.Txn_Type
-//            WHEN 'Sale'            THEN s.Sale_Id
-//            WHEN 'Purchase'        THEN p.Purchase_Id
-//            WHEN 'Expense'         THEN e.id
-//            WHEN 'Sale_Return'     THEN sr.id
-//            WHEN 'Purchase_Return' THEN pr.id
-//            WHEN 'Payment_In'      THEN pi.id
-//            WHEN 'Payment_Out'     THEN po.id
-//          END AS Formatted_Reference_Id
-//        FROM txn
-//        LEFT JOIN add_sale s
-//          ON txn.Txn_Type = 'Sale' AND txn.Source_Id = s.id
-//        LEFT JOIN add_purchase p
-//          ON txn.Txn_Type = 'Purchase' AND txn.Source_Id = p.id
-//        LEFT JOIN sale_return sr
-//          ON txn.Txn_Type = 'Sale_Return' AND txn.Source_Id = sr.id
-//        LEFT JOIN purchase_return pr
-//          ON txn.Txn_Type = 'Purchase_Return' AND txn.Source_Id = pr.id
-//        LEFT JOIN payment_in pi
-//          ON txn.Txn_Type = 'Payment_In' AND txn.Source_Id = pi.Id
-//        LEFT JOIN payment_out po
-//          ON txn.Txn_Type = 'Payment_Out' AND txn.Source_Id = po.id
-
-// LEFT JOIN expenses e
-//   ON txn.Txn_Type = 'Expense' AND txn.Source_Id = e.id
-//        ORDER BY txn.id DESC
-//        LIMIT ?`,
-//       queryParams
-//     );
-
-//     // 🔹 detect hasMore by fetching limit+1
-//     const hasMore = transactions.length > limit;
-//     const pageRows = hasMore ? transactions.slice(0, limit) : transactions;
-
-//     // 🔹 build next cursor from last row
-//     let nextCursor = null;
-//     if (hasMore && pageRows.length > 0) {
-//       const last = pageRows[pageRows.length - 1];
-//       nextCursor = Buffer.from(
-//         JSON.stringify({ id: last.id })
-//       ).toString("base64");
-//     }
-
-//     // current balance — always from the latest row regardless of cursor
-//     const [[latestRow]] = await db.query(
-//       `SELECT Running_Balance
-//        FROM bank_transactions
-//        WHERE Bank_Account_Id = ?
-//        ORDER BY id DESC LIMIT 1`,
-//       [Bank_Account_Id]
-//     );
-
-//     const currentBalance = latestRow
-//       ? Number(latestRow.Running_Balance)
-//       : Number(account.Opening_Balance);
-
-//     res.status(200).json({
-//       success: true,
-//       bankAccount: account,
-//       currentBalance,
-//       transactions: pageRows,
-//       hasMore,
-//       nextCursor,
-//     });
-//   } catch (err) {
-//     console.error("❌ Get bank account details error:", err);
-//     next(err);
-//   }
-// };
 const getBankAccountById = async (req, res, next) => {
   try {
     const { Bank_Account_Id } = req.params;
@@ -459,6 +320,7 @@ const getBankAccountById = async (req, res, next) => {
 
       SELECT
         txn.*,
+        DATE_FORMAT(txn.Txn_Date, '%Y-%m-%d %H:%i:%s') AS Txn_Date_Raw,
 
         CASE txn.Txn_Type
 
@@ -545,7 +407,8 @@ const getBankAccountById = async (req, res, next) => {
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: last.Txn_Date,
+          //date: last.Txn_Date,
+           date: last.Txn_Date_Raw,
           id: last.id,
         })
       ).toString("base64");

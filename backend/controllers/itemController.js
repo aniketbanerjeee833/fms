@@ -5383,7 +5383,8 @@ const getItemBills = async (req, res, next) => {
 
     il.Rate,
     il.Running_Stock,
-    il.Txn_Date
+    il.Txn_Date,
+     DATE_FORMAT(il.Txn_Date, '%Y-%m-%d %H:%i:%s') AS Txn_Date_Raw
 
   FROM item_ledger il
 
@@ -5504,12 +5505,18 @@ const getItemBills = async (req, res, next) => {
 
     let nextCursor = null;
 
+    // if (hasMore && transactions.length > 0) {
+    //   const last = transactions[transactions.length - 1];
+    //   nextCursor = Buffer.from(
+    //     JSON.stringify({ date: last.Txn_Date, id: last.Ledger_Id })
+    //   ).toString("base64");
+    // }
     if (hasMore && transactions.length > 0) {
-      const last = transactions[transactions.length - 1];
-      nextCursor = Buffer.from(
-        JSON.stringify({ date: last.Txn_Date, id: last.Ledger_Id })
-      ).toString("base64");
-    }
+  const last = transactions[transactions.length - 1];
+  nextCursor = Buffer.from(
+    JSON.stringify({ date: last.Txn_Date_Raw, id: last.Ledger_Id })
+  ).toString("base64");
+}
 
     // =========================================================
     // 8. RESPONSE

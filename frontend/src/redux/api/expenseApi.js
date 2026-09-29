@@ -251,9 +251,19 @@ export const expenseApi = createApi({
         }
 
         // Next page
-        currentCache.expenses.push(
-          ...newData.expenses
-        );
+        // currentCache.expenses.push(
+        //   ...newData.expenses
+        // );
+          const getKey = (e) => e.id ?? e.Expense_Id;
+
+  const seen = new Set(currentCache.expenses.map(getKey));
+  newData.expenses.forEach((e) => {
+    const key = getKey(e);
+    // rows with no key are always kept, so a wrong field name can't drop data
+    if (key === undefined || !seen.has(key)) {
+      currentCache.expenses.push(e);
+    }
+  });
 
         currentCache.hasMore =
           newData.hasMore;
@@ -321,8 +331,16 @@ export const expenseApi = createApi({
         if (!arg.cursor) {
           return newData;
         }
+  const getKey = (u) => u.id ?? u.Expense_Item_Id;
 
-        currentCache.usage.push(...newData.usage);
+  const seen = new Set(currentCache.usage.map(getKey));
+  newData.usage.forEach((u) => {
+    const key = getKey(u);
+    if (key === undefined || !seen.has(key)) {
+      currentCache.usage.push(u);
+    }
+  });
+        //currentCache.usage.push(...newData.usage);
         currentCache.hasMore = newData.hasMore;
         currentCache.nextCursor = newData.nextCursor;
       },

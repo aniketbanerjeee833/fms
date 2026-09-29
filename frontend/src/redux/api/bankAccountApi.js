@@ -41,26 +41,7 @@ export const bankAccountApi = createApi({
   }),
 
   // 🔹 merge incoming page into existing cache
-  // merge: (currentCache, newData) => {
-  //   if (!currentCache.transactions) {
-  //     // first page — replace entirely
-  //     return newData;
-  //   }
-  //   // subsequent pages — append, deduplicate by id
-  //   const existingIds = new Set(
-  //     currentCache.transactions.map((t) => t.id)
-  //   );
-  //   const fresh = newData.transactions.filter(
-  //     (t) => !existingIds.has(t.id)
-  //   );
-  //   return {
-  //     ...newData,                              // hasMore, nextCursor, bankAccount, currentBalance
-  //     transactions: [
-  //       ...currentCache.transactions,
-  //       ...fresh,
-  //     ],
-  //   };
-  // },
+ 
   merge: (currentCache, newData, { arg }) => {
     if (!arg.cursor) {
         // first page (including the one-shot restore fetch) — always replace

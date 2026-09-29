@@ -121,7 +121,12 @@ const VirtualScrollList = forwardRef(function VirtualScrollList({
     }, [items.length, hasMore, isFetching, onLoadMore, rowVirtualizer]);
 
     const calculatedHeight = height ?? Math.min(items.length * rowHeight, maxHeight);
-
+// useEffect(() => {
+//     console.log({ hasMore, isFetching, items: items.length,
+//         last: virtualItems[virtualItems.length - 1]?.index,
+//         container: scrollRef.current?.clientHeight,
+//         total: rowVirtualizer.getTotalSize() });
+// });
     return (
         <div
             className={className}

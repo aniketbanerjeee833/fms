@@ -25,15 +25,7 @@ export const partyApi = createApi({
     // }),
  
 
-    // getAllParties: builder.query({
-    //   query:(args) => {
-    //     const page = args?.page; // optional
-    //     return page
-    //       ? `party/get-all-parties?page=${page}`
-    //       : `party/get-all-parties`; // no pagination param
-    //   },
-    //   providesTags: ["Party"],
-    // }),
+    
     getAllParties: builder.query({
   query: ({ page, search = "" } = {}) => {
     const params = new URLSearchParams();
@@ -206,8 +198,12 @@ export const partyApi = createApi({
       // first page / fresh filter — replace
       return newData;
     }
+      const seen = new Set(currentCache.transactions.map((t) => t.id));
+  newData.transactions.forEach((t) => {
+    if (!seen.has(t.id)) currentCache.transactions.push(t);
+  });
     // subsequent pages — append
-    currentCache.transactions.push(...newData.transactions);
+    //currentCache.transactions.push(...newData.transactions);
     currentCache.nextCursor = newData.nextCursor;
     currentCache.hasMore = newData.hasMore;
   },
@@ -247,17 +243,7 @@ forceRefetch: ({
 //   providesTags: ["Party"],
 // }),
 
-//  getAllSales: builder.query({
-//       query: ({ page, search = "", fromDate = "", toDate = "" }) => {
-//         const params = new URLSearchParams();
-//        params.append("page", page || 1);
-//         if (search) params.append("search", search);
-//         if (fromDate) params.append("fromDate", fromDate);
-//         if (toDate) params.append("toDate", toDate);
-//         return `sale/get-all-sales?${params.toString()}`;
-//       },
-//       providesTags: [{ type: "Sale", id: "LIST" }],
-//     }),
+
  getAllPartiesReceivablesLeft: builder.query({
   query: ({ page, search = "", fromDate = "", toDate = "" } = {}) => {
     const params = new URLSearchParams();

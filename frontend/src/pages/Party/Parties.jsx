@@ -383,7 +383,10 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       }
 
       toast.success(res?.message || "Deleted successfully");
-
+      //setCursor(null);
+//       const next = new URLSearchParams(searchParams);
+// next.delete("highlightTxn");
+// setSearchParams(next, { replace: true });
       setDeleteTarget(null);
 
       dispatch(
@@ -1753,7 +1756,7 @@ export default function Parties() {
 
       // if the deleted item was the currently selected one, clear selection
       // so the auto-select effect picks a new first item
-      if (selectedId === deletePartyTarget.Item_Id) {
+      if (selectedId === deletePartyTarget.Party_Id) {
         const next = new URLSearchParams(searchParams);
         next.delete("partyId");
         setSearchParams(next, { replace: true });
