@@ -399,7 +399,20 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       }
 
       toast.success(res?.message || "Deleted successfully");
-
+      dispatch(
+        partyApi.util.updateQueryData(
+          "getSinglePartyDetailsSalesPurchases",
+          { Party_Id: partyId, search },
+          (draft) => {
+            draft.transactions = draft.transactions.filter(
+              (t) => t.id !== deleteTarget.RowId
+            );
+          }
+        )
+      );
+      const next = new URLSearchParams(searchParams);
+      next.delete("highlightTxn");
+      setSearchParams(next, { replace: true });
       setDeleteTarget(null);
 
       dispatch(
@@ -1387,8 +1400,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
         setDeleteTarget({
           Id: transactionId,
-          Txn_Type:
-            row.Txn_Type,
+          Txn_Type:row.Txn_Type,
+          RowId: row.id
         });
       }}
     >

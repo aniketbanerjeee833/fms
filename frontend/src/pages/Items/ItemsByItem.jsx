@@ -581,7 +581,7 @@ dispatch(
         {
             Item_Id: selectedItemId,
             search: txnSearch,
-            date: "",
+            //date: "",
         },
         (draft) => {
             if (draft?.transactions) {
