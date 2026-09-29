@@ -820,41 +820,7 @@ const showMRP =
             document.removeEventListener("mousedown", handleOutsideClick);
         };
     }, [labelDropdownOpen]);
-    // useEffect(() => {
-    //     if (!selectedItem) return;
-
-    //     setLabelConfig({
-    //         header: {
-    //             field: "Company_Name",
-    //             value: "Anco Innovation",
-    //         },
-    //         line1: {
-    //             field: "Discount",
-    //             value: resolveFieldValue(
-    //                 "Discount",
-    //                 selectedItem
-    //             ),
-    //         },
-    //         line2: {
-    //             field: "Sale_Price",
-    //             value: resolveFieldValue(
-    //                 "Sale_Price",
-    //                 selectedItem
-    //             ),
-    //         },
-    //         line3: {
-    //             field: "MRP",
-    //             value: resolveFieldValue(
-    //                 "MRP",
-    //                 selectedItem
-    //             ),
-    //         },
-    //         line4: {
-    //             field: "",
-    //             value: "",
-    //         },
-    //     });
-    // }, [selectedItem]);
+    
     const printTriggerRef = useRef(null);
     const handleGenerate = () => {
         if (printTriggerRef.current) {

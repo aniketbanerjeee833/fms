@@ -2674,25 +2674,25 @@ const deletePurchase = async (req, res, next) => {
 // CHECK PURCHASE RETURNS
 // =========================================================
 
-const [[purchaseReturn]] = await connection.query(
-  `
-  SELECT id
-  FROM purchase_return
-  WHERE Purchase_Id = ?
-  LIMIT 1
-  `,
-  [purchaseId]
-);
+// const [[purchaseReturn]] = await connection.query(
+//   `
+//   SELECT id
+//   FROM purchase_return
+//   WHERE Purchase_Id = ?
+//   LIMIT 1
+//   `,
+//   [purchaseId]
+// );
 
-if (purchaseReturn) {
-  await connection.rollback();
+// if (purchaseReturn) {
+//   await connection.rollback();
 
-  return res.status(400).json({
-    success: false,
-    message:
-      "This purchase cannot be deleted because a purchase return exists for it. Delete the purchase return first.",
-  });
-}
+//   return res.status(400).json({
+//     success: false,
+//     message:
+//       "This purchase cannot be deleted because a purchase return exists for it. Delete the purchase return first.",
+//   });
+// }
 
     // =========================================================
     // 2. GET ALL PURCHASE ITEMS

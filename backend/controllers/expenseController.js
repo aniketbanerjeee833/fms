@@ -570,6 +570,14 @@ const createExpense = async (req, res, next) => {
           sum + (Number(split.Amount) || 0),
         0
       );
+       if (totalPaid > totalAmount) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+       // message: "Received amount should be less than or equal to Total Amount",
+        message: "Paid amount should be less than or equal to Total Amount",
+      });
+    }
 
     const balanceDue = totalAmount - totalPaid;
     const roundOffValue = Number(Round_Off) || 0
@@ -1109,7 +1117,14 @@ const editExpense = async (req, res, next) => {
           sum + (Number(split.Amount) || 0),
         0
       );
-
+  if (totalPaid > totalAmount) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        //message: "Received amount should be less than or equal to Total Amount",
+        message:"Paid amount cannot excedd total amount"
+      });
+    }
     const balanceDue = totalAmount - totalPaid;
     const roundOffValue = Number(Round_Off) || 0
 

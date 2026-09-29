@@ -5219,25 +5219,25 @@ const deleteSale = async (req, res, next) => {
     // Do not allow deleting Sale while a Sale Return exists.
     // =========================================================
 
-    const [[saleReturn]] = await connection.query(
-      `
-      SELECT id
-      FROM sale_return
-      WHERE Sale_Id = ?
-      LIMIT 1
-      `,
-      [saleId]
-    );
+    // const [[saleReturn]] = await connection.query(
+    //   `
+    //   SELECT id
+    //   FROM sale_return
+    //   WHERE Sale_Id = ?
+    //   LIMIT 1
+    //   `,
+    //   [saleId]
+    // );
 
-    if (saleReturn) {
-      await connection.rollback();
+    // if (saleReturn) {
+    //   await connection.rollback();
 
-      return res.status(400).json({
-        success: false,
-        message:
-          "This sale cannot be deleted because a sale return exists for it. Delete the sale return first.",
-      });
-    }
+    //   return res.status(400).json({
+    //     success: false,
+    //     message:
+    //       "This sale cannot be deleted because a sale return exists for it. Delete the sale return first.",
+    //   });
+    // }
 
     // =========================================================
     // 3. GET ALL SALE ITEMS

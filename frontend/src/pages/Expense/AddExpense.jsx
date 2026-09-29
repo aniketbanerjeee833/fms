@@ -449,34 +449,75 @@ const handlePartyLoadMore = useCallback(() => {
 
     const handleAddRow = () => append(emptyRow());
 
-    const handleDeleteRow = (i) => {
-        const remaining = itemsValues.filter(
-            (_, idx) => idx !== i
-        );
+    // const handleDeleteRow = (i) => {
+    //     const remaining = itemsValues.filter(
+    //         (_, idx) => idx !== i
+    //     );
 
-        const newRawTotal = remaining.reduce(
-            (sum, row) => sum + num(row.Amount),
-            0
-        );
+    //     const newRawTotal = remaining.reduce(
+    //         (sum, row) => sum + num(row.Amount),
+    //         0
+    //     );
 
-        remove(i);
+    //     remove(i);
 
-        const roundOffValue = isRoundOff
-            ? Number(watch("Round_Off")) || 0
-            : 0;
+    //     const roundOffValue = isRoundOff
+    //         ? Number(watch("Round_Off")) || 0
+    //         : 0;
 
-        const newTotal = newRawTotal + roundOffValue;
+    //     const newTotal = newRawTotal + roundOffValue;
 
-        setValue(
-            "Total_Amount",
-            newTotal.toFixed(2),
-            {
-                shouldValidate: true,
-                shouldDirty: true,
-            }
-        );
+    //     setValue(
+    //         "Total_Amount",
+    //         newTotal.toFixed(2),
+    //         {
+    //             shouldValidate: true,
+    //             shouldDirty: true,
+    //         }
+    //     );
+    // };
+const handleDeleteRow = (i) => {
+    const remaining = itemsValues.filter(
+        (_, idx) => idx !== i
+    );
+
+    const newRawTotal = remaining.reduce(
+        (sum, row) => sum + num(row.Amount),
+        0
+    );
+
+    remove(i);
+
+    // Shift an index-keyed object after removing row i
+    const shiftAfterDelete = (obj) => {
+        const shifted = {};
+        Object.keys(obj || {}).forEach((key) => {
+            const idx = Number(key);
+            if (idx < i) shifted[idx] = obj[idx];
+            else if (idx > i) shifted[idx - 1] = obj[idx];
+        });
+        return shifted;
     };
 
+    committedItemRef.current = shiftAfterDelete(committedItemRef.current);
+    setItemSearch((prev) => shiftAfterDelete(prev));
+    setItemOpen(null);
+
+    const roundOffValue = isRoundOff
+        ? Number(watch("Round_Off")) || 0
+        : 0;
+
+    const newTotal = newRawTotal + roundOffValue;
+
+    setValue(
+        "Total_Amount",
+        newTotal.toFixed(2),
+        {
+            shouldValidate: true,
+            shouldDirty: true,
+        }
+    );
+};
     /* ───────────────────────── PAYMENT SPLITS (mirrors PurchaseAdd) ───────────────────────── */
     const getRowIdentifier = (type, bankId) => (type === "Bank" ? `bank_${bankId ?? ""}` : type);
 
@@ -684,7 +725,7 @@ const handlePartyLoadMore = useCallback(() => {
     ];
 
 
-
+const committedItemRef = useRef({});
     return (
         <>
 
@@ -1330,7 +1371,7 @@ const handlePartyLoadMore = useCallback(() => {
                                                     </div>
                                                 </td>
 
-                                                <td>
+                                                {/* <td>
                                                     <div
                                                         ref={(el) => (itemRefs.current[i] = el)}
                                                         className="relative"
@@ -1363,7 +1404,7 @@ const handlePartyLoadMore = useCallback(() => {
 
                                                                 {filteredItems(i).length > 0 && (
                                                                     <>
-                                                                        {/* Header */}
+                                                                       
                                                                         <div
                                                                             className="flex justify-between px-3 py-2 border-b bg-gray-100"
                                                                             style={{
@@ -1429,12 +1470,185 @@ const handlePartyLoadMore = useCallback(() => {
                                                         )}
                                                     </div>
 
-                                                    {errors?.items?.[i]?.Item_Name && (
+                                                    {/* {errors?.items?.[i]?.Item_Name && (
                                                         <p className="text-red-500 text-xs mt-1">
                                                             {errors.items[i].Item_Name.message}
                                                         </p>
-                                                    )}
-                                                </td>
+                                                    )} 
+                                                </td> */}
+
+                                                <td>
+    <div
+        ref={(el) => (itemRefs.current[i] = el)}
+        className="relative"
+    >
+        <input
+            type="text"
+            value={itemSearch[i] ?? itemsValues[i]?.Item_Name ?? ""}
+            placeholder="Item Name"
+            className="w-full outline-none border-b-2 text-gray-900"
+            style={{ marginBottom: 0 }}
+            onClick={() => setItemOpen(i)}
+            onChange={(e) => {
+                const value = e.target.value;
+
+                // Name edited away from the committed item: uncommit it,
+                // so retyping the same name pulls master values again
+                // if (committedItemRef.current[i] !== value.trim().toLowerCase()) {
+                //     committedItemRef.current[i] = "";
+                // }
+
+                setItemSearch((prev) => ({
+                    ...prev,
+                    [i]: value,
+                }));
+
+                recalcRow(i, {
+                    Item_Name: value,
+                });
+
+                setItemOpen(i);
+            }}
+            onBlur={() => {
+                const typedValue = (
+                    itemSearch[i] ??
+                    itemsValues[i]?.Item_Name ??
+                    ""
+                ).trim();
+                const typedKey = typedValue.toLowerCase();
+
+                // Empty: just close
+                if (!typedValue) {
+                    setItemOpen(null);
+                    return;
+                }
+
+                // Same committed item: do NOT touch price/HSN/tax
+                if (committedItemRef.current[i] === typedKey) {
+                    setItemOpen(null);
+                    return;
+                }
+
+                const matchedItem = filteredItems(i).find(
+                    (it) => it.Item_Name?.trim().toLowerCase() === typedKey
+                );
+
+                if (matchedItem) {
+                    // Exists in master: take master values
+                    committedItemRef.current[i] = matchedItem.Item_Name
+                        .trim()
+                        .toLowerCase();
+
+                    setItemSearch((prev) => ({
+                        ...prev,
+                        [i]: matchedItem.Item_Name,
+                    }));
+
+                    recalcRow(i, {
+                        Item_Name: matchedItem.Item_Name,
+                        Item_HSN: matchedItem.Item_HSN || "",
+                        Price: matchedItem.Price || "",
+                        Quantity: itemsValues[i]?.Quantity || 1,
+                        Tax_Type: matchedItem.Tax_Type || "None",
+                    });
+                } else {
+                    // Not in master: clear master-derived values
+                    committedItemRef.current[i] = "";
+
+                    recalcRow(i, {
+                        Item_Name: typedValue,
+                        //Item_HSN: "",
+                        Price: "",
+                        Tax_Type: "None",
+                    });
+                }
+
+                setItemOpen(null);
+            }}
+        />
+
+        {itemOpen === i && (
+            <div
+                className="absolute z-20 w-full bg-white border rounded shadow max-h-48 overflow-y-auto"
+                onMouseDown={(e) => e.preventDefault()}
+            >
+                {filteredItems(i).length > 0 && (
+                    <>
+                        {/* Header */}
+                        <div
+                            className="flex justify-between px-3 py-2 border-b bg-gray-100"
+                            style={{
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                color: "#64748b",
+                                position: "sticky",
+                                top: 0,
+                                zIndex: 2,
+                            }}
+                        >
+                            <span>ITEM</span>
+                            <span>PRICE</span>
+                        </div>
+
+                        {filteredItems(i).map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex justify-between items-center px-3 py-2 hover:bg-gray-100 cursor-pointer"
+                                onClick={() => {
+                                    // remember this as the committed item for the row
+                                    committedItemRef.current[i] = item.Item_Name
+                                        .trim()
+                                        .toLowerCase();
+
+                                    setItemSearch((prev) => ({
+                                        ...prev,
+                                        [i]: item.Item_Name,
+                                    }));
+
+                                    recalcRow(i, {
+                                        Item_Name: item.Item_Name,
+                                        Item_HSN: item.Item_HSN || "",
+                                        // Item_Unit: item.Item_Unit || "",
+                                        Price: item.Price || "",
+                                        Quantity: 1,
+                                        // Price_Type: item.Price_Type || "Tax Excluded",
+                                        Tax_Type: item.Tax_Type || "None",
+                                    });
+
+                                    setItemOpen(null);
+                                }}
+                            >
+                                <span>{item.Item_Name}</span>
+
+                                <span
+                                    style={{
+                                        fontSize: "13px",
+                                        color: "#444",
+                                        fontWeight: 500,
+                                    }}
+                                >
+                                    {Number(item.Price || 0).toLocaleString("en-IN")}
+                                </span>
+                            </div>
+                        ))}
+                    </>
+                )}
+
+                {filteredItems(i).length === 0 && (
+                    <div className="px-3 py-2 text-gray-500">
+                        No Items Found
+                    </div>
+                )}
+            </div>
+        )}
+    </div>
+
+    {/* {errors?.items?.[i]?.Item_Name && (
+        <p className="text-red-500 text-xs mt-1">
+            {errors.items[i].Item_Name.message}
+        </p>
+    )} */}
+</td>
 
                                                 {gstEnabled && (
                                                     <td>

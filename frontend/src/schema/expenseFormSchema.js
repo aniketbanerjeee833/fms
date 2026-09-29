@@ -222,10 +222,10 @@ const expenseWithGSTSchema = expenseBaseSchema
     // 🔹 items array optional/empty-allowed — matches Purchase's approach
     items: z.array(expenseItemWithGSTSchema).optional().default([]),   // 🔻 was: nonempty required
   })
-  .refine(
-    (data) => data.Total_Paid <= data.Total_Amount,
-    { message: "Paid amount cannot exceed Total Amount", path: ["Total_Paid"] }
-  );
+  // .refine(
+  //   (data) => data.Total_Paid <= data.Total_Amount,
+  //   { message: "Paid amount cannot exceed Total Amount", path: ["Total_Paid"] }
+  // );
   // 🔻 REMOVED the splits-sum-must-equal-Total_Paid .refine() — this is now enforced
   //    server-side against validSplits (the computed, filtered array), same as Purchase/Sale,
   //    since the frontend's raw splits may still contain blank/zero placeholder rows.
