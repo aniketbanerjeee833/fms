@@ -623,6 +623,13 @@ dispatch(
             ])
         );
 
+        //  dispatch(
+        //     itemApi.util.invalidateTags([
+        //         "Item"
+        //     ])
+        // );
+
+
         dispatch(
             partyApi.util.invalidateTags([
                 "Party",
@@ -1791,7 +1798,8 @@ dispatch(
                                                                                         : txn.Document_Id,
 
                                                                                 Txn_Type:txn.Txn_Type,
-                                                                                RowId: txn.id
+                                                                                RowId: txn.Ledger_Id
+                                                                                //RowId: txn.id
                                                                             });
                                                                         }}
                                                                     >
