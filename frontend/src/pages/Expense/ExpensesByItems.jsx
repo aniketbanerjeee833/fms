@@ -23,9 +23,11 @@ import {
   useGetExpenseItemUsageQuery,
   useGetExpenseByIdQuery,
   useDeleteExpenseMutation,
-  useDeleteExpenseItemMasterMutation
+  useDeleteExpenseItemMasterMutation,
+  expenseApi
 } from "../../redux/api/expenseApi";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import { useDispatch } from "react-redux";
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -47,6 +49,7 @@ const ROW_ACTIONS = [
 export default function ExpensesByItems() {
 
   const navigate = useNavigate();
+  const dispatch=useDispatch()
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -249,6 +252,24 @@ export default function ExpensesByItems() {
         toast.success(
           res?.message || "Expense item deleted successfully"
         );
+        dispatch(
+  expenseApi.util.updateQueryData(
+    "getExpenseItemUsage",
+    {
+      masterItemId: selectedItemId,
+      search: txnSearch,
+    },
+    (draft) => {
+      if (draft?.usage) {
+        draft.usage = draft.usage.filter(
+          (usage) =>
+            String(usage.Expense_Id) !==
+            String(deleteTarget.expenseId)
+        );
+      }
+    }
+  )
+);
 
         // If the deleted item was selected,
         // clear selection so another item can be selected.

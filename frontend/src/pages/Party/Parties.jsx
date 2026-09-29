@@ -143,10 +143,12 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const initialRightLimit = useRef(
     Number(sessionStorage.getItem("partiesByParty:rightCount")) || 10
   );
+  
   const { data, isLoading, isFetching } = useGetSinglePartyDetailsSalesPurchasesQuery(
     {
-      Party_Id: partyId, cursor, search
-      , limit: initialRightLimit.current
+      Party_Id: partyId, cursor, search, 
+      limit: cursor? 10 : initialRightLimit.current
+     
 
     },
     { skip: !partyId,refetchOnMountOrArgChange: true }
@@ -227,6 +229,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
     Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const handleSearchChange = (value) => {
+   
     const next = new URLSearchParams(searchParams);
     if (value) {
       next.set("txnSearch", value);
@@ -247,26 +250,7 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
   const hasMore = data?.hasMore ?? false;
   const nextCursor = data?.nextCursor ?? null;
 
-  // const handleObserver = useCallback(
-  //   (entries) => {
-  //     if (entries[0].isIntersecting && hasMore && nextCursor && !isFetching && !isLoading) {
-  //       setCursor(nextCursor);
-  //     }
-  //   },
-  //   [hasMore, nextCursor, isFetching, isLoading]
-  // );
-
-  // useEffect(() => {
-  //   if (observerRef.current) observerRef.current.disconnect();
-  //   observerRef.current = new IntersectionObserver(handleObserver, {
-  //     //root: transactionListRef.current,
-  //     root: null,
-  //     rootMargin: "0px",
-  //     threshold: 0.1,
-  //   });
-  //   if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
-  //   return () => observerRef.current?.disconnect();
-  // }, [handleObserver]);
+ 
 
   const handleLoadMore = useCallback(() => {
     if (!hasMore || !nextCursor || isFetching) return;
@@ -383,10 +367,24 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
       }
 
       toast.success(res?.message || "Deleted successfully");
-      //setCursor(null);
-//       const next = new URLSearchParams(searchParams);
-// next.delete("highlightTxn");
-// setSearchParams(next, { replace: true });
+
+// setCursor(null);
+
+
+dispatch(
+  partyApi.util.updateQueryData(
+    "getSinglePartyDetailsSalesPurchases",
+    { Party_Id: partyId, search },
+    (draft) => {
+      draft.transactions = draft.transactions.filter(
+        (t) => t.id !== deleteTarget.RowId
+      );
+    }
+  )
+);
+const next = new URLSearchParams(searchParams);
+next.delete("highlightTxn");
+setSearchParams(next, { replace: true });
       setDeleteTarget(null);
 
       dispatch(
@@ -1448,8 +1446,8 @@ function PartyDetailPanel({ partyId, setSelectedPartyDetails }) {
 
                                 setDeleteTarget({
                                   Id: transactionId,
-                                  Txn_Type:
-                                    row.Txn_Type,
+                                  Txn_Type:row.Txn_Type,
+                                  RowId: row.id
                                 });
                               }}
                             >

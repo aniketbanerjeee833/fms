@@ -209,22 +209,7 @@ export default function ItemsByItem() {
             refetchOnMountOrArgChange: true, 
         },
     );
-    //     const {
-    //     data: billsResponse,
-    //     isLoading: isBillsLoading,
-    //     isFetching: isBillsFetching,
-    //     refetch: refetchBills,
-    // } = useGetItemBillsQuery(
-    //     {
-    //         Item_Id: selectedItemId,
-    //         cursor,
-    //         search: txnSearch,
-    //         limit: cursor ? 10 : initialRightLimit.current,
-    //     },
-    //     {
-    //         skip: !selectedItemId,
-    //     }
-    // );
+    
 
 
     const transactions = billsResponse?.transactions || [];
@@ -260,49 +245,7 @@ export default function ItemsByItem() {
         setCursor(nextCursor);
     }, [hasMore, nextCursor, isBillsFetching]);
 
-    // const handleObserver = useCallback(
-    //     (entries) => {
-    //         //if(isRestoringRight) return;
-    //         if (
-
-    //             entries[0].isIntersecting &&
-    //             hasMore &&
-    //             nextCursor &&
-    //             !isBillsFetching &&
-    //             !isBillsLoading
-    //         ) {
-    //             setCursor(nextCursor);
-    //         }
-    //     },
-    //     [
-    //         hasMore,
-    //         nextCursor,
-    //         isBillsFetching,
-    //         isBillsLoading,
-
-    //     ]
-    // );
-
-    // useEffect(() => {
-    //     if (observerRef.current) {
-    //         observerRef.current.disconnect();
-    //     }
-
-    //     observerRef.current = new IntersectionObserver(
-    //         handleObserver,
-    //         {
-    //             root: null,
-    //             rootMargin: "0px",
-    //             threshold: 0.1,
-    //         }
-    //     );
-
-    //     if (sentinelRef.current) {
-    //         observerRef.current.observe(sentinelRef.current);
-    //     }
-
-    //     return () => observerRef.current?.disconnect();
-    // }, [handleObserver]);
+ 
 
 
     useEffect(() => {
@@ -493,81 +436,238 @@ export default function ItemsByItem() {
         isDeletingPaymentIn ||
         isDeletingPaymentOut ||
         isDeletingStockAdjustment;
+    // const handleConfirmDelete = async () => {
+    //     if (!deleteTarget) return;
+
+    //     try {
+    //         let res;
+
+    //         switch (deleteTarget.Txn_Type) {
+    //             case "Sale":
+    //                 res = await deleteSale(deleteTarget.Id).unwrap();
+    //                 break;
+
+    //             case "Purchase":
+    //                 res = await deletePurchase(
+    //                     deleteTarget.Id
+    //                 ).unwrap();
+    //                 break;
+
+    //             case "Sale_Return":
+    //                 res = await deleteSaleReturn(deleteTarget.Id).unwrap();
+    //                 break;
+
+    //             case "Purchase_Return":
+    //                 res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
+    //                 break;
+
+    //             case "Payment_In":
+    //                 res = await deletePaymentIn(deleteTarget.Id).unwrap();
+    //                 break;
+
+    //             case "Payment_Out":
+    //                 res = await deletePaymentOut(deleteTarget.Id).unwrap();
+    //                 break;
+    //             case "Add_Adjustment":
+    //             case "Reduce_Adjustment":
+    //                 res = await deleteStockAdjustment(deleteTarget.Id).unwrap();
+    //                 break;
+
+    //             default:
+    //                 toast.error(
+    //                     "Unknown transaction type — cannot delete"
+    //                 );
+    //                 return;
+    //         }
+
+    //         toast.success(res?.message || "Deleted successfully");
+    //         //setCursor(null);   // right-side transactions cursor
+    //         setDeleteTarget(null);
+    //         dispatch(partyApi.util.invalidateTags(["Party"]));
+
+    //         dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+    //         dispatch(
+    //             bankAccountApi.util.invalidateTags(["BankAccount"])
+    //         )
+    //         dispatch(saleApi.util.invalidateTags(["Sale"]));
+    //         dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
+    //         dispatch(
+    //             itemApi.util.invalidateTags([
+    //                 "Item",
+    //                 "ItemLedger",
+    //             ])
+    //         );
+    //     } catch (err) {
+
+    //         console.error(
+    //             "❌ Delete error:",
+    //             err
+    //         );
+
+    //         toast.error(
+    //             err?.data?.message ||
+    //             "Failed to delete"
+    //         );
+    //         setDeleteTarget(null);
+    //     }
+    // };
     const handleConfirmDelete = async () => {
-        if (!deleteTarget) return;
+    if (!deleteTarget) return;
 
-        try {
-            let res;
+    try {
+        let res;
 
-            switch (deleteTarget.Txn_Type) {
-                case "Sale":
-                    res = await deleteSale(deleteTarget.Id).unwrap();
-                    break;
+        switch (deleteTarget.Txn_Type) {
+            case "Sale":
+                res = await deleteSale(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                case "Purchase":
-                    res = await deletePurchase(
-                        deleteTarget.Id
-                    ).unwrap();
-                    break;
+            case "Purchase":
+                res = await deletePurchase(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                case "Sale_Return":
-                    res = await deleteSaleReturn(deleteTarget.Id).unwrap();
-                    break;
+            case "Sale_Return":
+                res = await deleteSaleReturn(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                case "Purchase_Return":
-                    res = await deletePurchaseReturn(deleteTarget.Id).unwrap();
-                    break;
+            case "Purchase_Return":
+                res = await deletePurchaseReturn(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                case "Payment_In":
-                    res = await deletePaymentIn(deleteTarget.Id).unwrap();
-                    break;
+            case "Payment_In":
+                res = await deletePaymentIn(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                case "Payment_Out":
-                    res = await deletePaymentOut(deleteTarget.Id).unwrap();
-                    break;
-                case "Add_Adjustment":
-                case "Reduce_Adjustment":
-                    res = await deleteStockAdjustment(deleteTarget.Id).unwrap();
-                    break;
+            case "Payment_Out":
+                res = await deletePaymentOut(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-                default:
-                    toast.error(
-                        "Unknown transaction type — cannot delete"
-                    );
-                    return;
-            }
+            case "Add_Adjustment":
+            case "Reduce_Adjustment":
+                res = await deleteStockAdjustment(
+                    deleteTarget.Id
+                ).unwrap();
+                break;
 
-            toast.success(res?.message || "Deleted successfully");
-            //setCursor(null);   // right-side transactions cursor
-            setDeleteTarget(null);
-            dispatch(partyApi.util.invalidateTags(["Party"]));
-
-            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-            dispatch(
-                bankAccountApi.util.invalidateTags(["BankAccount"])
-            )
-            dispatch(saleApi.util.invalidateTags(["Sale"]));
-            dispatch(purchaseApi.util.invalidateTags(["Purchase"]));
-            dispatch(
-                itemApi.util.invalidateTags([
-                    "Item",
-                    "ItemLedger",
-                ])
-            );
-        } catch (err) {
-
-            console.error(
-                "❌ Delete error:",
-                err
-            );
-
-            toast.error(
-                err?.data?.message ||
-                "Failed to delete"
-            );
-            setDeleteTarget(null);
+            default:
+                toast.error(
+                    "Unknown transaction type — cannot delete"
+                );
+                return;
         }
-    };
+
+        toast.success(
+            res?.message || "Deleted successfully"
+        );
+
+        // =====================================================
+        // OPTIMISTICALLY REMOVE DELETED ROW FROM ITEM BILLS
+        // =====================================================
+dispatch(
+    itemApi.util.updateQueryData(
+        "getItemBills",
+        {
+            Item_Id: selectedItemId,
+            search: txnSearch,
+            date: "",
+        },
+        (draft) => {
+            if (draft?.transactions) {
+                draft.transactions =
+                    draft.transactions.filter(
+                        (t) =>
+                            t.Ledger_Id !==
+                            deleteTarget.RowId
+                    );
+            }
+        }
+    )
+);
+        // =====================================================
+        // CLEAR HIGHLIGHT
+        // =====================================================
+
+        const next = new URLSearchParams(searchParams);
+        next.delete("highlightTxn");
+
+        setSearchParams(next, {
+            replace: true,
+        });
+
+        // =====================================================
+        // CLOSE DELETE MODAL
+        // =====================================================
+
+        setDeleteTarget(null);
+
+        // =====================================================
+        // REFRESH RELATED DATA
+        // =====================================================
+
+        dispatch(
+            itemApi.util.invalidateTags([
+                "Item",
+                "ItemLedger",
+            ])
+        );
+
+        dispatch(
+            partyApi.util.invalidateTags([
+                "Party",
+                "PartyLedger",
+            ])
+        );
+
+        dispatch(
+            cashInHandApi.util.invalidateTags([
+                "CashInHand",
+            ])
+        );
+
+        dispatch(
+            bankAccountApi.util.invalidateTags([
+                "BankAccount",
+            ])
+        );
+
+        dispatch(
+            saleApi.util.invalidateTags([
+                "Sale",
+            ])
+        );
+
+        dispatch(
+            purchaseApi.util.invalidateTags([
+                "Purchase",
+            ])
+        );
+
+    } catch (err) {
+        console.error(
+            "❌ Delete error:",
+            err
+        );
+
+        toast.error(
+            err?.data?.message ||
+            "Failed to delete"
+        );
+
+        setDeleteTarget(null);
+    }
+};
     const printRef = useRef(null);
     const [printTarget, setPrintTarget] = useState({ type: null, id: null });
 
@@ -1690,8 +1790,8 @@ export default function ItemsByItem() {
                                                                                         ? txn.Source_Id
                                                                                         : txn.Document_Id,
 
-                                                                                Txn_Type:
-                                                                                    txn.Txn_Type,
+                                                                                Txn_Type:txn.Txn_Type,
+                                                                                RowId: txn.id
                                                                             });
                                                                         }}
                                                                     >

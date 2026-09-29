@@ -25,11 +25,13 @@ import {
   useGetExpensesByCategoryQuery,
   useGetExpenseByIdQuery,
   useDeleteExpenseMutation,
-  useDeleteExpenseCategoryMutation
+  useDeleteExpenseCategoryMutation,
+  expenseApi
 } from "../../redux/api/expenseApi";
 
 import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import { useDispatch } from "react-redux";
 
 
 
@@ -48,6 +50,7 @@ export default function ExpensesByCategories() {
   ];
 
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -234,6 +237,25 @@ const handleRightLoadMore = useCallback(() => {
       toast.success(
         res?.message || "Expense deleted successfully"
       );
+      // Remove deleted expense immediately from RTK Query cache
+dispatch(
+  expenseApi.util.updateQueryData(
+    "getExpensesByCategory",
+    {
+      categoryId: selectedCategoryId,
+      search: txnSearch,
+    },
+    (draft) => {
+      if (draft?.expenses) {
+        draft.expenses = draft.expenses.filter(
+          (expense) =>
+            String(expense.id) !==
+            String(deleteTarget.expenseId)
+        );
+      }
+    }
+  )
+);
 
       setDeleteTarget(null);
 
