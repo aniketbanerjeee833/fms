@@ -1660,7 +1660,8 @@ const getAllSales = async (req, res, next) => {
       `
         SELECT
           s.*,
-          a.Party_Name
+          a.Party_Name,
+          DATE_FORMAT(s.Invoice_Date, '%Y-%m-%d %H:%i:%s') AS Invoice_Date_Raw
 
         FROM add_sale s
 
@@ -1699,7 +1700,8 @@ const getAllSales = async (req, res, next) => {
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: lastRow.Invoice_Date,
+          //date: lastRow.Invoice_Date,
+          date: lastRow.Invoice_Date_Raw,
           id: lastRow.id,
         })
       ).toString("base64");

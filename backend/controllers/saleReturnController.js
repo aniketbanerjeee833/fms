@@ -236,7 +236,8 @@ if (cursorDate && cursorId) {
     const [rows] = await connection.query(
       `SELECT
          sr.*,
-         p.Party_Name
+         p.Party_Name,
+          DATE_FORMAT(sr.Return_Date, '%Y-%m-%d %H:%i:%s') AS Return_Date_Raw
 
        FROM sale_return sr
 
@@ -288,7 +289,8 @@ if (hasMore && pageRows.length > 0) {
 
   nextCursor = Buffer.from(
     JSON.stringify({
-      date: last.Return_Date,
+      //date: last.Return_Date,
+       date: last.Return_Date_Raw,
       id: last.id,
     })
   ).toString("base64");

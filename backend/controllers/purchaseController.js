@@ -1131,7 +1131,8 @@ const getAllPurchases = async (req, res, next) => {
       `
         SELECT
           p.*,
-          a.Party_Name
+          a.Party_Name,
+           DATE_FORMAT(p.Bill_Date, '%Y-%m-%d %H:%i:%s') AS Bill_Date_Raw
 
         FROM add_purchase p
 
@@ -1170,7 +1171,8 @@ const getAllPurchases = async (req, res, next) => {
 
       nextCursor = Buffer.from(
         JSON.stringify({
-          date: lastRow.Bill_Date,
+          //date: lastRow.Bill_Date,
+          date: lastRow.Bill_Date_Raw,
           id: lastRow.id,
         })
       ).toString("base64");

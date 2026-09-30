@@ -263,7 +263,8 @@ const getAllPurchaseReturns = async (req, res, next) => {
     const [rows] = await connection.query(
       `SELECT
          pr.*,
-         a.Party_Name
+         a.Party_Name,
+         DATE_FORMAT(pr.Return_Date, '%Y-%m-%d %H:%i:%s') AS Return_Date_Raw
 
        FROM purchase_return pr
 
@@ -309,7 +310,8 @@ const getAllPurchaseReturns = async (req, res, next) => {
       // ).toString("base64");
       nextCursor = Buffer.from(
   JSON.stringify({
-    date: last.Return_Date,
+    //date: last.Return_Date,
+     date: last.Return_Date_Raw,
     id: last.id,
   })
 ).toString("base64");
