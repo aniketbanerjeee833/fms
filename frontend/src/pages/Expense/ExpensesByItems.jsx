@@ -908,49 +908,6 @@ export default function ExpensesByItems() {
                         /> */}
                       </div>
 
-                      {/* {menuOpen === item.id && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute bg-white shadow-lg rounded-md"
-                          style={{
-                            right: 10,
-                            top: 48,
-                            width: 140,
-                            zIndex: 50,
-                            border: "1px solid #e2e8f0",
-                          }}
-                        >
-                          <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm"
-                            onClick={() => {
-                              const originalItem = items.find(
-                                (i) => i.id === item.id
-                              );
-
-                              setEditingItem(originalItem);
-                              setShowEditItemModal(true);
-                              setMenuOpen(null);
-                            }}
-                          >
-                            View/Edit
-                          </button>
-
-                          <button
-                            className="w-full text-left px-4 py-2 hover:bg-red-50 text-sm text-red-500"
-                            onClick={() => {
-                              setDeleteTarget({
-                                type: "item",
-                                itemId: item.id,
-                                itemName: item.name,
-                              });
-
-                              setMenuOpen(null);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )} */}
                       {menuOpen === item.id && (
   <div
     onClick={(e) => e.stopPropagation()}

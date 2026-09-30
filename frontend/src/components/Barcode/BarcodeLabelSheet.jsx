@@ -314,12 +314,12 @@ function buildPrintHtml(labels, size, pageWidthMm, pageHeightMm, gapMm = 2) {
     // const codeFontSize = Math.max(9 * scale, 7);
     // const lineFontSize = Math.max(8 * scale, 6.5);
     const barcodeWidth = Math.max(1.6 * scale, 1.5);
-const barcodeHeight = Math.max(32 * scale, 18);
+    const barcodeHeight = Math.max(32 * scale, 18);
 
-// sizes are now in pt
-const headerFontSize = Math.max(11 * scale, 8);
-const codeFontSize = Math.max(11 * scale, 8);
-const lineFontSize = Math.max(10 * scale, 7.5);
+    // sizes are now in pt
+    const headerFontSize = Math.max(11 * scale, 8);
+    const codeFontSize = Math.max(11 * scale, 8);
+    const lineFontSize = Math.max(10 * scale, 7.5);
 
     // Shrink each label's width so total width (labels + gaps) still equals pageWidthMm exactly.
     const totalGap = gapMm * (size.columns - 1);
@@ -344,6 +344,12 @@ const lineFontSize = Math.max(10 * scale, 7.5);
                     margin: 2,
                     background: "transparent",
                 });
+                // Make the SVG scale to fit the label instead of using its raw pixel size
+                const rawWidth = svgEl.getAttribute("width");
+                const rawHeight = svgEl.getAttribute("height");
+                svgEl.setAttribute("viewBox", `0 0 ${rawWidth} ${rawHeight}`);
+                svgEl.removeAttribute("width");
+                svgEl.removeAttribute("height");
             } catch (err) {
                 console.error("Barcode render error:", err);
             }
@@ -352,33 +358,28 @@ const lineFontSize = Math.max(10 * scale, 7.5);
 
             return `
                 <div class="label-cell">
-                    ${
-                        label.header?.value
-                            ? `<div class="label-header">${label.header.value}</div>`
-                            : ""
-                    }
+                    ${label.header?.value
+                    ? `<div class="label-header">${label.header.value}</div>`
+                    : ""
+                }
                     ${barcodeSvgString}
                     <div class="label-code">${label.itemCode}</div>
-                    ${
-                        label.line1?.value
-                            ? `<div class="label-line">${label.line1.value}</div>`
-                            : ""
-                    }
-                    ${
-                        label.line2?.value
-                            ? `<div class="label-line">${label.line2.value}</div>`
-                            : ""
-                    }
-                    ${
-                        label.line3?.value
-                            ? `<div class="label-line">${label.line3.value}</div>`
-                            : ""
-                    }
-                    ${
-                        label.line4?.value
-                            ? `<div class="label-line">${label.line4.value}</div>`
-                            : ""
-                    }
+                    ${label.line1?.value
+                    ? `<div class="label-line">${label.line1.value}</div>`
+                    : ""
+                }
+                    ${label.line2?.value
+                    ? `<div class="label-line">${label.line2.value}</div>`
+                    : ""
+                }
+                    ${label.line3?.value
+                    ? `<div class="label-line">${label.line3.value}</div>`
+                    : ""
+                }
+                    ${label.line4?.value
+                    ? `<div class="label-line">${label.line4.value}</div>`
+                    : ""
+                }
                 </div>
             `;
         })
@@ -444,9 +445,13 @@ overflow-wrap: anywhere; }
 .label-line   { font-size: ${lineFontSize}pt; line-height: 1.1;word-break: break-word;
 overflow-wrap: anywhere; }
 
+ 
     svg {
-        display: block;
-    }
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: ${barcodeHeight * 0.35}mm;
+}
 </style>
 </head>
 <body>
@@ -457,23 +462,10 @@ overflow-wrap: anywhere; }
 </html>
     `;
 }
-
-   // .label-header {
-    //     font-size: ${headerFontSize}px;
-    //     font-style: italic;
-    //     line-height: 1.1;
+   // svg {
+    //     display: block;
     // }
 
-    // .label-code {
-    //     font-size: ${codeFontSize}px;
-    //     font-weight: 600;
-    //     margin-top: ${Math.max(0.5 * scale, 0.3)}mm;
-    // }
-
-    // .label-line {
-    //     font-size: ${lineFontSize}px;
-    //     line-height: 1.1;
-    // }
 
 export default function BarcodeLabelSheet({ barcodeItems, triggerPrint, labelSettings }) {
     const iframeRef = useRef(null);
@@ -548,3 +540,21 @@ export default function BarcodeLabelSheet({ barcodeItems, triggerPrint, labelSet
 
     return null;
 }
+
+
+// .label-header {
+//     font-size: ${headerFontSize}px;
+//     font-style: italic;
+//     line-height: 1.1;
+// }
+
+// .label-code {
+//     font-size: ${codeFontSize}px;
+//     font-weight: 600;
+//     margin-top: ${Math.max(0.5 * scale, 0.3)}mm;
+// }
+
+// .label-line {
+//     font-size: ${lineFontSize}px;
+//     line-height: 1.1;
+// }

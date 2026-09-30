@@ -23,6 +23,7 @@ import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import { useReactToPrint } from "react-to-print";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import useListRestore from "../../utils/useListRestore";
 
 export default function AllSaleList() {
   const dispatch = useDispatch()
@@ -50,6 +51,9 @@ export default function AllSaleList() {
   //   fromDate,
   //   toDate,
   // });
+    const cameBack = useRef(!!searchParams.get("highlightTxn")).current;
+  
+    const { initial, saveCount, saveOffset, reset } = useListRestore("saleList", cameBack);
   const {
     data: sales,
     isLoading,
@@ -59,10 +63,12 @@ export default function AllSaleList() {
     search: searchTerm,
     fromDate,
     toDate,
-    limit: 10,
+    //limit: 10,
+    limit: cursor ? 10 : initial.current.count
   });
   console.log(sales);
   const salesList = sales?.sales ?? [];
+   useEffect(() => { saveCount(salesList.length); }, [salesList.length]);
   const hasMore = sales?.hasMore ?? false;
   const nextCursor = sales?.nextCursor ?? null;
 
@@ -186,56 +192,56 @@ export default function AllSaleList() {
     }
   }, [bulkSaleReportData, showSaleBulkPrintPreview]);
   const virtualListRef = useRef(null);
-  const hasScrolledToHighlightRef = useRef(false);
+  //const hasScrolledToHighlightRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
   //const skipHighlightScrollRef = useRef(false);
-  const highlightTxnId = searchParams.get("highlightTxn");
+  //const highlightTxnId = searchParams.get("highlightTxn");
 
-  useEffect(() => {
-    //  if (skipHighlightScrollRef.current) {
-    //   skipHighlightScrollRef.current = false;
-    //   return;
-    // }
+  // useEffect(() => {
+  //   //  if (skipHighlightScrollRef.current) {
+  //   //   skipHighlightScrollRef.current = false;
+  //   //   return;
+  //   // }
 
-    if (hasScrolledToHighlightRef.current) return;
-    if (!highlightTxnId) return;
-    if (isLoading || isFetching) return;
+  //   if (hasScrolledToHighlightRef.current) return;
+  //   if (!highlightTxnId) return;
+  //   if (isLoading || isFetching) return;
 
-    const targetIndex = salesList.findIndex(
-      (sale) =>
-        String(sale?.Sale_Id) === String(highlightTxnId)
-    );
-    console.log("Target index for highlight:", targetIndex);
-    if (targetIndex === -1) {
-      if (hasMore && nextCursor && !isFetching) {
-        handleLoadMore();
-      }
-      return;
-    }
+  //   const targetIndex = salesList.findIndex(
+  //     (sale) =>
+  //       String(sale?.Sale_Id) === String(highlightTxnId)
+  //   );
+  //   console.log("Target index for highlight:", targetIndex);
+  //   if (targetIndex === -1) {
+  //     if (hasMore && nextCursor && !isFetching) {
+  //       handleLoadMore();
+  //     }
+  //     return;
+  //   }
 
-    // Wait until VirtualScrollList has rendered the new data
-    const timer = setTimeout(() => {
-      virtualListRef.current?.scrollToIndex(targetIndex, {
-        align: "auto",
-        behavior: "auto",
-      });
+  //   // Wait until VirtualScrollList has rendered the new data
+  //   const timer = setTimeout(() => {
+  //     virtualListRef.current?.scrollToIndex(targetIndex, {
+  //       align: "auto",
+  //       behavior: "auto",
+  //     });
 
-      hasScrolledToHighlightRef.current = true;
-    }, 100);
+  //     hasScrolledToHighlightRef.current = true;
+  //   }, 100);
 
-    return () => clearTimeout(timer);
-  }, [
-    salesList,
-    highlightTxnId,
-    isLoading,
-    isFetching,
-    hasMore,
-    nextCursor,
-    handleLoadMore,
-  ]);
-  useEffect(() => {
-    hasScrolledToHighlightRef.current = false;
-  }, [highlightTxnId, searchTerm, fromDate, toDate])
+  //   return () => clearTimeout(timer);
+  // }, [
+  //   salesList,
+  //   highlightTxnId,
+  //   isLoading,
+  //   isFetching,
+  //   hasMore,
+  //   nextCursor,
+  //   handleLoadMore,
+  // ]);
+  // useEffect(() => {
+  //   hasScrolledToHighlightRef.current = false;
+  // }, [highlightTxnId, searchTerm, fromDate, toDate])
 
   return (
     <>
@@ -303,6 +309,7 @@ export default function AllSaleList() {
                   value={fromDate}
                   onChange={(e) => {
                      setCursor(null);
+                      reset();
                     setSearchParams({
                       search: searchTerm,
                       fromDate: e.target.value,
@@ -322,6 +329,7 @@ export default function AllSaleList() {
                   value={toDate}
                   onChange={(e) => {
                      setCursor(null);
+                      reset();
                     setSearchParams({
                       search: searchTerm,
                       fromDate,
@@ -341,6 +349,7 @@ export default function AllSaleList() {
                   value={searchTerm}
                   onChange={(e) => {
                     setCursor(null);
+                     reset();
                     setSearchParams({
                       search: e.target.value,
                       fromDate,
@@ -571,7 +580,7 @@ export default function AllSaleList() {
                       items={salesList}
                       rowHeight={52}
                       height="100%"
-                      dynamicHeight={true}
+                      //dynamicHeight={true}
                       onLoadMore={() => {
                         if (
                           sales?.hasMore &&
@@ -589,6 +598,8 @@ export default function AllSaleList() {
                       isRowActive={(sale) =>
                         rowMenuOpen === sale?.Sale_Id
                       }
+                      initialOffset={initial.current.offset}
+                      onScrollOffsetChange={saveOffset}
                       renderRow={(sale, idx) => {
                         // const isHighlighted =
                         //   String(searchParams.get("highlightTxn")) ===
@@ -641,7 +652,8 @@ export default function AllSaleList() {
                               //gridTemplateColumns: "60px 110px 130px minmax(300px, 1fr) 160px 132px 120px 50px",
                               //gridTemplateColumns:"70px 110px 120px minmax(150px, 1fr) 130px 110px 110px 50px",
                               alignItems: "center",
-                              minHeight: "52px",
+                              //minHeight: "52px",
+                               height: 52,
                               columnGap: "10px",
                               width: "100%",
                               cursor: "pointer",
@@ -681,11 +693,12 @@ export default function AllSaleList() {
 
                             {/* PARTY */}
                             <div
-                              className="table-desi-cell"
-                              style={{
-                                overflowWrap: "break-word",
-                                wordBreak: "break-word",
-                              }}
+                              className="table-desi-cell truncate"
+                              title={sale?.Party_Name || ""}
+                              // style={{
+                              //   overflowWrap: "break-word",
+                              //   wordBreak: "break-word",
+                              // }}
                             >
                               {sale?.Party_Name || ""}
                             </div>

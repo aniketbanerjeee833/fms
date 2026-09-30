@@ -702,13 +702,12 @@ export default function PaymentOut() {
                                                     {/* PARTY */}
 
                                                     <div
-                                                        className="table-desi-cell"
-                                                        style={{
-                                                            overflowWrap:
-                                                                "break-word",
-                                                            wordBreak:
-                                                                "break-word",
-                                                        }}
+                                                        className="table-desi-cell truncate"
+                                                        title={paymentOut?.Party_Name || ""}
+                                                        // style={{
+                                                        //     overflowWrap:"break-word",
+                                                        //     wordBreak:"break-word",
+                                                        // }}
                                                     >
                                                         {paymentOut?.Party_Name ||
                                                             ""}

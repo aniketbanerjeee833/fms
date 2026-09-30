@@ -643,11 +643,12 @@ export default function PaymentIn() {
                                                     {/* PARTY */}
 
                                                     <div
-                                                        className="table-desi-cell"
-                                                        style={{
-                                                            overflowWrap: "break-word",
-                                                            wordBreak: "break-word",
-                                                        }}
+                                                        className="table-desi-cell truncate"
+                                                         title={paymentIn?.Party_Name || ""}
+                                                        // style={{
+                                                        //     overflowWrap: "break-word",
+                                                        //     wordBreak: "break-word",
+                                                        // }}
                                                     >
                                                         {paymentIn?.Party_Name ||
                                                             ""}

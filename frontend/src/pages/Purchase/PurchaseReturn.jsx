@@ -20,6 +20,7 @@ import { useReactToPrint } from "react-to-print";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import useListRestore from "../../utils/useListRestore";
 
 
 
@@ -87,6 +88,10 @@ export default function PurchaseReturn() {
   //   fromDate,
   //   toDate,
   // });
+  const cameBack = useRef(!!searchParams.get("highlightTxn")).current;
+
+  const { initial, saveCount, saveOffset, reset } = useListRestore("purchaseReturnList", cameBack);
+
   const {
     data: purchaseReturns,
     isLoading,
@@ -96,11 +101,12 @@ export default function PurchaseReturn() {
     search: searchTerm,
     fromDate,
     toDate,
-    limit: 10,
+    //limit: 10,
+    limit: cursor ? 10 : initial.current.count,
   });
 
   const purchaseReturnList = purchaseReturns?.purchaseReturns ?? [];
-
+  useEffect(() => { saveCount(purchaseReturnList.length); }, [purchaseReturnList.length]);
   const hasMore = purchaseReturns?.hasMore ?? false;
 
   const nextCursor = purchaseReturns?.nextCursor ?? null;
@@ -197,56 +203,56 @@ export default function PurchaseReturn() {
   }, [bulkPurchaseReturnReportData, showSaleReturnBulkPrintPreview]);
 
   const virtualListRef = useRef(null);
-  const hasScrolledToHighlightRef = useRef(false);
+  //const hasScrolledToHighlightRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
   //const skipHighlightScrollRef = useRef(false);
-  const highlightTxnId = searchParams.get("highlightTxn");
+  //const highlightTxnId = searchParams.get("highlightTxn");
 
-  useEffect(() => {
+  // useEffect(() => {
 
-    //  if (skipHighlightScrollRef.current) {
-    //   skipHighlightScrollRef.current = false;
-    //   return;
-    // }
-    if (hasScrolledToHighlightRef.current) return;
-    if (!highlightTxnId) return;
-    if (isLoading || isFetching) return;
+  //   //  if (skipHighlightScrollRef.current) {
+  //   //   skipHighlightScrollRef.current = false;
+  //   //   return;
+  //   // }
+  //   if (hasScrolledToHighlightRef.current) return;
+  //   if (!highlightTxnId) return;
+  //   if (isLoading || isFetching) return;
 
-    const targetIndex = purchaseReturnList.findIndex(
-      (purchaseReturn) =>
-        String(purchaseReturn?.id) === String(highlightTxnId)
-    );
-    console.log("Target index for highlight:", targetIndex);
-    if (targetIndex === -1) {
-      if (hasMore && nextCursor && !isFetching) {
-        handleLoadMore();
-      }
-      return;
-    }
+  //   const targetIndex = purchaseReturnList.findIndex(
+  //     (purchaseReturn) =>
+  //       String(purchaseReturn?.id) === String(highlightTxnId)
+  //   );
+  //   console.log("Target index for highlight:", targetIndex);
+  //   if (targetIndex === -1) {
+  //     if (hasMore && nextCursor && !isFetching) {
+  //       handleLoadMore();
+  //     }
+  //     return;
+  //   }
 
-    // Wait until VirtualScrollList has rendered the new data
-    const timer = setTimeout(() => {
-      virtualListRef.current?.scrollToIndex(targetIndex, {
-        align: "auto",
-        behavior: "auto",
-      });
+  //   // Wait until VirtualScrollList has rendered the new data
+  //   const timer = setTimeout(() => {
+  //     virtualListRef.current?.scrollToIndex(targetIndex, {
+  //       align: "auto",
+  //       behavior: "auto",
+  //     });
 
-      hasScrolledToHighlightRef.current = true;
-    }, 100);
+  //     hasScrolledToHighlightRef.current = true;
+  //   }, 100);
 
-    return () => clearTimeout(timer);
-  }, [
-    purchaseReturnList,
-    highlightTxnId,
-    isLoading,
-    isFetching,
-    hasMore,
-    nextCursor,
-    handleLoadMore,
-  ]);
-  useEffect(() => {
-    hasScrolledToHighlightRef.current = false;
-  }, [highlightTxnId, searchTerm, fromDate, toDate])
+  //   return () => clearTimeout(timer);
+  // }, [
+  //   purchaseReturnList,
+  //   highlightTxnId,
+  //   isLoading,
+  //   isFetching,
+  //   hasMore,
+  //   nextCursor,
+  //   handleLoadMore,
+  // ]);
+  // useEffect(() => {
+  //   hasScrolledToHighlightRef.current = false;
+  // }, [highlightTxnId, searchTerm, fromDate, toDate])
 
   return (
     <>
@@ -262,7 +268,7 @@ export default function PurchaseReturn() {
           overflow: "hidden",
         }}
       > */}
-         <div
+      <div
         className="flex flex-col bg-white"
         style={{
           height: "100%",
@@ -281,7 +287,7 @@ export default function PurchaseReturn() {
                   All Debit Note Details
                 </p>
               </div>
-                <button
+              <button
                 style={{
                   outline: "none",
                   boxShadow: "none",
@@ -313,6 +319,7 @@ export default function PurchaseReturn() {
                   value={fromDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -340,6 +347,7 @@ export default function PurchaseReturn() {
                   value={toDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -367,6 +375,7 @@ export default function PurchaseReturn() {
                   value={searchTerm}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
                     setSearchParams({
                       search: e.target.value,
                       fromDate,
@@ -383,7 +392,7 @@ export default function PurchaseReturn() {
                   className="w-full sm:w-56"
                 />
               </div>
-               <div className="hidden sm:block">
+              <div className="hidden sm:block">
                 <button
                   style={{
                     outline: "none",
@@ -480,7 +489,7 @@ export default function PurchaseReturn() {
 
           </div>
         </div>
-     
+
         <div
           className="tab-inn"
           style={{
@@ -532,7 +541,7 @@ export default function PurchaseReturn() {
                     display: "grid",
                     //gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
                     //gridTemplateColumns:"0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
-                      gridTemplateColumns: "0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                    gridTemplateColumns: "0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                     width: "100%",
                     //minWidth: "1062px",
                     boxSizing: "border-box",
@@ -548,10 +557,10 @@ export default function PurchaseReturn() {
                   }}
                 >
                   <div>Sl.No</div>
-                  
+
                   {/* <div>Bill Date</div> */}
-                    <div>Date</div>
-                    <div>Ref No</div>
+                  <div>Date</div>
+                  <div>Ref No</div>
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
@@ -582,7 +591,7 @@ export default function PurchaseReturn() {
                     items={purchaseReturnList}
                     rowHeight={52}
                     height="100%"
-                    dynamicHeight={true}
+                    //dynamicHeight={true}
                     isFetching={isFetching}
                     hasMore={hasMore}
                     getItemKey={(purchaseReturn) => purchaseReturn?.id}
@@ -592,6 +601,8 @@ export default function PurchaseReturn() {
                     isRowActive={(purchaseReturn) =>
                       rowMenuOpen === purchaseReturn?.id
                     }
+                    initialOffset={initial.current.offset}
+                    onScrollOffsetChange={saveOffset}
 
                     renderRow={(purchaseReturn, idx) => {
                       // const isHighlighted =
@@ -640,11 +651,12 @@ export default function PurchaseReturn() {
                           }}
                           style={{
                             display: "grid",
-                             gridTemplateColumns:"0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
+                            gridTemplateColumns: "0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                             //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.5fr",
                             //gridTemplateColumns:"70px 120px minmax(180px, 1fr) 160px 120px 120px 120px 50px",
                             alignItems: "center",
-                            minHeight: 52,
+                            //minHeight: 52,
+                            height: 52,
                             padding: "0 8px",
                             cursor: "pointer",
                             borderBottom:
@@ -661,20 +673,7 @@ export default function PurchaseReturn() {
                           </div>
 
                           {/* RETURN DATE */}
-                          {/* <div>
-                            {purchaseReturn?.Bill_Date
-                              ? new Date(
-                                purchaseReturn.Bill_Date
-                              ).toLocaleDateString(
-                                "en-IN",
-                                {
-                                  day: "numeric",
-                                  month: "numeric",
-                                  year: "numeric",
-                                }
-                              )
-                              : "N/A"}
-                          </div> */}
+                         
 
                           <div>
                             {purchaseReturn?.Return_Date
@@ -690,18 +689,20 @@ export default function PurchaseReturn() {
                               )
                               : ""}
                           </div>
-                            <div className="table-desi-cell">
-                          
+                          <div className="table-desi-cell">
+
                             {purchaseReturn?.Return_Number ??
                               ""}
                           </div>
 
                           {/* PARTY */}
-                          <div className="table-desi-cell"
-                            style={{
-                              overflowWrap: "break-word",
-                              wordBreak: "break-word",
-                            }}>
+                          <div className="table-desi-cell truncate"
+                          title={purchaseReturn?.Party_Name || ""}
+                            // style={{
+                            //   overflowWrap: "break-word",
+                            //   wordBreak: "break-word",
+                            // }}
+                            >
                             {purchaseReturn?.Party_Name ||
                               ""}
                           </div>
@@ -892,174 +893,174 @@ export default function PurchaseReturn() {
                             )}
                           </div> */}
                           {/* ACTION */}
-<div
-  className="py-2 px-2 table-desi-cell"
-  style={{
-    position: "sticky",
-    right: 0,
-    width: 80,
-    textAlign: "center",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "2px",
-  }}
->
-  {/* PRINT BUTTON */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
+                          <div
+                            className="py-2 px-2 table-desi-cell"
+                            style={{
+                              position: "sticky",
+                              right: 0,
+                              width: 80,
+                              textAlign: "center",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: "2px",
+                            }}
+                          >
+                            {/* PRINT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-      setClickHighlightId(purchaseReturn.id);
-      setPrintPurchaseReturnId(purchaseReturn.id);
-    }}
-    className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-    style={{
-      backgroundColor: "transparent",
-      border: "none",
-      cursor: "pointer",
-    }}
-    title="Print"
-  >
-        <Printer
-          size={16}
-          className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
-        />
-  </button>
+                                setClickHighlightId(purchaseReturn.id);
+                                setPrintPurchaseReturnId(purchaseReturn.id);
+                              }}
+                              className="group p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                              title="Print"
+                            >
+                              <Printer
+                                size={16}
+                                className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
+                              />
+                            </button>
 
-  {/* THREE DOT BUTTON */}
-  <button
-    type="button"
-    onClick={(e) => {
-      e.stopPropagation();
+                            {/* THREE DOT BUTTON */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
 
-      setClickHighlightId(purchaseReturn.id);
+                                setClickHighlightId(purchaseReturn.id);
 
-      setRowMenuOpen(
-        rowMenuOpen === purchaseReturn.id
-          ? null
-          : purchaseReturn.id
-      );
-    }}
-    className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
-    style={{
-      backgroundColor: "transparent",
-      border: "none",
-      cursor: "pointer",
-    }}
-    title="More"
-  >
-    <MoreVertical
-      size={16}
-      style={{
-        color: "#374151",
-      }}
-    />
-  </button>
+                                setRowMenuOpen(
+                                  rowMenuOpen === purchaseReturn.id
+                                    ? null
+                                    : purchaseReturn.id
+                                );
+                              }}
+                              className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                              style={{
+                                backgroundColor: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                              title="More"
+                            >
+                              <MoreVertical
+                                size={16}
+                                style={{
+                                  color: "#374151",
+                                }}
+                              />
+                            </button>
 
-  {/* THREE DOT MENU */}
-  {rowMenuOpen === purchaseReturn.id && (
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="absolute bg-white shadow-lg rounded-md"
-      style={{
-        right: 0,
-        top: "100%",
-        width: 150,
-        zIndex: 100,
-        border: "1px solid #e2e8f0",
-        overflow: "hidden",
-      }}
-    >
-      {/* VIEW / EDIT */}
-      <NavLink
-        to={{
-          pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
-          search: (() => {
-            const params = new URLSearchParams(searchParams);
+                            {/* THREE DOT MENU */}
+                            {rowMenuOpen === purchaseReturn.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute bg-white shadow-lg rounded-md"
+                                style={{
+                                  right: 0,
+                                  top: "100%",
+                                  width: 150,
+                                  zIndex: 100,
+                                  border: "1px solid #e2e8f0",
+                                  overflow: "hidden",
+                                }}
+                              >
+                                {/* VIEW / EDIT */}
+                                <NavLink
+                                  to={{
+                                    pathname: `/purchase/return/edit/${purchaseReturn?.id}`,
+                                    search: (() => {
+                                      const params = new URLSearchParams(searchParams);
 
-            params.set(
-              "highlightTxn",
-              purchaseReturn?.id
-            );
+                                      params.set(
+                                        "highlightTxn",
+                                        purchaseReturn?.id
+                                      );
 
-            return params.toString();
-          })(),
-        }}
-        state={{
-          from: "all-purchase-return-list",
-        }}
-        className="row-menu-item"
-        onClick={() => {
-          setClickHighlightId(null);
-          setRowMenuOpen(null);
-        }}
-      >
-        <Eye
-          size={13}
-          style={{
-            color: "#4CA1AF",
-          }}
-        />
+                                      return params.toString();
+                                    })(),
+                                  }}
+                                  state={{
+                                    from: "all-purchase-return-list",
+                                  }}
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setClickHighlightId(null);
+                                    setRowMenuOpen(null);
+                                  }}
+                                >
+                                  <Eye
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
 
-        <span>
-          View / Edit
-        </span>
-      </NavLink>
+                                  <span>
+                                    View / Edit
+                                  </span>
+                                </NavLink>
 
-      {/* PRINT */}
-      <button
-        type="button"
-        className="row-menu-item"
-        onClick={() => {
-          setRowMenuOpen(null);
+                                {/* PRINT */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
 
-          setPrintPurchaseReturnId(
-            purchaseReturn.id
-          );
-        }}
-      >
-        <Printer
-          size={13}
-          style={{
-            color: "#4CA1AF",
-          }}
-        />
+                                    setPrintPurchaseReturnId(
+                                      purchaseReturn.id
+                                    );
+                                  }}
+                                >
+                                  <Printer
+                                    size={13}
+                                    style={{
+                                      color: "#4CA1AF",
+                                    }}
+                                  />
 
-        <span>
-          Print
-        </span>
-      </button>
+                                  <span>
+                                    Print
+                                  </span>
+                                </button>
 
-      {/* DELETE */}
-      <button
-        type="button"
-        className="row-menu-item delete-item"
-        title="Delete purchase return"
-        onClick={() => {
-          setRowMenuOpen(null);
+                                {/* DELETE */}
+                                <button
+                                  type="button"
+                                  className="row-menu-item delete-item"
+                                  title="Delete purchase return"
+                                  onClick={() => {
+                                    setRowMenuOpen(null);
 
-          setDeleteTarget({
-            Purchase_Return_Id:
-              purchaseReturn.id,
-          });
-        }}
-      >
-        <Trash2
-          size={13}
-          style={{
-            color: "#dc2626",
-          }}
-        />
+                                    setDeleteTarget({
+                                      Purchase_Return_Id:
+                                        purchaseReturn.id,
+                                    });
+                                  }}
+                                >
+                                  <Trash2
+                                    size={13}
+                                    style={{
+                                      color: "#dc2626",
+                                    }}
+                                  />
 
-        <span>
-          Delete
-        </span>
-      </button>
-    </div>
-  )}
-</div>
+                                  <span>
+                                    Delete
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     }}

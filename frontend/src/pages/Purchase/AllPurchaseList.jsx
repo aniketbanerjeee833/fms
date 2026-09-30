@@ -25,6 +25,7 @@ import { useReactToPrint } from "react-to-print";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import useListRestore from "../../utils/useListRestore";
 
 
 export default function AllPurchaseList() {
@@ -83,6 +84,11 @@ export default function AllPurchaseList() {
   //   const initialPurchaseLimit = useRef(
   //   Number(sessionStorage.getItem("purchaseListCount")) || 10
   // );
+  //const { initial, saveCount, saveOffset, reset } = useListRestore("purchaseList");
+  // true only when we arrived back from an edit page
+  const cameBack = useRef(!!searchParams.get("highlightTxn")).current;
+
+  const { initial, saveCount, saveOffset, reset } = useListRestore("purchaseList", cameBack);
   const {
     data: purchases,
     isLoading,
@@ -92,10 +98,14 @@ export default function AllPurchaseList() {
     search: searchTerm,
     fromDate,
     toDate,
-    limit: 10,
-    // limit: cursor ? 10 : initialPurchaseLimit.current,
+    //limit: 10,//used
+    limit: cursor ? 10 : initial.current.count
+
   });
+
+
   const purchaseList = purchases?.purchases ?? [];
+  useEffect(() => { saveCount(purchaseList.length); }, [purchaseList.length]);
   const hasMore = purchases?.hasMore ?? false;
   const nextCursor = purchases?.nextCursor ?? null;
 
@@ -219,12 +229,18 @@ export default function AllPurchaseList() {
 
   const virtualListRef = useRef(null);
 
-  const hasScrolledToHighlightRef = useRef(false);
+  //const hasScrolledToHighlightRef = useRef(false);
   //const skipHighlightScrollRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
-  const highlightTxnId = searchParams.get("highlightTxn");
+  //const highlightTxnId = searchParams.get("highlightTxn");
+
 
   // useEffect(() => {
+  //   // if (skipHighlightScrollRef.current) {
+  //   //   skipHighlightScrollRef.current = false;
+  //   //   return;
+  //   // }
+
   //   if (hasScrolledToHighlightRef.current) return;
   //   if (!highlightTxnId) return;
   //   if (isLoading || isFetching) return;
@@ -233,7 +249,7 @@ export default function AllPurchaseList() {
   //     (purchase) =>
   //       String(purchase?.Purchase_Id) === String(highlightTxnId)
   //   );
-  //   console.log("Target index for highlight:", targetIndex);
+
   //   if (targetIndex === -1) {
   //     if (hasMore && nextCursor && !isFetching) {
   //       handleLoadMore();
@@ -241,7 +257,6 @@ export default function AllPurchaseList() {
   //     return;
   //   }
 
-  //   // Wait until VirtualScrollList has rendered the new data
   //   const timer = setTimeout(() => {
   //     virtualListRef.current?.scrollToIndex(targetIndex, {
   //       align: "auto",
@@ -261,58 +276,12 @@ export default function AllPurchaseList() {
   //   nextCursor,
   //   handleLoadMore,
   // ]);
-  useEffect(() => {
-    // if (skipHighlightScrollRef.current) {
-    //   skipHighlightScrollRef.current = false;
-    //   return;
-    // }
 
-    if (hasScrolledToHighlightRef.current) return;
-    if (!highlightTxnId) return;
-    if (isLoading || isFetching) return;
-
-    const targetIndex = purchaseList.findIndex(
-      (purchase) =>
-        String(purchase?.Purchase_Id) === String(highlightTxnId)
-    );
-
-    if (targetIndex === -1) {
-      if (hasMore && nextCursor && !isFetching) {
-        handleLoadMore();
-      }
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      virtualListRef.current?.scrollToIndex(targetIndex, {
-        align: "auto",
-        behavior: "auto",
-      });
-
-      hasScrolledToHighlightRef.current = true;
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [
-    purchaseList,
-    highlightTxnId,
-    isLoading,
-    isFetching,
-    hasMore,
-    nextCursor,
-    handleLoadMore,
-  ]);
-
-  useEffect(() => {
-
-    hasScrolledToHighlightRef.current = false;
-  }, [highlightTxnId, searchTerm, fromDate, toDate]);
   // useEffect(() => {
-  //   sessionStorage.setItem(
-  //     "purchaseListCount",
-  //     String(purchaseList.length)
-  //   );
-  // }, [purchaseList.length]);
+
+  //   hasScrolledToHighlightRef.current = false;
+  // }, [highlightTxnId, searchTerm, fromDate, toDate]);
+
   return (
     <>
       {/* <div className="flex flex-col bg-white"
@@ -379,6 +348,7 @@ export default function AllPurchaseList() {
                   value={fromDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -406,6 +376,7 @@ export default function AllPurchaseList() {
                   value={toDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -433,6 +404,7 @@ export default function AllPurchaseList() {
                   value={searchTerm}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: e.target.value,
@@ -679,7 +651,7 @@ export default function AllPurchaseList() {
                       items={purchaseList}
                       rowHeight={52}
                       height="100%"
-                      dynamicHeight={true}
+                      //dynamicHeight={true}
                       onLoadMore={handleLoadMore}
                       isFetching={isFetching}
                       hasMore={hasMore}
@@ -689,6 +661,8 @@ export default function AllPurchaseList() {
                       isRowActive={(purchase) =>
                         rowMenuOpen === purchase?.Purchase_Id
                       }
+                      initialOffset={initial.current.offset}
+                      onScrollOffsetChange={saveOffset}
                       renderRow={(purchase, idx) => {
                         // const isHighlighted =
                         //   String(searchParams.get("highlightTxn")) ===
@@ -735,7 +709,8 @@ export default function AllPurchaseList() {
                               gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.8fr",
                               //gridTemplateColumns: "0.6fr 1.1fr 1.3fr 3fr 1.6fr 1.3fr 1.2fr 0.5fr",
                               alignItems: "center",
-                              minHeight: "52px",
+                              // minHeight: "52px",
+                              height: 52,
                               columnGap: "10px",
                               width: "100%",
                               cursor: "pointer",
@@ -772,12 +747,18 @@ export default function AllPurchaseList() {
                             </div>
 
                             {/* PARTY */}
-                            <div
+                            {/* <div
                               className="table-desi-cell"
                               style={{
                                 overflowWrap: "break-word",
                                 wordBreak: "break-word",
                               }}
+                            >
+                              {purchase?.Party_Name || ""}
+                            </div> */}
+                            <div
+                              className="table-desi-cell truncate"
+                              title={purchase?.Party_Name || ""}
                             >
                               {purchase?.Party_Name || ""}
                             </div>

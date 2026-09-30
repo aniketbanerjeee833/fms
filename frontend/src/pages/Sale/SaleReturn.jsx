@@ -21,6 +21,7 @@ import { useReactToPrint } from "react-to-print";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import useListRestore from "../../utils/useListRestore";
 
 
 
@@ -45,6 +46,10 @@ export default function SaleReturn() {
   //   fromDate,
   //   toDate,
   // });
+    const cameBack = useRef(!!searchParams.get("highlightTxn")).current;
+  
+    const { initial, saveCount, saveOffset, reset } = useListRestore("saleReturnList", cameBack);
+  
   const {
     data: saleReturns,
     isLoading,
@@ -54,11 +59,12 @@ export default function SaleReturn() {
     search: searchTerm,
     fromDate,
     toDate,
-    limit: 10,
+    //limit: 10,
+    limit: cursor ? 10 : initial.current.count,
   });
 
   const saleReturnList = saleReturns?.saleReturns ?? [];
-
+useEffect(() => { saveCount(saleReturnList.length); }, [saleReturnList.length]);
   const hasMore = saleReturns?.hasMore ?? false;
 
   const nextCursor = saleReturns?.nextCursor ?? null;
@@ -194,56 +200,55 @@ export default function SaleReturn() {
     }
   }, [bulkSaleReturnReportData, showSaleReturnBulkPrintPreview]);
   const virtualListRef = useRef(null);
-  const hasScrolledToHighlightRef = useRef(false);
+  //const hasScrolledToHighlightRef = useRef(false);
   const [clickHighlightId, setClickHighlightId] = useState(null);
-  //const skipHighlightScrollRef = useRef(false);
 
-  const highlightTxnId = searchParams.get("highlightTxn");
+  //const highlightTxnId = searchParams.get("highlightTxn");
 
-  useEffect(() => {
-    //   if (skipHighlightScrollRef.current) {
-    //   skipHighlightScrollRef.current = false;
-    //   return;
-    // }
-    if (hasScrolledToHighlightRef.current) return;
-    if (!highlightTxnId) return;
-    if (isLoading || isFetching) return;
+  // useEffect(() => {
+  //   //   if (skipHighlightScrollRef.current) {
+  //   //   skipHighlightScrollRef.current = false;
+  //   //   return;
+  //   // }
+  //   if (hasScrolledToHighlightRef.current) return;
+  //   if (!highlightTxnId) return;
+  //   if (isLoading || isFetching) return;
 
-    const targetIndex = saleReturnList.findIndex(
-      (saleReturn) =>
-        String(saleReturn?.id) === String(highlightTxnId)
-    );
-    console.log("Target index for highlight:", targetIndex);
-    if (targetIndex === -1) {
-      if (hasMore && nextCursor && !isFetching) {
-        handleLoadMore();
-      }
-      return;
-    }
+  //   const targetIndex = saleReturnList.findIndex(
+  //     (saleReturn) =>
+  //       String(saleReturn?.id) === String(highlightTxnId)
+  //   );
+  //   console.log("Target index for highlight:", targetIndex);
+  //   if (targetIndex === -1) {
+  //     if (hasMore && nextCursor && !isFetching) {
+  //       handleLoadMore();
+  //     }
+  //     return;
+  //   }
 
-    // Wait until VirtualScrollList has rendered the new data
-    const timer = setTimeout(() => {
-      virtualListRef.current?.scrollToIndex(targetIndex, {
-        align: "auto",
-        behavior: "auto",
-      });
+  //   // Wait until VirtualScrollList has rendered the new data
+  //   const timer = setTimeout(() => {
+  //     virtualListRef.current?.scrollToIndex(targetIndex, {
+  //       align: "auto",
+  //       behavior: "auto",
+  //     });
 
-      hasScrolledToHighlightRef.current = true;
-    }, 100);
+  //     hasScrolledToHighlightRef.current = true;
+  //   }, 100);
 
-    return () => clearTimeout(timer);
-  }, [
-    saleReturnList,
-    highlightTxnId,
-    isLoading,
-    isFetching,
-    hasMore,
-    nextCursor,
-    handleLoadMore,
-  ]);
-  useEffect(() => {
-    hasScrolledToHighlightRef.current = false;
-  }, [highlightTxnId, searchTerm, fromDate, toDate])
+  //   return () => clearTimeout(timer);
+  // }, [
+  //   saleReturnList,
+  //   highlightTxnId,
+  //   isLoading,
+  //   isFetching,
+  //   hasMore,
+  //   nextCursor,
+  //   handleLoadMore,
+  // ]);
+  // useEffect(() => {
+  //   hasScrolledToHighlightRef.current = false;
+  // }, [highlightTxnId, searchTerm, fromDate, toDate])
   return (
     <>
 
@@ -310,6 +315,7 @@ export default function SaleReturn() {
                   value={fromDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -331,6 +337,7 @@ export default function SaleReturn() {
                   value={toDate}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
 
                     setSearchParams({
                       search: searchTerm,
@@ -352,6 +359,7 @@ export default function SaleReturn() {
                   value={searchTerm}
                   onChange={(e) => {
                     setCursor(null);
+                    reset();
                     setSearchParams({
                       search: e.target.value,
                       fromDate,
@@ -566,7 +574,7 @@ export default function SaleReturn() {
                     items={saleReturnList}
                     rowHeight={52}
                     height="100%"
-                    dynamicHeight={true}
+                    //dynamicHeight={true}
                     isFetching={isFetching}
                     hasMore={hasMore}
                     getItemKey={(saleReturn) => saleReturn?.id}
@@ -576,6 +584,8 @@ export default function SaleReturn() {
                     isRowActive={(saleReturn) =>
                       rowMenuOpen === saleReturn?.id
                     }
+                     initialOffset={initial.current.offset}
+                    onScrollOffsetChange={saveOffset}
                     renderRow={(saleReturn, idx) => {
                       const isHighlighted =
                         clickHighlightId !== null
@@ -625,7 +635,8 @@ export default function SaleReturn() {
                             //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                             gridTemplateColumns:"0.7fr 1.2fr 1.4fr 3fr 1.6fr 1.2fr 1.2fr 1.2fr 0.8fr",
                             alignItems: "center",
-                            minHeight: 52,
+                            //minHeight: "52px",
+                            height: 52,
                             padding: "0 8px",
                             cursor: "pointer",
                             borderBottom:
@@ -681,11 +692,12 @@ export default function SaleReturn() {
                           {/* PARTY */}
 
                           <div
-                            className="table-desi-cell"
-                            style={{
-                              overflowWrap: "break-word",
-                              wordBreak: "break-word",
-                            }}
+                            className="table-desi-cell truncate"
+                            // style={{
+                            //   overflowWrap: "break-word",
+                            //   wordBreak: "break-word",
+                            // }}
+                            title={saleReturn?.Party_Name || ""}
                           >
                             {saleReturn?.Party_Name ||
                               ""}

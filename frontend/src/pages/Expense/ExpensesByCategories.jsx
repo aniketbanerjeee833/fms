@@ -6,7 +6,7 @@ import {
   Search,
   MoreVertical,
   
-  ChevronRight,
+
   Receipt,
   Tags,
   Eye,
