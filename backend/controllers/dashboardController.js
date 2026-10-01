@@ -1485,78 +1485,88 @@ const getSalesChartData = async (req, res, next) => {
   let connection;
   try {
     connection = await db.getConnection();
- 
+
     const today = new Date();
     const defaultFrom = new Date(today.getFullYear(), today.getMonth(), 1);
- 
-    const toDate   = req.query.toDate   || today.toISOString().slice(0, 10);
-    const fromDate = req.query.fromDate || defaultFrom.toISOString().slice(0, 10);
- 
-    if (new Date(fromDate) > new Date(toDate)) {
+
+    // Local-date helper so defaults don't shift through toISOString() (UTC)
+    const toYMD = (d) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+
+    const toDate = req.query.toDate || toYMD(today);
+    const fromDate = req.query.fromDate || toYMD(defaultFrom);
+
+    if (new Date(`${fromDate}T00:00:00Z`) > new Date(`${toDate}T00:00:00Z`)) {
       return res.status(400).json({
         success: false,
         message: "From date cannot be after To date",
       });
     }
- 
-    /* ── current period totals, grouped by day ── */
+
+    /* ── current period totals, grouped by day (date returned as a STRING) ── */
     const [rows] = await connection.query(
-      `SELECT DATE(Invoice_Date) AS date, COALESCE(SUM(Total_Amount), 0) AS total
+      `SELECT DATE_FORMAT(Invoice_Date, '%Y-%m-%d') AS date,
+              COALESCE(SUM(Total_Amount), 0) AS total
        FROM add_sale
        WHERE Invoice_Date BETWEEN ? AND ?
-       GROUP BY DATE(Invoice_Date)`,
+       GROUP BY DATE_FORMAT(Invoice_Date, '%Y-%m-%d')`,
       [`${fromDate} 00:00:00`, `${toDate} 23:59:59`]
     );
- 
+
     const totalsByDate = {};
     rows.forEach((r) => {
-      // MySQL DATE() may come back as a Date object depending on driver config
-      const key = typeof r.date === "string" ? r.date : r.date.toISOString().slice(0, 10);
-      totalsByDate[key] = Number(r.total);
+      totalsByDate[r.date] = Number(r.total);
     });
- 
-    /* ── zero-fill every day in the range so the chart line is continuous ── */
+
+    /* ── zero-fill every day in the range (UTC math, no timezone drift) ── */
     const series = [];
-    let cursor = new Date(fromDate);
-    const end  = new Date(toDate);
+    const cursor = new Date(`${fromDate}T00:00:00Z`);
+    const end = new Date(`${toDate}T00:00:00Z`);
     let currentPeriodTotal = 0;
- 
+
     while (cursor <= end) {
       const dateStr = cursor.toISOString().slice(0, 10);
-      const total   = totalsByDate[dateStr] || 0;
+      const total = totalsByDate[dateStr] || 0;
       series.push({ date: dateStr, total });
       currentPeriodTotal += total;
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
- 
+
     /* ── previous period of the SAME length, immediately before fromDate ── */
     const periodDays = series.length;
-    const prevTo   = new Date(fromDate);
-    prevTo.setDate(prevTo.getDate() - 1);
+
+    const prevTo = new Date(`${fromDate}T00:00:00Z`);
+    prevTo.setUTCDate(prevTo.getUTCDate() - 1);
+
     const prevFrom = new Date(prevTo);
-    prevFrom.setDate(prevFrom.getDate() - (periodDays - 1));
- 
+    prevFrom.setUTCDate(prevFrom.getUTCDate() - (periodDays - 1));
+
     const prevFromStr = prevFrom.toISOString().slice(0, 10);
-    const prevToStr   = prevTo.toISOString().slice(0, 10);
- 
+    const prevToStr = prevTo.toISOString().slice(0, 10);
+
     const [[prevResult]] = await connection.query(
       `SELECT COALESCE(SUM(Total_Amount), 0) AS total
        FROM add_sale
        WHERE Invoice_Date BETWEEN ? AND ?`,
       [`${prevFromStr} 00:00:00`, `${prevToStr} 23:59:59`]
     );
- 
+
     const previousPeriodTotal = Number(prevResult.total);
- 
+
     let percentChange = null;
     if (previousPeriodTotal > 0) {
-      percentChange = ((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100;
+      percentChange =
+        ((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100;
     } else if (currentPeriodTotal > 0) {
-      percentChange = 100; // previous period had zero sales — treat as +100%
+      percentChange = 100; // previous period had zero sales, treat as +100%
     } else {
       percentChange = 0;
     }
- 
+
     return res.status(200).json({
       success: true,
       fromDate,
@@ -1567,7 +1577,6 @@ const getSalesChartData = async (req, res, next) => {
       percentChange: Number(percentChange.toFixed(1)),
       comparedTo: { fromDate: prevFromStr, toDate: prevToStr },
     });
- 
   } catch (err) {
     console.error("❌ getSalesChartData:", err);
     next(err);
@@ -1575,6 +1584,101 @@ const getSalesChartData = async (req, res, next) => {
     if (connection) connection.release();
   }
 };
+
+// const getSalesChartData = async (req, res, next) => {
+//   let connection;
+//   try {
+//     connection = await db.getConnection();
+ 
+//     const today = new Date();
+//     const defaultFrom = new Date(today.getFullYear(), today.getMonth(), 1);
+ 
+//     const toDate   = req.query.toDate   || today.toISOString().slice(0, 10);
+//     const fromDate = req.query.fromDate || defaultFrom.toISOString().slice(0, 10);
+ 
+//     if (new Date(fromDate) > new Date(toDate)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "From date cannot be after To date",
+//       });
+//     }
+ 
+//     /* ── current period totals, grouped by day ── */
+//     const [rows] = await connection.query(
+//       `SELECT DATE(Invoice_Date) AS date, COALESCE(SUM(Total_Amount), 0) AS total
+//        FROM add_sale
+//        WHERE Invoice_Date BETWEEN ? AND ?
+//        GROUP BY DATE(Invoice_Date)`,
+//       [`${fromDate} 00:00:00`, `${toDate} 23:59:59`]
+//     );
+ 
+//     const totalsByDate = {};
+//     rows.forEach((r) => {
+//       // MySQL DATE() may come back as a Date object depending on driver config
+//       const key = typeof r.date === "string" ? r.date : r.date.toISOString().slice(0, 10);
+//       totalsByDate[key] = Number(r.total);
+//     });
+ 
+//     /* ── zero-fill every day in the range so the chart line is continuous ── */
+//     const series = [];
+//     let cursor = new Date(fromDate);
+//     const end  = new Date(toDate);
+//     let currentPeriodTotal = 0;
+ 
+//     while (cursor <= end) {
+//       const dateStr = cursor.toISOString().slice(0, 10);
+//       const total   = totalsByDate[dateStr] || 0;
+//       series.push({ date: dateStr, total });
+//       currentPeriodTotal += total;
+//       cursor.setDate(cursor.getDate() + 1);
+//     }
+ 
+//     /* ── previous period of the SAME length, immediately before fromDate ── */
+//     const periodDays = series.length;
+//     const prevTo   = new Date(fromDate);
+//     prevTo.setDate(prevTo.getDate() - 1);
+//     const prevFrom = new Date(prevTo);
+//     prevFrom.setDate(prevFrom.getDate() - (periodDays - 1));
+ 
+//     const prevFromStr = prevFrom.toISOString().slice(0, 10);
+//     const prevToStr   = prevTo.toISOString().slice(0, 10);
+ 
+//     const [[prevResult]] = await connection.query(
+//       `SELECT COALESCE(SUM(Total_Amount), 0) AS total
+//        FROM add_sale
+//        WHERE Invoice_Date BETWEEN ? AND ?`,
+//       [`${prevFromStr} 00:00:00`, `${prevToStr} 23:59:59`]
+//     );
+ 
+//     const previousPeriodTotal = Number(prevResult.total);
+ 
+//     let percentChange = null;
+//     if (previousPeriodTotal > 0) {
+//       percentChange = ((currentPeriodTotal - previousPeriodTotal) / previousPeriodTotal) * 100;
+//     } else if (currentPeriodTotal > 0) {
+//       percentChange = 100; // previous period had zero sales — treat as +100%
+//     } else {
+//       percentChange = 0;
+//     }
+ 
+//     return res.status(200).json({
+//       success: true,
+//       fromDate,
+//       toDate,
+//       series,
+//       totalSales: currentPeriodTotal,
+//       previousPeriodTotal,
+//       percentChange: Number(percentChange.toFixed(1)),
+//       comparedTo: { fromDate: prevFromStr, toDate: prevToStr },
+//     });
+ 
+//   } catch (err) {
+//     console.error("❌ getSalesChartData:", err);
+//     next(err);
+//   } finally {
+//     if (connection) connection.release();
+//   }
+// };
  
 export { getAllSalesAndPurchasesYearWise ,
   getCategoriesWiseItemCount,
