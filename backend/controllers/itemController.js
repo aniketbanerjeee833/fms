@@ -1180,6 +1180,16 @@ const importItemsExcel = async (req, res, next) => {
       const raw = excelRow.raw || {};
 
       const errors = [];
+      const fieldErrors = {};
+      const addFieldError = (field, message) => {
+  errors.push(message);
+
+  if (!fieldErrors[field]) {
+    fieldErrors[field] = [];
+  }
+
+  fieldErrors[field].push(message);
+};
 
       // -------------------------------------------------------
       // Clone raw object
@@ -1199,17 +1209,43 @@ const importItemsExcel = async (req, res, next) => {
 let primaryUnit = null;
 let secondaryUnit = null;
 
+// if (rest.Primary_Unit) {
+//   primaryUnit = findUnit(
+//     rest.Primary_Unit,
+//     units
+//   );
+
+//   if (!primaryUnit) {
+//       addFieldError(
+//     "Primary_Unit",
+//     `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
+//   );
+//     // errors.push(
+//     //   `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
+//     // );
+//   }
+// }
+
+// if (rest.Secondary_Unit) {
+//   secondaryUnit = findUnit(
+//     rest.Secondary_Unit,
+//     units
+//   );
+
+//   if (!secondaryUnit) {
+//     addFieldError(
+//       "Secondary_Unit",
+//       `Secondary Unit "${rest.Secondary_Unit}" not found. Add it in Units first.`
+//     );
+//   }
+// }
+
+
 if (rest.Primary_Unit) {
   primaryUnit = findUnit(
     rest.Primary_Unit,
     units
   );
-
-  if (!primaryUnit) {
-    errors.push(
-      `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
-    );
-  }
 }
 
 if (rest.Secondary_Unit) {
@@ -1217,62 +1253,51 @@ if (rest.Secondary_Unit) {
     rest.Secondary_Unit,
     units
   );
-
-  if (!secondaryUnit) {
-    errors.push(
-      `Secondary Unit "${rest.Secondary_Unit}" not found. Add it in Units first.`
-    );
-  }
 }
-// if (rest.Primary_Unit) {
-//   const primaryUnit = findUnit(
-//     rest.Primary_Unit,
-//     units
-//   );
-
-//   if (!primaryUnit) {
-//     errors.push(
-//       `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
-//     );
-//   } else {
-//     // Use the database's canonical Unit_Name
-//     rest.Primary_Unit = primaryUnit.Unit_Name;
-//   }
-// }
-
-// if (rest.Secondary_Unit) {
-//   const secondaryUnit = findUnit(
-//     rest.Secondary_Unit,
-//     units
-//   );
-
-//   if (!secondaryUnit) {
-//     errors.push(
-//       `Secondary Unit "${rest.Secondary_Unit}" not found. Add it in Units first.`
-//     );
-//   } else {
-//     // Use the database's canonical Unit_Name
-//     rest.Secondary_Unit = secondaryUnit.Unit_Name;
-//   }
-// }
-
       // -------------------------------------------------------
       // Discount type
       // -------------------------------------------------------
 
-      const dt = normalizeDiscountType(
-        rest.Discount_Type_On_Sale_Price
-      );
+      // const dt = normalizeDiscountType(
+      //   rest.Discount_Type_On_Sale_Price
+      // );
 
-      if (
-        rest.Discount_Type_On_Sale_Price !== undefined &&
-        rest.Discount_Type_On_Sale_Price !== "" &&
-        dt === null
-      ) {
-        errors.push(
-          'Discount Type: use "Discount %" or "Discount Amount"'
-        );
-      }
+      // if (
+      //   rest.Discount_Type_On_Sale_Price !== undefined &&
+      //   rest.Discount_Type_On_Sale_Price !== "" &&
+      //   dt === null
+      // ) {
+      //   errors.push(
+      //     'Discount Type: use "Discount %" or "Discount Amount"'
+      //   );
+      // }
+      const dt = normalizeDiscountType(
+  rest.Discount_Type_On_Sale_Price
+);
+
+if (
+  rest.Discount_Type_On_Sale_Price !== undefined &&
+  rest.Discount_Type_On_Sale_Price !== "" &&
+  dt === null
+) {
+  addFieldError(
+    "Discount_Type_On_Sale_Price",
+    'Discount Type: use "Discount %" or "Discount Amount"'
+  );
+}
+
+// Discount % cannot be greater than 100
+if (
+  dt === "Percentage" &&
+  rest.Discount_On_Sale_Price !== undefined &&
+  rest.Discount_On_Sale_Price !== "" &&
+  Number(rest.Discount_On_Sale_Price) > 100
+) {
+  addFieldError(
+    "Discount_On_Sale_Price",
+    "Discount percentage cannot be greater than 100"
+  );
+}
 
       rest.Discount_Type_On_Sale_Price = dt || "";
 
@@ -1295,13 +1320,21 @@ if (rest.Secondary_Unit) {
 
       const parsed = itemFormSchema.safeParse(input);
 
+      // if (!parsed.success) {
+      //   parsed.error.errors.forEach((error) => {
+      //     errors.push(
+      //       `${error.path.join(".") || "Row"}: ${error.message}`
+      //     );
+      //   });
+      // }
       if (!parsed.success) {
-        parsed.error.errors.forEach((error) => {
-          errors.push(
-            `${error.path.join(".") || "Row"}: ${error.message}`
-          );
-        });
-      }
+  parsed.error.issues.forEach((error) => {
+    const field = error.path[0] || "Row";
+    const message = `${error.path.join(".") || "Row"}: ${error.message}`;
+
+    addFieldError(field, message);
+  });
+}
 
       // const data = parsed.success
       //   ? {
@@ -1323,58 +1356,14 @@ if (rest.Secondary_Unit) {
     }
   : null;
 
-      // -------------------------------------------------------
-      // Unit validation
-      // -------------------------------------------------------
-
-      // if (data) {
-      //   // const checkUnit = (field, label) => {
-      //   //   if (!data[field]) return;
-
-      //   //   const found = unitMap.get(
-      //   //     String(data[field]).trim().toLowerCase()
-      //   //   );
-
-      //   //   if (!found) {
-      //   //     errors.push(
-      //   //       `${label} "${data[field]}" not found. Add it in Units first.`
-      //   //     );
-      //   //   } else {
-      //   //     // Use DB's actual spelling
-      //   //     data[field] = found;
-      //   //   }
-      //   // };
-
-      //   checkUnit("Primary_Unit", "Base Unit");
-
-      //   checkUnit("Secondary_Unit", "Secondary Unit");
-
-      //   if (data.Secondary_Unit && !data.Primary_Unit) {
-      //     errors.push(
-      //       "Base Unit is required when Secondary Unit is given"
-      //     );
-      //   }
-
-      //   // -----------------------------------------------------
-      //   // Conversion rate validation
-      //   // -----------------------------------------------------
-
-      //   if (
-      //     data.Secondary_Unit &&
-      //     (!data.Conversion_Rate ||
-      //       Number(data.Conversion_Rate) <= 0)
-      //   ) {
-      //     errors.push(
-      //       "Conversion Rate must be greater than 0 when Secondary Unit is given"
-      //     );
-      //   }
-      // }
+     
 
       return {
         rowNo,
         input,
         data,
         errors: [...new Set(errors)],
+          fieldErrors
       };
     });
 
@@ -1402,15 +1391,30 @@ if (rest.Secondary_Unit) {
       // Duplicate item name
       // -------------------------------------------------------
 
+      // if (name) {
+      //   if (seenNames.has(name)) {
+      //     row.errors.push(
+      //       `Duplicate item name (also in row ${seenNames.get(name)})`
+      //     );
+      //   } else {
+      //     seenNames.set(name, row.rowNo);
+      //   }
+      // }
       if (name) {
-        if (seenNames.has(name)) {
-          row.errors.push(
-            `Duplicate item name (also in row ${seenNames.get(name)})`
-          );
-        } else {
-          seenNames.set(name, row.rowNo);
-        }
-      }
+  if (seenNames.has(name)) {
+    const message = `Duplicate item name (also in row ${seenNames.get(name)})`;
+
+    row.errors.push(message);
+
+    if (!row.fieldErrors.Item_Name) {
+      row.fieldErrors.Item_Name = [];
+    }
+
+    row.fieldErrors.Item_Name.push(message);
+  } else {
+    seenNames.set(name, row.rowNo);
+  }
+}
 
       // -------------------------------------------------------
       // Duplicate item code
@@ -1418,9 +1422,15 @@ if (rest.Secondary_Unit) {
 
       if (code) {
         if (seenCodes.has(code)) {
-          row.errors.push(
-            `Duplicate item code (also in row ${seenCodes.get(code)})`
-          );
+          const message = `Duplicate item code (also in row ${seenCodes.get(code)})`;
+
+          row.errors.push(message);
+
+          if (!row.fieldErrors.Item_Code) {
+            row.fieldErrors.Item_Code = [];
+          }
+
+          row.fieldErrors.Item_Code.push(message);
         } else {
           seenCodes.set(code, row.rowNo);
         }
@@ -1492,15 +1502,37 @@ if (rest.Secondary_Unit) {
         .trim()
         .toLowerCase();
 
-      if (name && dbNames.has(name)) {
-        row.errors.push("Item already exists");
-      }
+      // if (name && dbNames.has(name)) {
+      //   row.errors.push("Item already exists");
+      // }
 
-      if (code && dbCodes.has(code)) {
-        row.errors.push("Item Code already exists");
-      }
+      // if (code && dbCodes.has(code)) {
+      //   row.errors.push("Item Code already exists");
+      // }
+      if (name && dbNames.has(name)) {
+  row.errors.push("Item already exists");
+
+  if (!row.fieldErrors.Item_Name) {
+    row.fieldErrors.Item_Name = [];
+  }
+
+  row.fieldErrors.Item_Name.push("Item already exists");
+}
+
+if (code && dbCodes.has(code)) {
+  row.errors.push("Item Code already exists");
+
+  if (!row.fieldErrors.Item_Code) {
+    row.fieldErrors.Item_Code = [];
+  }
+
+  row.fieldErrors.Item_Code.push("Item Code already exists");
+}
 
       row.errors = [...new Set(row.errors)];
+      Object.keys(row.fieldErrors).forEach((field) => {
+  row.fieldErrors[field] = [...new Set(row.fieldErrors[field])];
+});
     });
 
     // =========================================================
@@ -1543,6 +1575,7 @@ if (rest.Secondary_Unit) {
           data: row.input,
 
           errors: row.errors,
+          fieldErrors: row.fieldErrors
         })),
 
         errors: errorList,
@@ -1572,6 +1605,63 @@ if (rest.Secondary_Unit) {
     await connection.beginTransaction();
 
     inTransaction = true;
+    const getOrCreateUnit = async (unitValue) => {
+  if (!unitValue || String(unitValue).trim() === "") {
+    return null;
+  }
+
+  const input = String(unitValue).trim();
+
+  const normalized = normalizeUnit(input);
+
+  // Convert alias to canonical shorthand
+  const canonicalShorthand =
+    UNIT_ALIASES[normalized] || normalized;
+
+  // Check if unit already exists
+  const [existing] = await connection.query(
+    `
+    SELECT
+      Unit_Name,
+      Unit_Shorthand
+    FROM units
+    WHERE Is_Used = 1
+      AND (
+        LOWER(TRIM(Unit_Name)) = ?
+        OR LOWER(TRIM(Unit_Shorthand)) = ?
+      )
+    LIMIT 1
+    `,
+    [
+      canonicalShorthand,
+      canonicalShorthand,
+    ]
+  );
+
+  // Existing unit → use it
+  if (existing.length > 0) {
+    return existing[0].Unit_Shorthand;
+  }
+
+  // Unit does not exist → create it
+  await connection.execute(
+    `
+    INSERT INTO units
+    (
+      Unit_Name,
+      Unit_Shorthand,
+      Is_Used
+    )
+    VALUES (?, ?, 1)
+    `,
+    [
+      input,
+      canonicalShorthand,
+    ]
+  );
+
+  return canonicalShorthand;
+};
 
     // =========================================================
     // 14. GET NEXT ITEM ID
@@ -1630,19 +1720,32 @@ if (rest.Secondary_Unit) {
         // Units
         // -----------------------------------------------------
 
-        const primaryUnit =
-          d.Primary_Unit || null;
+        // const primaryUnit =
+        //   d.Primary_Unit || null;
 
-        const secondaryUnit =
-          d.Secondary_Unit || null;
+        // const secondaryUnit =
+        //   d.Secondary_Unit || null;
 
-        const itemUnit =
-          primaryUnit ?? "";
+        // const itemUnit =
+        //   primaryUnit ?? "";
 
-        const conversionRate =
-          secondaryUnit
-            ? d.Conversion_Rate ?? null
-            : null;
+        // const conversionRate =
+        //   secondaryUnit
+        //     ? d.Conversion_Rate ?? null
+        //     : null;
+        const primaryUnit = await getOrCreateUnit(
+  d.Primary_Unit
+);
+
+const secondaryUnit = await getOrCreateUnit(
+  d.Secondary_Unit
+);
+
+const itemUnit = primaryUnit ?? "";
+
+const conversionRate = secondaryUnit
+  ? d.Conversion_Rate ?? null
+  : null;
 
         // -----------------------------------------------------
         // Opening stock

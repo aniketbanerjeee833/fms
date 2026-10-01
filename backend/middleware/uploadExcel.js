@@ -24,9 +24,13 @@ import multer from "multer";
 import path from "path";
 import fs from "fs/promises";
 
-const uploadDir = path.join(process.cwd(), "uploads", "items-excel");
+const uploadDir = path.join(
+  process.cwd(),
+  "uploads",
+  "items-excel"
+);
 
-// Ensure upload directory exists
+// Creates uploads/items-excel if it doesn't exist
 await fs.mkdir(uploadDir, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -47,14 +51,16 @@ const uploadExcel = multer({
   storage,
 
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB
+    fileSize: 5 * 1024 * 1024,
   },
 
   fileFilter: (req, file, cb) => {
     const allowedExtensions = /\.(xlsx|xls)$/i;
 
     if (!allowedExtensions.test(file.originalname)) {
-      return cb(new Error("Only .xls and .xlsx files are allowed."));
+      return cb(
+        new Error("Only .xls and .xlsx files are allowed.")
+      );
     }
 
     cb(null, true);

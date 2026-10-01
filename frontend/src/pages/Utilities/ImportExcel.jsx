@@ -204,6 +204,16 @@ const [showErrorsOnly, setShowErrorsOnly] = useState(false);
 
     /* ---- preview table columns (status + #, then active columns) ---- */
     // const previewRows = (rows || []).slice(0, PREVIEW_LIMIT);
+// const previewRows = useMemo(() => {
+//   if (!rows) return [];
+
+//   if (showErrorsOnly) {
+//     return rows.filter((row) => row.errors.length > 0);
+//   }
+
+//   return rows;
+// }, [rows, showErrorsOnly]);
+
 const previewRows = useMemo(() => {
   if (!rows) return [];
 
@@ -211,7 +221,7 @@ const previewRows = useMemo(() => {
     return rows.filter((row) => row.errors.length > 0);
   }
 
-  return rows;
+  return rows.filter((row) => row.errors.length === 0);
 }, [rows, showErrorsOnly]);
 const rowVirtualizer = useVirtualizer({
   count: previewRows.length,
@@ -543,7 +553,8 @@ const rowVirtualizer = useVirtualizer({
               fontWeight: 600,
             }}
           >
-            ✓ Valid: {validRows.length}
+            {/* ✓ Valid: {validRows.length} */}
+            ✓ Correct: {validRows.length}
           </div>
 
           {/* Errors */}
@@ -589,7 +600,7 @@ const rowVirtualizer = useVirtualizer({
               cursor: "pointer",
             }}
           >
-            All ({rows.length})
+            Correct ({validRows.length})
           </button>
 
           <button
@@ -629,7 +640,7 @@ const rowVirtualizer = useVirtualizer({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: `60px 240px ${activeColumns
+            gridTemplateColumns: `60px ${activeColumns
               .map(() => "180px")
               .join(" ")}`,
             minWidth: "max-content",
@@ -642,14 +653,14 @@ const rowVirtualizer = useVirtualizer({
         >
           <div style={th}>Row</div>
 
-          <div
+          {/* <div
             style={{
               ...th,
               minWidth: 240,
             }}
           >
             Status
-          </div>
+          </div> */}
 
           {activeColumns.map((c) => (
             <div
@@ -680,8 +691,8 @@ const rowVirtualizer = useVirtualizer({
 
               if (!row) return null;
 
-              const hasError =
-                row.errors && row.errors.length > 0;
+              //const hasError =row.errors && row.errors.length > 0;
+              const fieldErrors = row.fieldErrors || {};
 
               return (
                 <div
@@ -694,7 +705,7 @@ const rowVirtualizer = useVirtualizer({
 
                     display: "grid",
 
-                    gridTemplateColumns: `60px 240px ${activeColumns
+                    gridTemplateColumns: `60px  ${activeColumns
                       .map(() => "180px")
                       .join(" ")}`,
 
@@ -702,12 +713,11 @@ const rowVirtualizer = useVirtualizer({
                     width: "100%",
                     height: `${virtualRow.size}px`,
 
-                    background: hasError
-                      ? "#fffafa"
-                      : "#ffffff",
+                    // background: hasError
+                    //   ? "#fffafa"
+                    //   : "#ffffff",
 
-                    borderBottom:
-                      "1px solid #f1f5f9",
+                    borderBottom:"1px solid #f1f5f9",
                   }}
                 >
                   {/* ROW NUMBER */}
@@ -722,7 +732,7 @@ const rowVirtualizer = useVirtualizer({
                   </div>
 
                   {/* STATUS */}
-                  <div
+                  {/* <div
                     style={{
                       ...cell,
                       minWidth: 240,
@@ -776,11 +786,13 @@ const rowVirtualizer = useVirtualizer({
                         Ready
                       </div>
                     )}
-                  </div>
+                  </div> */}
 
                   {/* DATA CELLS */}
                   {activeColumns.map((c) => {
                     const val = row.data?.[c.field];
+                     const hasFieldError =
+                    (fieldErrors[c.field]?.length || 0) > 0;
 
                     return (
                       <div
@@ -795,22 +807,37 @@ const rowVirtualizer = useVirtualizer({
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
 
-                          background:
-                            hasError &&
-                            (
-                              c.field === "Item_Name" ||
-                              c.field === "Primary_Unit" ||
-                              c.field === "Secondary_Unit"
-                            )
-                              ? "#fff7f7"
-                              : "transparent",
+                          // background:
+                          //   hasError &&
+                          //   (
+                          //     c.field === "Item_Name" ||
+                          //     c.field === "Primary_Unit" ||
+                          //     c.field === "Secondary_Unit"
+                          //   )
+                          //     ? "#fff7f7"
+                          //     : "transparent",
+                               background: hasFieldError
+                               ? "#fff7f7"
+                               : "transparent",
+
+                                border: hasFieldError
+                                 ? "1px solid #ef4444"
+                                : "1px solid transparent",
+           
                         }}
-                        title={
-                          val === null ||
-                          val === undefined
-                            ? ""
-                            : String(val)
-                        }
+                        // title={
+                        //   val === null ||
+                        //   val === undefined
+                        //     ? ""
+                        //     : String(val)
+                        // }
+                          title={
+        hasFieldError
+          ? fieldErrors[c.field].join(" | ")
+          : val === null || val === undefined
+            ? ""
+            : String(val)
+      }
                       >
                         {val === null ||
                         val === undefined ||
@@ -852,7 +879,7 @@ const rowVirtualizer = useVirtualizer({
             : "All rows are ready to import."}
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={() => {
@@ -907,7 +934,55 @@ const rowVirtualizer = useVirtualizer({
                     : "Items"
                 }`}
           </button>
-        </div>
+        </div> */}
+        {!showErrorsOnly && (
+  <div className="flex items-center gap-3">
+    <button
+      type="button"
+      onClick={() => {
+        if (importing) return;
+
+        setShowPreviewModal(false);
+        resetUpload();
+      }}
+      disabled={importing}
+      className="rounded-full px-5 py-2 text-sm font-semibold"
+      style={{
+        background: "#fff",
+        border: `1px solid ${PRIMARY}`,
+        color: PRIMARY,
+        cursor: importing ? "not-allowed" : "pointer",
+        opacity: importing ? 0.6 : 1,
+      }}
+    >
+      Choose Another File
+    </button>
+
+    <button
+      type="button"
+      onClick={handleImport}
+      disabled={validRows.length === 0 || importing}
+      className="rounded-full px-6 py-2 text-sm font-semibold text-white"
+      style={{
+        background:
+          validRows.length === 0 || importing
+            ? "#cbd5e1"
+            : PRIMARY,
+        border: "none",
+        cursor:
+          validRows.length === 0 || importing
+            ? "not-allowed"
+            : "pointer",
+      }}
+    >
+      {importing
+        ? "Importing..."
+        : `Import ${validRows.length} ${
+            validRows.length === 1 ? "Item" : "Items"
+          }`}
+    </button>
+  </div>
+)}
       </div>
     </div>
   </div>
