@@ -191,8 +191,8 @@ const getAllSaleReturns = async (req, res, next) => {
     // }
     /* ---------- CURSOR CONDITION ---------- */
 
-if (cursorDate && cursorId) {
-  cursorClauses.push(`(
+    if (cursorDate && cursorId) {
+      cursorClauses.push(`(
     sr.Return_Date < ?
     OR (
       sr.Return_Date = ?
@@ -200,12 +200,12 @@ if (cursorDate && cursorId) {
     )
   )`);
 
-  cursorParams.push(
-    cursorDate,
-    cursorDate,
-    cursorId
-  );
-}
+      cursorParams.push(
+        cursorDate,
+        cursorDate,
+        cursorId
+      );
+    }
 
     /* ---------- MAIN QUERY WHERE (filters + cursor) ---------- */
 
@@ -283,18 +283,18 @@ if (cursorDate && cursorId) {
     // }
     /* ---------- NEXT CURSOR ---------- */
 
-if (hasMore && pageRows.length > 0) {
-  const last =
-    pageRows[pageRows.length - 1];
+    if (hasMore && pageRows.length > 0) {
+      const last =
+        pageRows[pageRows.length - 1];
 
-  nextCursor = Buffer.from(
-    JSON.stringify({
-      //date: last.Return_Date,
-       date: last.Return_Date_Raw,
-      id: last.id,
-    })
-  ).toString("base64");
-}
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          //date: last.Return_Date,
+          date: last.Return_Date_Raw,
+          id: last.id,
+        })
+      ).toString("base64");
+    }
 
     /* ---------- ATTACH SPLIT PAYMENT-TYPE LABELS ---------- */
 
@@ -460,14 +460,14 @@ const getSaleReturnById = async (req, res, next) => {
     // =========================================================
     // 1. FETCH HEADER
     // =========================================================
-  //a.Phone_Number,
-//       (
-//   SELECT pa.Address_Text
-//   FROM add_party_addresses pa
-//   WHERE pa.Party_Id = sr.Party_Id
-//     AND pa.Address_Type = 'Billing'
-//     AND pa.Is_Default = 1
-// ) AS Billing_Address
+    //a.Phone_Number,
+    //       (
+    //   SELECT pa.Address_Text
+    //   FROM add_party_addresses pa
+    //   WHERE pa.Party_Id = sr.Party_Id
+    //     AND pa.Address_Type = 'Billing'
+    //     AND pa.Is_Default = 1
+    // ) AS Billing_Address
     const [[header]] = await connection.query(
       `SELECT
      sr.id,
@@ -521,10 +521,10 @@ const getSaleReturnById = async (req, res, next) => {
       });
     }
     // =========================================================
-// FETCH ALL PARTY ADDRESSES
-// =========================================================
-const [partyAddresses] = await connection.query(
-  `
+    // FETCH ALL PARTY ADDRESSES
+    // =========================================================
+    const [partyAddresses] = await connection.query(
+      `
   SELECT
     id,
     Address_Type,
@@ -536,8 +536,8 @@ const [partyAddresses] = await connection.query(
     Is_Default DESC,
     id ASC
   `,
-  [header.Party_Id]
-);
+      [header.Party_Id]
+    );
 
     // =========================================================
     // 2. FETCH ITEMS
@@ -797,7 +797,7 @@ const [partyAddresses] = await connection.query(
         Item_Unit: it.Item_Unit,
 
         Item_Category: it.Item_Category,
-        Item_Type:it.Item_Type,
+        Item_Type: it.Item_Type,
 
         Quantity: it.Quantity,
         Free_Quantity: it.Free_Quantity,
@@ -905,11 +905,11 @@ const [partyAddresses] = await connection.query(
       success: true,
       saleReturn: {
         ...header,
-          addresses: partyAddresses,
+        addresses: partyAddresses,
         Phone_Number:
-      header.Phone_Number ||
-      header.Party_Phone_Number ||
-      "",
+          header.Phone_Number ||
+          header.Party_Phone_Number ||
+          "",
         items: formattedItems,
         splits,
       },
@@ -940,11 +940,11 @@ const createSaleReturn = async (req, res, next) => {
 
     const {
       Party_Name,
-      Billing_Name, 
+      Billing_Name,
       Billing_Address,
       Return_Number,
-        Return_Number_Prefix,
-  Return_Number_Value,
+      Return_Number_Prefix,
+      Return_Number_Value,
       Invoice_Number,
       Phone_Number,
       Invoice_Date,
@@ -970,12 +970,12 @@ const createSaleReturn = async (req, res, next) => {
     //   });
     // }
     if (!Party_Name || !Return_Date) {
-  await connection.rollback();
-  return res.status(400).json({
-    success: false,
-    message: "Party and Return Date are required",
-  });
-}
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Party and Return Date are required",
+      });
+    }
     const [fy] = await connection.query(
       `
       SELECT Financial_Year
@@ -1075,13 +1075,13 @@ const createSaleReturn = async (req, res, next) => {
     // }
 
     // =========================================================
-// 7. FIND OR CREATE PARTY
-// =========================================================
+    // 7. FIND OR CREATE PARTY
+    // =========================================================
 
-const cleanPartyName = Party_Name?.trim();
+    const cleanPartyName = Party_Name?.trim();
 
-const [[existingParty]] = await connection.query(
-  `
+    const [[existingParty]] = await connection.query(
+      `
   SELECT
     Party_Id,
     Party_Name,
@@ -1090,18 +1090,18 @@ const [[existingParty]] = await connection.query(
   WHERE Party_Name = ?
   LIMIT 1
   `,
-  [cleanPartyName]
-);
+      [cleanPartyName]
+    );
 
-let party;
+    let party;
 
-if (!existingParty) {
-  // =======================================================
-  // CREATE NEW PARTY
-  // =======================================================
+    if (!existingParty) {
+      // =======================================================
+      // CREATE NEW PARTY
+      // =======================================================
 
-  const [partyResult] = await connection.execute(
-    `
+      const [partyResult] = await connection.execute(
+        `
     INSERT INTO add_party
     (
       Party_Name,
@@ -1112,44 +1112,44 @@ if (!existingParty) {
     )
     VALUES (?, ?, ?, NOW(), NOW())
     `,
-    [
-      cleanPartyName,
-      cleanValue(Billing_Name),
-      cleanValue(Phone_Number),
-    ]
-  );
+        [
+          cleanPartyName,
+          cleanValue(Billing_Name),
+          cleanValue(Phone_Number),
+        ]
+      );
 
-  const partyIdNumber = partyResult.insertId;
+      const partyIdNumber = partyResult.insertId;
 
-  const Party_Id =
-    "PTY" + partyIdNumber.toString().padStart(3, "0");
+      const Party_Id =
+        "PTY" + partyIdNumber.toString().padStart(3, "0");
 
-  await connection.execute(
-    `
+      await connection.execute(
+        `
     UPDATE add_party
     SET Party_Id = ?
     WHERE id = ?
     `,
-    [
-      Party_Id,
-      partyIdNumber,
-    ]
-  );
+        [
+          Party_Id,
+          partyIdNumber,
+        ]
+      );
 
-  party = {
-    Party_Id,
-    Party_Name: cleanPartyName,
-    Phone_Number: cleanValue(Phone_Number),
-  };
+      party = {
+        Party_Id,
+        Party_Name: cleanPartyName,
+        Phone_Number: cleanValue(Phone_Number),
+      };
 
 
-  // =====================================================
-  // FIRST BILLING ADDRESS -> DEFAULT ADDRESS
-  // =====================================================
+      // =====================================================
+      // FIRST BILLING ADDRESS -> DEFAULT ADDRESS
+      // =====================================================
 
-  if (Billing_Address?.trim()) {
-    await connection.execute(
-      `
+      if (Billing_Address?.trim()) {
+        await connection.execute(
+          `
       INSERT INTO add_party_addresses
       (
         Party_Id,
@@ -1161,108 +1161,108 @@ if (!existingParty) {
       )
       VALUES (?, 'Billing', ?, 1, NOW(), NOW())
       `,
-      [
-        Party_Id,
-        Billing_Address.trim(),
-      ]
-    );
-  }
-}
-else {
-  // =======================================================
-  // EXISTING PARTY
-  // =======================================================
+          [
+            Party_Id,
+            Billing_Address.trim(),
+          ]
+        );
+      }
+    }
+    else {
+      // =======================================================
+      // EXISTING PARTY
+      // =======================================================
 
-  party = existingParty;
+      party = existingParty;
 
 
-  // =====================================================
-  // 1. PHONE NUMBER
-  // =====================================================
+      // =====================================================
+      // 1. PHONE NUMBER
+      // =====================================================
 
-  // if (
-  //   !existingParty.Phone_Number?.trim() &&
-  //   Phone_Number?.trim()
-  // ) {
-  //   await connection.execute(
-  //     `
-  //     UPDATE add_party
-  //     SET
-  //       Phone_Number = ?,
-  //       Billing_Name = ?,
-  //       updated_at = NOW()
-  //     WHERE Party_Id = ?
-  //     `,
-  //     [
-  //       cleanValue(Phone_Number),
-  //       cleanValue(Billing_Name),
-  //       existingParty.Party_Id,
-  //     ]
-  //   );
+      // if (
+      //   !existingParty.Phone_Number?.trim() &&
+      //   Phone_Number?.trim()
+      // ) {
+      //   await connection.execute(
+      //     `
+      //     UPDATE add_party
+      //     SET
+      //       Phone_Number = ?,
+      //       Billing_Name = ?,
+      //       updated_at = NOW()
+      //     WHERE Party_Id = ?
+      //     `,
+      //     [
+      //       cleanValue(Phone_Number),
+      //       cleanValue(Billing_Name),
+      //       existingParty.Party_Id,
+      //     ]
+      //   );
 
-  //   party.Phone_Number = Phone_Number.trim();
-  // }
-  // =====================================================
-// UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
-// =====================================================
+      //   party.Phone_Number = Phone_Number.trim();
+      // }
+      // =====================================================
+      // UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
+      // =====================================================
 
-const partyUpdates = [];
-const partyParams = [];
+      const partyUpdates = [];
+      const partyParams = [];
 
-// Phone: update only if master phone is empty
-// and new phone has a value
-if (
-  !existingParty.Phone_Number?.trim() &&
-  Phone_Number?.trim()
-) {
-  partyUpdates.push("Phone_Number = ?");
-  partyParams.push(cleanValue(Phone_Number));
+      // Phone: update only if master phone is empty
+      // and new phone has a value
+      if (
+        !existingParty.Phone_Number?.trim() &&
+        Phone_Number?.trim()
+      ) {
+        partyUpdates.push("Phone_Number = ?");
+        partyParams.push(cleanValue(Phone_Number));
 
-  party.Phone_Number = Phone_Number.trim();
-}
+        party.Phone_Number = Phone_Number.trim();
+      }
 
-// Billing Name: update only if new Billing Name has a value
-if (Billing_Name?.trim()) {
-  partyUpdates.push("Billing_Name = ?");
-  partyParams.push(cleanValue(Billing_Name));
-}
+      // Billing Name: update only if new Billing Name has a value
+      if (Billing_Name?.trim()) {
+        partyUpdates.push("Billing_Name = ?");
+        partyParams.push(cleanValue(Billing_Name));
+      }
 
-if (partyUpdates.length > 0) {
-  partyUpdates.push("updated_at = NOW()");
-  partyParams.push(existingParty.Party_Id);
+      if (partyUpdates.length > 0) {
+        partyUpdates.push("updated_at = NOW()");
+        partyParams.push(existingParty.Party_Id);
 
-  await connection.execute(
-    `
+        await connection.execute(
+          `
     UPDATE add_party
     SET
       ${partyUpdates.join(", ")}
     WHERE Party_Id = ?
     `,
-    partyParams
-  );
-}
+          partyParams
+        );
+      }
 
 
-  // =====================================================
-  // 2. BILLING ADDRESS
-  //    Initialize only if NO billing address exists
-  // =====================================================
+      // =====================================================
+      // 2. BILLING ADDRESS
+      //    Initialize only if NO billing address exists
+      // =====================================================
 
-  if (Billing_Address?.trim()) {
-    const [[{ addrCount }]] =
-      await connection.query(
-        `
+      if (Billing_Address?.trim()) {
+        const [[{ addrCount }]] =
+          await connection.query(
+            `
         SELECT COUNT(*) AS addrCount
         FROM add_party_addresses
         WHERE Party_Id = ?
           AND Address_Type = 'Billing'
         `,
-        [existingParty.Party_Id]
-      );
+            [existingParty.Party_Id]
+          );
 
-    if (Number(addrCount) === 0) {
-      await connection.execute(
-        `
+        if (Number(addrCount) === 0) {
+          await connection.execute(
+            `
         INSERT INTO add_party_addresses
         (
           Party_Id,
@@ -1274,14 +1274,14 @@ if (partyUpdates.length > 0) {
         )
         VALUES (?, 'Billing', ?, 1, NOW(), NOW())
         `,
-        [
-          existingParty.Party_Id,
-          Billing_Address.trim(),
-        ]
-      );
+            [
+              existingParty.Party_Id,
+              Billing_Address.trim(),
+            ]
+          );
+        }
+      }
     }
-  }
-}
     // =========================================================
     // 8. INSERT SALE RETURN HEADER
     // =========================================================
@@ -1309,53 +1309,53 @@ if (partyUpdates.length > 0) {
       transactionDiscountAmount > 0
         ? transactionDiscountAmount
         : null;
-        // =========================================================
-// RETURN NUMBER PREFIX SEQUENCE
-// =========================================================
+    // =========================================================
+    // RETURN NUMBER PREFIX SEQUENCE
+    // =========================================================
 
-// =========================================================
-// RETURN NUMBER PREFIX SEQUENCE
-// =========================================================
+    // =========================================================
+    // RETURN NUMBER PREFIX SEQUENCE
+    // =========================================================
 
-const returnNumberPrefix =
-  String(Return_Number_Prefix ?? "").trim() || "None";
+    const returnNumberPrefix =
+      String(Return_Number_Prefix ?? "").trim() || "None";
 
-const returnNumberValueString =
-  String(Return_Number_Value ?? "").trim();
+    const returnNumberValueString =
+      String(Return_Number_Value ?? "").trim();
 
-let returnNumberValue = null;
-let returnNumber = null;
-
-
-// ---------------------------------------------------------
-// VALIDATE RETURN NUMBER VALUE
-// ---------------------------------------------------------
-
-if (returnNumberValueString !== "") {
-
-  // Only digits are allowed.
-  // 0 IS VALID.
-  if (!/^\d+$/.test(returnNumberValueString)) {
-
-    await connection.rollback();
-
-    return res.status(400).json({
-      success: false,
-      message: "Return number must contain only digits.",
-    });
-  }
-
-  returnNumberValue =
-    Number(returnNumberValueString);
+    let returnNumberValue = null;
+    let returnNumber = null;
 
 
-  // -------------------------------------------------------
-  // Find + LOCK the return prefix row.
-  // -------------------------------------------------------
+    // ---------------------------------------------------------
+    // VALIDATE RETURN NUMBER VALUE
+    // ---------------------------------------------------------
 
-  const [prefixRows] =
-    await connection.execute(
-      `
+    if (returnNumberValueString !== "") {
+
+      // Only digits are allowed.
+      // 0 IS VALID.
+      if (!/^\d+$/.test(returnNumberValueString)) {
+
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message: "Return number must contain only digits.",
+        });
+      }
+
+      returnNumberValue =
+        Number(returnNumberValueString);
+
+
+      // -------------------------------------------------------
+      // Find + LOCK the return prefix row.
+      // -------------------------------------------------------
+
+      const [prefixRows] =
+        await connection.execute(
+          `
       SELECT
         id,
         transaction_type,
@@ -1368,70 +1368,70 @@ if (returnNumberValueString !== "") {
       LIMIT 1
       FOR UPDATE
       `,
-      [returnNumberPrefix]
-    );
+          [returnNumberPrefix]
+        );
 
 
-  // -------------------------------------------------------
-  // Prefix must exist.
-  // -------------------------------------------------------
+      // -------------------------------------------------------
+      // Prefix must exist.
+      // -------------------------------------------------------
 
-  if (prefixRows.length === 0) {
+      if (prefixRows.length === 0) {
 
-    await connection.rollback();
+        await connection.rollback();
 
-    return res.status(400).json({
-      success: false,
-      message:
-        `Return prefix "${returnNumberPrefix}" does not exist.`,
-    });
-  }
+        return res.status(400).json({
+          success: false,
+          message:
+            `Return prefix "${returnNumberPrefix}" does not exist.`,
+        });
+      }
 
-  const prefixRow = prefixRows[0];
+      const prefixRow = prefixRows[0];
 
-  const currentLastNumber =
-    Number(prefixRow.last_number) || 0;
+      const currentLastNumber =
+        Number(prefixRow.last_number) || 0;
 
 
-  // -------------------------------------------------------
-  // UPDATE PREFIX SEQUENCE
-  //
-  // Add Sale Return:
-  // Only increase last_number.
-  // -------------------------------------------------------
+      // -------------------------------------------------------
+      // UPDATE PREFIX SEQUENCE
+      //
+      // Add Sale Return:
+      // Only increase last_number.
+      // -------------------------------------------------------
 
-  if (
-    returnNumberValue >
-    currentLastNumber
-  ) {
+      if (
+        returnNumberValue >
+        currentLastNumber
+      ) {
 
-    await connection.execute(
-      `
+        await connection.execute(
+          `
       UPDATE transactions_prefixes
       SET last_number = ?
       WHERE id = ?
       `,
-      [
-        returnNumberValue,
-        prefixRow.id,
-      ]
-    );
-  }
+          [
+            returnNumberValue,
+            prefixRow.id,
+          ]
+        );
+      }
 
-} else {
+    } else {
 
-  // -------------------------------------------------------
-  // NO NUMERIC VALUE
-  //
-  // Do NOT update last_number.
-  // -------------------------------------------------------
+      // -------------------------------------------------------
+      // NO NUMERIC VALUE
+      //
+      // Do NOT update last_number.
+      // -------------------------------------------------------
 
-  // If a prefix was selected, make sure it exists.
-  if (returnNumberPrefix !== "None") {
+      // If a prefix was selected, make sure it exists.
+      if (returnNumberPrefix !== "None") {
 
-    const [prefixRows] =
-      await connection.execute(
-        `
+        const [prefixRows] =
+          await connection.execute(
+            `
         SELECT
           id,
           transaction_type,
@@ -1444,75 +1444,75 @@ if (returnNumberValueString !== "") {
         LIMIT 1
         FOR UPDATE
         `,
-        [returnNumberPrefix]
-      );
+            [returnNumberPrefix]
+          );
 
-    if (prefixRows.length === 0) {
+        if (prefixRows.length === 0) {
 
-      await connection.rollback();
+          await connection.rollback();
 
-      return res.status(400).json({
-        success: false,
-        message:
-          `Return prefix "${returnNumberPrefix}" does not exist.`,
-      });
+          return res.status(400).json({
+            success: false,
+            message:
+              `Return prefix "${returnNumberPrefix}" does not exist.`,
+          });
+        }
+      }
     }
-  }
-}
 
 
-// ---------------------------------------------------------
-// BUILD COMBINED / LEGACY RETURN NUMBER
-//
-// This uses your helper.
-//
-// None + 5000 -> "5000"
-// SAL  + 5000 -> "SAL5000"
-// SAL  + 0    -> "SAL"
-// None + 0    -> null
-// SAL  + empty -> "SAL"
-// None + empty -> null
-// ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // BUILD COMBINED / LEGACY RETURN NUMBER
+    //
+    // This uses your helper.
+    //
+    // None + 5000 -> "5000"
+    // SAL  + 5000 -> "SAL5000"
+    // SAL  + 0    -> "SAL"
+    // None + 0    -> null
+    // SAL  + empty -> "SAL"
+    // None + empty -> null
+    // ---------------------------------------------------------
 
-returnNumber = buildLegacyReturnNumber(
-  returnNumberPrefix,
-  returnNumberValue
-);
-if (returnNumber !== null) {
-  // const [duplicateRows] = await connection.execute(
-  //   `
-  //   SELECT id
-  //   FROM sale_return
-  //   WHERE Return_Number = ?
-  //     AND id <> ?
-  //   LIMIT 1
-  //   FOR UPDATE
-  //   `,
-  //   [returnNumber,id]
-  // );
-  const [duplicateRows] = await connection.execute(
-  `
+    returnNumber = buildLegacyReturnNumber(
+      returnNumberPrefix,
+      returnNumberValue
+    );
+    if (returnNumber !== null) {
+      // const [duplicateRows] = await connection.execute(
+      //   `
+      //   SELECT id
+      //   FROM sale_return
+      //   WHERE Return_Number = ?
+      //     AND id <> ?
+      //   LIMIT 1
+      //   FOR UPDATE
+      //   `,
+      //   [returnNumber,id]
+      // );
+      const [duplicateRows] = await connection.execute(
+        `
   SELECT id
   FROM sale_return
   WHERE Return_Number = ?
   LIMIT 1
   FOR UPDATE
   `,
-  [returnNumber]
-);
+        [returnNumber]
+      );
 
-  if (duplicateRows.length > 0) {
-    await connection.rollback();
+      if (duplicateRows.length > 0) {
+        await connection.rollback();
 
-    return res.status(400).json({
-      success: false,
-      message: `Return number "${returnNumber}" already exists.`,
-    });
-  }
-}
+        return res.status(400).json({
+          success: false,
+          message: `Return number "${returnNumber}" already exists.`,
+        });
+      }
+    }
 
- const [headerResult] = await connection.query(
-  `INSERT INTO sale_return 
+    const [headerResult] = await connection.query(
+      `INSERT INTO sale_return 
    (
      Sale_Id, 
      Party_Id,
@@ -1535,33 +1535,33 @@ if (returnNumber !== null) {
      Balance_Due 
    ) 
    VALUES (?, ?, ?,?,?, ?, ?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  [
-    Sale_Id,
-    party.Party_Id,
-    cleanValue(Billing_Name),
-     cleanValue(Billing_Address),
+      [
+        Sale_Id,
+        party.Party_Id,
+        cleanValue(Billing_Name),
+        cleanValue(Billing_Address),
 
-    // Combined number — keep for Item Ledger / backward compatibility
-    returnNumber || null,
+        // Combined number — keep for Item Ledger / backward compatibility
+        returnNumber || null,
 
-    // New separate fields
-    returnNumberPrefix,
-    returnNumberValue,
+        // New separate fields
+        returnNumberPrefix,
+        returnNumberValue,
 
-    Invoice_Number || null,
-    cleanValue(Phone_Number),
-    Invoice_Date || null,
-    activeFY,
-    Return_Date,
-    State_Of_Supply || null,
-    cleanTransactionDiscountPercentage,
-    cleanTransactionDiscountAmount,
-    totalAmount,
-    roundOffValue,
-    totalPaid,
-    balanceDue,
-  ]
-);
+        Invoice_Number || null,
+        cleanValue(Phone_Number),
+        Invoice_Date || null,
+        activeFY,
+        Return_Date,
+        State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
+        totalAmount,
+        roundOffValue,
+        totalPaid,
+        balanceDue,
+      ]
+    );
 
     const id = headerResult.insertId;
 
@@ -1768,7 +1768,7 @@ if (returnNumber !== null) {
         dbItemRow,
         Selected_Unit,
         //Quantity,
-         Quantity: (normalizeNumber(Quantity) ?? 0) +
+        Quantity: (normalizeNumber(Quantity) ?? 0) +
           (cleanFreeQuantity ?? 0)
       });
 
@@ -1893,7 +1893,7 @@ if (returnNumber !== null) {
 
         billId: id,                     // sale_return.id
         //billNumber: Return_Number || null,
-        billNumber:returnNumber || null,
+        billNumber: returnNumber || null,
         partyName: Party_Name,
 
         // User-entered quantity
@@ -1949,15 +1949,15 @@ const editSaleReturn = async (req, res, next) => {
     // =========================================================
 
     const [[existing]] = await connection.query(
-  `
+      `
   SELECT id, financial_year
   FROM sale_return
   WHERE id = ?
   LIMIT 1
   FOR UPDATE
   `,
-  [Sale_Return_Id]
-);
+      [Sale_Return_Id]
+    );
 
     if (!existing) {
       await connection.rollback();
@@ -1967,21 +1967,21 @@ const editSaleReturn = async (req, res, next) => {
       });
     }
     // =========================================================
-// GET OLD PARTY ID
-// =========================================================
+    // GET OLD PARTY ID
+    // =========================================================
 
-const [[oldSaleReturn]] = await connection.query(
-  `
+    const [[oldSaleReturn]] = await connection.query(
+      `
   SELECT Party_Id
   FROM sale_return
   WHERE id = ?
   LIMIT 1
   FOR UPDATE
   `,
-  [Sale_Return_Id]
-);
+      [Sale_Return_Id]
+    );
 
-const oldPartyId = oldSaleReturn?.Party_Id || null;
+    const oldPartyId = oldSaleReturn?.Party_Id || null;
 
     // =========================================================
     // 2. BODY
@@ -1990,16 +1990,16 @@ const oldPartyId = oldSaleReturn?.Party_Id || null;
     const {
       Party_Name,
       Billing_Name,
-      Billing_Address, 
+      Billing_Address,
       Return_Number,
-        Return_Number_Prefix,
-  Return_Number_Value,
+      Return_Number_Prefix,
+      Return_Number_Value,
       Invoice_Number,
       Phone_Number,
       Invoice_Date,
       Return_Date,
       State_Of_Supply,
-       Transaction_Discount_Percentage,
+      Transaction_Discount_Percentage,
       Transaction_Discount_Amount,
       Total_Amount,
       Round_Off,
@@ -2075,17 +2075,17 @@ const oldPartyId = oldSaleReturn?.Party_Id || null;
     // }
 
     // =========================================================
-// 6. FIND OR CREATE PARTY
-// =========================================================
+    // 6. FIND OR CREATE PARTY
+    // =========================================================
 
-// =========================================================
-// 6. FIND OR CREATE PARTY
-// =========================================================
+    // =========================================================
+    // 6. FIND OR CREATE PARTY
+    // =========================================================
 
-const cleanPartyName = Party_Name?.trim();
+    const cleanPartyName = Party_Name?.trim();
 
-const [[existingParty]] = await connection.query(
-  `
+    const [[existingParty]] = await connection.query(
+      `
   SELECT
     Party_Id,
     Party_Name,
@@ -2094,18 +2094,18 @@ const [[existingParty]] = await connection.query(
   WHERE Party_Name = ?
   LIMIT 1
   `,
-  [cleanPartyName]
-);
+      [cleanPartyName]
+    );
 
-let party;
+    let party;
 
-if (!existingParty) {
-  // =======================================================
-  // CREATE NEW PARTY
-  // =======================================================
+    if (!existingParty) {
+      // =======================================================
+      // CREATE NEW PARTY
+      // =======================================================
 
-  const [partyResult] = await connection.execute(
-    `
+      const [partyResult] = await connection.execute(
+        `
     INSERT INTO add_party
     (
       Party_Name,
@@ -2116,37 +2116,37 @@ if (!existingParty) {
     )
     VALUES (?, ?, ?, NOW(), NOW())
     `,
-    [
-      cleanPartyName,
-      cleanValue(Billing_Name),
-      cleanValue(Phone_Number),
-    ]
-  );
+        [
+          cleanPartyName,
+          cleanValue(Billing_Name),
+          cleanValue(Phone_Number),
+        ]
+      );
 
-  const partyIdNumber = partyResult.insertId;
+      const partyIdNumber = partyResult.insertId;
 
-  const Party_Id =
-    "PTY" + partyIdNumber.toString().padStart(3, "0");
+      const Party_Id =
+        "PTY" + partyIdNumber.toString().padStart(3, "0");
 
-  await connection.execute(
-    `
+      await connection.execute(
+        `
     UPDATE add_party
     SET Party_Id = ?
     WHERE id = ?
     `,
-    [
-      Party_Id,
-      partyIdNumber,
-    ]
-  );
+        [
+          Party_Id,
+          partyIdNumber,
+        ]
+      );
 
-  // =======================================================
-  // SAVE BILLING ADDRESS INTO PARTY MASTER
-  // =======================================================
+      // =======================================================
+      // SAVE BILLING ADDRESS INTO PARTY MASTER
+      // =======================================================
 
-  if (Billing_Address?.trim()) {
-    await connection.execute(
-      `
+      if (Billing_Address?.trim()) {
+        await connection.execute(
+          `
       INSERT INTO add_party_addresses
       (
         Party_Id,
@@ -2158,111 +2158,111 @@ if (!existingParty) {
       )
       VALUES (?, 'Billing', ?, 1, NOW(), NOW())
       `,
-      [
+          [
+            Party_Id,
+            cleanValue(Billing_Address),
+          ]
+        );
+      }
+
+      party = {
         Party_Id,
-        cleanValue(Billing_Address),
-      ]
-    );
-  }
+        Party_Name: cleanPartyName,
+        Phone_Number: cleanValue(Phone_Number),
+      };
 
-  party = {
-    Party_Id,
-    Party_Name: cleanPartyName,
-    Phone_Number: cleanValue(Phone_Number),
-  };
+    } else {
+      // =======================================================
+      // EXISTING PARTY
+      // =======================================================
 
-} else {
-  // =======================================================
-  // EXISTING PARTY
-  // =======================================================
+      party = existingParty;
 
-  party = existingParty;
+      // =======================================================
+      // UPDATE PARTY PHONE/BILLING NAME ONLY IF PHONE IS EMPTY
+      // =======================================================
 
-  // =======================================================
-  // UPDATE PARTY PHONE/BILLING NAME ONLY IF PHONE IS EMPTY
-  // =======================================================
+      // if (
+      //   !existingParty.Phone_Number?.trim() &&
+      //   Phone_Number?.trim()
+      // ) {
+      //   await connection.execute(
+      //     `
+      //     UPDATE add_party
+      //     SET
+      //       Phone_Number = ?,
+      //       Billing_Name = ?,
+      //       updated_at = NOW()
+      //     WHERE Party_Id = ?
+      //     `,
+      //     [
+      //       cleanValue(Phone_Number),
+      //       cleanValue(Billing_Name),
+      //       existingParty.Party_Id,
+      //     ]
+      //   );
 
-  // if (
-  //   !existingParty.Phone_Number?.trim() &&
-  //   Phone_Number?.trim()
-  // ) {
-  //   await connection.execute(
-  //     `
-  //     UPDATE add_party
-  //     SET
-  //       Phone_Number = ?,
-  //       Billing_Name = ?,
-  //       updated_at = NOW()
-  //     WHERE Party_Id = ?
-  //     `,
-  //     [
-  //       cleanValue(Phone_Number),
-  //       cleanValue(Billing_Name),
-  //       existingParty.Party_Id,
-  //     ]
-  //   );
+      //   party.Phone_Number = Phone_Number.trim();
+      // }
+      // =======================================================
+      // UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
+      // =======================================================
 
-  //   party.Phone_Number = Phone_Number.trim();
-  // }
-  // =======================================================
-// UPDATE PARTY MASTER ONLY WITH NON-EMPTY VALUES
-// =======================================================
+      const partyUpdates = [];
+      const partyParams = [];
 
-const partyUpdates = [];
-const partyParams = [];
+      // Update phone ONLY if master phone is empty
+      // and the new phone has a value
+      if (
+        !existingParty.Phone_Number?.trim() &&
+        Phone_Number?.trim()
+      ) {
+        partyUpdates.push("Phone_Number = ?");
+        partyParams.push(cleanValue(Phone_Number));
 
-// Update phone ONLY if master phone is empty
-// and the new phone has a value
-if (
-  !existingParty.Phone_Number?.trim() &&
-  Phone_Number?.trim()
-) {
-  partyUpdates.push("Phone_Number = ?");
-  partyParams.push(cleanValue(Phone_Number));
+        party.Phone_Number = Phone_Number.trim();
+      }
 
-  party.Phone_Number = Phone_Number.trim();
-}
+      // Update Billing Name ONLY if a value is provided
+      if (Billing_Name?.trim()) {
+        partyUpdates.push("Billing_Name = ?");
+        partyParams.push(cleanValue(Billing_Name));
+      }
 
-// Update Billing Name ONLY if a value is provided
-if (Billing_Name?.trim()) {
-  partyUpdates.push("Billing_Name = ?");
-  partyParams.push(cleanValue(Billing_Name));
-}
+      if (partyUpdates.length > 0) {
+        partyUpdates.push("updated_at = NOW()");
+        partyParams.push(existingParty.Party_Id);
 
-if (partyUpdates.length > 0) {
-  partyUpdates.push("updated_at = NOW()");
-  partyParams.push(existingParty.Party_Id);
-
-  await connection.execute(
-    `
+        await connection.execute(
+          `
     UPDATE add_party
     SET
       ${partyUpdates.join(", ")}
     WHERE Party_Id = ?
     `,
-    partyParams
-  );
-}
+          partyParams
+        );
+      }
 
-  // =======================================================
-  // SAVE BILLING ADDRESS INTO PARTY MASTER
-  // ONLY IF PARTY DOES NOT ALREADY HAVE ONE
-  // =======================================================
+      // =======================================================
+      // SAVE BILLING ADDRESS INTO PARTY MASTER
+      // ONLY IF PARTY DOES NOT ALREADY HAVE ONE
+      // =======================================================
 
-  if (Billing_Address?.trim()) {
-    const [[{ addrCount }]] = await connection.query(
-      `
+      if (Billing_Address?.trim()) {
+        const [[{ addrCount }]] = await connection.query(
+          `
       SELECT COUNT(*) AS addrCount
       FROM add_party_addresses
       WHERE Party_Id = ?
         AND Address_Type = 'Billing'
       `,
-      [existingParty.Party_Id]
-    );
+          [existingParty.Party_Id]
+        );
 
-    if (Number(addrCount) === 0) {
-      await connection.execute(
-        `
+        if (Number(addrCount) === 0) {
+          await connection.execute(
+            `
         INSERT INTO add_party_addresses
         (
           Party_Id,
@@ -2274,421 +2274,421 @@ if (partyUpdates.length > 0) {
         )
         VALUES (?, 'Billing', ?, 1, NOW(), NOW())
         `,
-        [
-          existingParty.Party_Id,
-          cleanValue(Billing_Address),
-        ]
-      );
+            [
+              existingParty.Party_Id,
+              cleanValue(Billing_Address),
+            ]
+          );
+        }
+      }
     }
-  }
-}
 
     // =========================================================
     // 7. UPDATE HEADER — unchanged
     // =========================================================
     const transactionDiscountPercentage =
-  normalizeNumber(Transaction_Discount_Percentage);
+      normalizeNumber(Transaction_Discount_Percentage);
 
-const transactionDiscountAmount =
-  normalizeNumber(Transaction_Discount_Amount);
-if (
-  transactionDiscountPercentage !== null &&
-  transactionDiscountPercentage > 100
-) {
-  return res.status(400).json({
-    success: false,
-    message: "Transaction discount percentage cannot be greater than 100%",
-  });
-}
-const cleanTransactionDiscountPercentage =
-  transactionDiscountPercentage > 0
-    ? transactionDiscountPercentage
-    : null;
+    const transactionDiscountAmount =
+      normalizeNumber(Transaction_Discount_Amount);
+    if (
+      transactionDiscountPercentage !== null &&
+      transactionDiscountPercentage > 100
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Transaction discount percentage cannot be greater than 100%",
+      });
+    }
+    const cleanTransactionDiscountPercentage =
+      transactionDiscountPercentage > 0
+        ? transactionDiscountPercentage
+        : null;
 
-const cleanTransactionDiscountAmount =
-  transactionDiscountAmount > 0
-    ? transactionDiscountAmount
-    : null;
+    const cleanTransactionDiscountAmount =
+      transactionDiscountAmount > 0
+        ? transactionDiscountAmount
+        : null;
 
     // =========================================================
     // =========================================================
-// 8. GET OLD RETURN NUMBER
-// =========================================================
+    // 8. GET OLD RETURN NUMBER
+    // =========================================================
 
-// const [oldReturnRows] = await connection.execute(
-//   `
-//   SELECT Return_Number
-//   FROM sale_return
-//   WHERE id = ?
-//   LIMIT 1
-//   FOR UPDATE
-//   `,
-//   [Sale_Return_Id]
-// );
+    // const [oldReturnRows] = await connection.execute(
+    //   `
+    //   SELECT Return_Number
+    //   FROM sale_return
+    //   WHERE id = ?
+    //   LIMIT 1
+    //   FOR UPDATE
+    //   `,
+    //   [Sale_Return_Id]
+    // );
 
-// const oldReturnNumber = String(
-//   oldReturnRows[0]?.Return_Number || ""
-// ).trim();
-
-
-// // =========================================================
-// // 9. CURRENT RETURN NUMBER
-// // =========================================================
-// const normalizeReturnPrefix = (prefix) =>
-//   String(prefix || "").trim() || "None";
-// let returnNumber = String(
-//   Return_Number || ""
-// ).trim();
+    // const oldReturnNumber = String(
+    //   oldReturnRows[0]?.Return_Number || ""
+    // ).trim();
 
 
-// // =========================================================
-// // 10. SPECIAL CASE
-// //
-// // SAL0  -> SAL
-// // SAL00 -> SAL
-// // INV0  -> INV
-// // INV00 -> INV
-// //
-// // 0     -> ""
-// // 00    -> ""
-// // 000   -> ""
-// //
-// // IMPORTANT:
-// // "None" is the UI prefix name, but it is NOT stored in DB.
-// //
-// // So:
-// //
-// // None + 0  -> ""
-// // None + 00 -> ""
-// //
-// // If old number was latest:
-// //
-// // SAL1000 -> SAL
-// // SAL last_number: 1000 -> 999
-// // =========================================================
+    // // =========================================================
+    // // 9. CURRENT RETURN NUMBER
+    // // =========================================================
+    // const normalizeReturnPrefix = (prefix) =>
+    //   String(prefix || "").trim() || "None";
+    // let returnNumber = String(
+    //   Return_Number || ""
+    // ).trim();
 
-// // =========================================================
-// // 10. SPECIAL ZERO NUMBER
-// //
-// // DN0   -> DN
-// // DN00  -> DN
-// // DN000 -> DN
-// //
-// // 0     -> ""
-// // 00    -> ""
-// //
-// // IMPORTANT:
-// // DN1300 must remain DN1300.
-// // We only treat the number as "zero" when the ENTIRE
-// // numeric portion is zero.
-// // =========================================================
 
-// const returnMatchForZeroCheck =
-//   returnNumber.match(/^(.*?)(\d+)$/);
+    // // =========================================================
+    // // 10. SPECIAL CASE
+    // //
+    // // SAL0  -> SAL
+    // // SAL00 -> SAL
+    // // INV0  -> INV
+    // // INV00 -> INV
+    // //
+    // // 0     -> ""
+    // // 00    -> ""
+    // // 000   -> ""
+    // //
+    // // IMPORTANT:
+    // // "None" is the UI prefix name, but it is NOT stored in DB.
+    // //
+    // // So:
+    // //
+    // // None + 0  -> ""
+    // // None + 00 -> ""
+    // //
+    // // If old number was latest:
+    // //
+    // // SAL1000 -> SAL
+    // // SAL last_number: 1000 -> 999
+    // // =========================================================
 
-// if (returnMatchForZeroCheck) {
-//   const zeroPrefix = normalizeReturnPrefix(
-//   returnMatchForZeroCheck[1]
-// );
-//   //const zeroPrefix = returnMatchForZeroCheck[1] || "";
-//   const numericPart = returnMatchForZeroCheck[2] || "";
+    // // =========================================================
+    // // 10. SPECIAL ZERO NUMBER
+    // //
+    // // DN0   -> DN
+    // // DN00  -> DN
+    // // DN000 -> DN
+    // //
+    // // 0     -> ""
+    // // 00    -> ""
+    // //
+    // // IMPORTANT:
+    // // DN1300 must remain DN1300.
+    // // We only treat the number as "zero" when the ENTIRE
+    // // numeric portion is zero.
+    // // =========================================================
 
-//   // Only special-case when the ENTIRE number is zero.
-//   // Examples:
-//   // 0     -> true
-//   // 00    -> true
-//   // 000   -> true
-//   // 1300  -> false
-//   // 100   -> false
-//   // 10    -> false
+    // const returnMatchForZeroCheck =
+    //   returnNumber.match(/^(.*?)(\d+)$/);
 
-//   if (/^0+$/.test(numericPart)) {
+    // if (returnMatchForZeroCheck) {
+    //   const zeroPrefix = normalizeReturnPrefix(
+    //   returnMatchForZeroCheck[1]
+    // );
+    //   //const zeroPrefix = returnMatchForZeroCheck[1] || "";
+    //   const numericPart = returnMatchForZeroCheck[2] || "";
 
-//     // -------------------------------------------------------
-//     // Get old return number
-//     // -------------------------------------------------------
+    //   // Only special-case when the ENTIRE number is zero.
+    //   // Examples:
+    //   // 0     -> true
+    //   // 00    -> true
+    //   // 000   -> true
+    //   // 1300  -> false
+    //   // 100   -> false
+    //   // 10    -> false
 
-//     const oldMatch =
-//       oldReturnNumber.match(/^(.*?)(\d+)$/);
+    //   if (/^0+$/.test(numericPart)) {
 
-//     if (oldMatch) {
-//       //const oldPrefix =oldMatch[1] || "";
-//       const oldPrefix = normalizeReturnPrefix(oldMatch[1]);
-//       const oldNumber =
-//         Number(oldMatch[2]);
+    //     // -------------------------------------------------------
+    //     // Get old return number
+    //     // -------------------------------------------------------
 
-//       // Only decrement when the old prefix is the same
-//       if (oldPrefix === zeroPrefix) {
+    //     const oldMatch =
+    //       oldReturnNumber.match(/^(.*?)(\d+)$/);
 
-//         const [oldPrefixRows] =
-//           await connection.execute(
-//             `
-//             SELECT
-//               id,
-//               last_number
-//             FROM transactions_prefixes
-//             WHERE transaction_type = 'sale_return'
-//               AND prefix_name = ?
-//             LIMIT 1
-//             FOR UPDATE
-//             `,
-//             [oldPrefix]
-//           );
+    //     if (oldMatch) {
+    //       //const oldPrefix =oldMatch[1] || "";
+    //       const oldPrefix = normalizeReturnPrefix(oldMatch[1]);
+    //       const oldNumber =
+    //         Number(oldMatch[2]);
 
-//         if (oldPrefixRows.length > 0) {
+    //       // Only decrement when the old prefix is the same
+    //       if (oldPrefix === zeroPrefix) {
 
-//           const oldPrefixRow =
-//             oldPrefixRows[0];
+    //         const [oldPrefixRows] =
+    //           await connection.execute(
+    //             `
+    //             SELECT
+    //               id,
+    //               last_number
+    //             FROM transactions_prefixes
+    //             WHERE transaction_type = 'sale_return'
+    //               AND prefix_name = ?
+    //             LIMIT 1
+    //             FOR UPDATE
+    //             `,
+    //             [oldPrefix]
+    //           );
 
-//           const oldLastNumber =
-//             Number(oldPrefixRow.last_number) || 0;
+    //         if (oldPrefixRows.length > 0) {
 
-//           // Only decrement if old return was latest
-//           if (oldNumber === oldLastNumber) {
+    //           const oldPrefixRow =
+    //             oldPrefixRows[0];
 
-//             await connection.execute(
-//               `
-//               UPDATE transactions_prefixes
-//               SET last_number = ?
-//               WHERE id = ?
-//               `,
-//               [
-//                 Math.max(
-//                   0,
-//                   oldLastNumber - 1
-//                 ),
-//                 oldPrefixRow.id,
-//               ]
-//             );
-//           }
-//         }
-//       }
-//     }
+    //           const oldLastNumber =
+    //             Number(oldPrefixRow.last_number) || 0;
 
-//     // -------------------------------------------------------
-//     // Store prefix only
-//     //
-//     // DN0  -> DN
-//     // DN00 -> DN
-//     //
-//     // 0 / 00 / 000 -> ""
-//     // -------------------------------------------------------
+    //           // Only decrement if old return was latest
+    //           if (oldNumber === oldLastNumber) {
 
-//     returnNumber = zeroPrefix;
-//   }
-// }
+    //             await connection.execute(
+    //               `
+    //               UPDATE transactions_prefixes
+    //               SET last_number = ?
+    //               WHERE id = ?
+    //               `,
+    //               [
+    //                 Math.max(
+    //                   0,
+    //                   oldLastNumber - 1
+    //                 ),
+    //                 oldPrefixRow.id,
+    //               ]
+    //             );
+    //           }
+    //         }
+    //       }
+    //     }
 
-// // =========================================================
-// // 11. HANDLE NORMAL RETURN NUMBER PREFIX SEQUENCE
-// // =========================================================
-// //
-// // This block runs only for:
-// //
-// // SAL5
-// // SAL1000
-// // INV5
-// // 5
-// // 100
-// //
-// // It does NOT run for:
-// //
-// // SAL0
-// // SAL00
-// // INV0
-// // INV00
-// // 0
-// // 00
-// // =========================================================
+    //     // -------------------------------------------------------
+    //     // Store prefix only
+    //     //
+    //     // DN0  -> DN
+    //     // DN00 -> DN
+    //     //
+    //     // 0 / 00 / 000 -> ""
+    //     // -------------------------------------------------------
 
-// if (
-//   returnNumber &&
-//   /\d+$/.test(returnNumber)
-// ) {
-//   const returnMatch =
-//     returnNumber.match(/^(.*?)(\d+)$/);
+    //     returnNumber = zeroPrefix;
+    //   }
+    // }
 
-//   // -------------------------------------------------------
-//   // Invalid return number
-//   // -------------------------------------------------------
+    // // =========================================================
+    // // 11. HANDLE NORMAL RETURN NUMBER PREFIX SEQUENCE
+    // // =========================================================
+    // //
+    // // This block runs only for:
+    // //
+    // // SAL5
+    // // SAL1000
+    // // INV5
+    // // 5
+    // // 100
+    // //
+    // // It does NOT run for:
+    // //
+    // // SAL0
+    // // SAL00
+    // // INV0
+    // // INV00
+    // // 0
+    // // 00
+    // // =========================================================
 
-//   if (!returnMatch) {
-//     await connection.rollback();
+    // if (
+    //   returnNumber &&
+    //   /\d+$/.test(returnNumber)
+    // ) {
+    //   const returnMatch =
+    //     returnNumber.match(/^(.*?)(\d+)$/);
 
-//     return res.status(400).json({
-//       success: false,
-//       message: "Invalid return number.",
-//     });
-//   }
+    //   // -------------------------------------------------------
+    //   // Invalid return number
+    //   // -------------------------------------------------------
 
-//   //const returnPrefix =returnMatch[1] || "";
-//   const returnPrefix = normalizeReturnPrefix(returnMatch[1]);
+    //   if (!returnMatch) {
+    //     await connection.rollback();
 
-//   const enteredReturnNumber =
-//     Number(returnMatch[2]);
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: "Invalid return number.",
+    //     });
+    //   }
 
-//   // -------------------------------------------------------
-//   // Validate positive number
-//   // -------------------------------------------------------
+    //   //const returnPrefix =returnMatch[1] || "";
+    //   const returnPrefix = normalizeReturnPrefix(returnMatch[1]);
 
-//   if (
-//     !Number.isInteger(enteredReturnNumber) ||
-//     enteredReturnNumber < 1
-//   ) {
-//     await connection.rollback();
+    //   const enteredReturnNumber =
+    //     Number(returnMatch[2]);
 
-//     return res.status(400).json({
-//       success: false,
-//       message:
-//         "Return number must contain a valid positive number.",
-//     });
-//   }
+    //   // -------------------------------------------------------
+    //   // Validate positive number
+    //   // -------------------------------------------------------
 
-//   // -------------------------------------------------------
-//   // If prefix changed while editing,
-//   // release old prefix number.
-//   //
-//   // Example:
-//   //
-//   // SAL3 -> INV2
-//   //
-//   // SAL last_number:
-//   // 3 -> 2
-//   // -------------------------------------------------------
+    //   if (
+    //     !Number.isInteger(enteredReturnNumber) ||
+    //     enteredReturnNumber < 1
+    //   ) {
+    //     await connection.rollback();
 
-//   if (
-//     oldReturnNumber &&
-//     oldReturnNumber !== returnNumber
-//   ) {
-//     const oldMatch =
-//       oldReturnNumber.match(/^(.*?)(\d+)$/);
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         "Return number must contain a valid positive number.",
+    //     });
+    //   }
 
-//     if (oldMatch) {
-//       const oldPrefix =
-//         oldMatch[1] || "";
+    //   // -------------------------------------------------------
+    //   // If prefix changed while editing,
+    //   // release old prefix number.
+    //   //
+    //   // Example:
+    //   //
+    //   // SAL3 -> INV2
+    //   //
+    //   // SAL last_number:
+    //   // 3 -> 2
+    //   // -------------------------------------------------------
 
-//       const oldNumber =
-//         Number(oldMatch[2]);
+    //   if (
+    //     oldReturnNumber &&
+    //     oldReturnNumber !== returnNumber
+    //   ) {
+    //     const oldMatch =
+    //       oldReturnNumber.match(/^(.*?)(\d+)$/);
 
-//       // ---------------------------------------------------
-//       // Only when PREFIX changed
-//       // ---------------------------------------------------
+    //     if (oldMatch) {
+    //       const oldPrefix =
+    //         oldMatch[1] || "";
 
-//       if (oldPrefix !== returnPrefix) {
-//         const [oldPrefixRows] =
-//           await connection.execute(
-//             `
-//             SELECT
-//               id,
-//               last_number
-//             FROM transactions_prefixes
-//             WHERE transaction_type = 'sale_return'
-//               AND prefix_name = ?
-//             LIMIT 1
-//             FOR UPDATE
-//             `,
-//             [oldPrefix]
-//           );
+    //       const oldNumber =
+    //         Number(oldMatch[2]);
 
-//         if (oldPrefixRows.length > 0) {
-//           const oldPrefixRow =
-//             oldPrefixRows[0];
+    //       // ---------------------------------------------------
+    //       // Only when PREFIX changed
+    //       // ---------------------------------------------------
 
-//           const oldLastNumber =
-//             Number(oldPrefixRow.last_number) || 0;
+    //       if (oldPrefix !== returnPrefix) {
+    //         const [oldPrefixRows] =
+    //           await connection.execute(
+    //             `
+    //             SELECT
+    //               id,
+    //               last_number
+    //             FROM transactions_prefixes
+    //             WHERE transaction_type = 'sale_return'
+    //               AND prefix_name = ?
+    //             LIMIT 1
+    //             FOR UPDATE
+    //             `,
+    //             [oldPrefix]
+    //           );
 
-//           // Old return was latest
-//           if (
-//             oldNumber === oldLastNumber
-//           ) {
-//             await connection.execute(
-//               `
-//               UPDATE transactions_prefixes
-//               SET last_number = ?
-//               WHERE id = ?
-//               `,
-//               [
-//                 Math.max(
-//                   0,
-//                   oldLastNumber - 1
-//                 ),
-//                 oldPrefixRow.id,
-//               ]
-//             );
-//           }
-//         }
-//       }
-//     }
-//   }
+    //         if (oldPrefixRows.length > 0) {
+    //           const oldPrefixRow =
+    //             oldPrefixRows[0];
 
-//   // -------------------------------------------------------
-//   // Find + LOCK NEW prefix row
-//   // -------------------------------------------------------
+    //           const oldLastNumber =
+    //             Number(oldPrefixRow.last_number) || 0;
 
-//   const [prefixRows] =
-//     await connection.execute(
-//       `
-//       SELECT
-//         id,
-//         transaction_type,
-//         prefix_name,
-//         last_number,
-//         is_active
-//       FROM transactions_prefixes
-//       WHERE transaction_type = 'sale_return'
-//         AND prefix_name = ?
-//       LIMIT 1
-//       FOR UPDATE
-//       `,
-//       [returnPrefix]
-//     );
+    //           // Old return was latest
+    //           if (
+    //             oldNumber === oldLastNumber
+    //           ) {
+    //             await connection.execute(
+    //               `
+    //               UPDATE transactions_prefixes
+    //               SET last_number = ?
+    //               WHERE id = ?
+    //               `,
+    //               [
+    //                 Math.max(
+    //                   0,
+    //                   oldLastNumber - 1
+    //                 ),
+    //                 oldPrefixRow.id,
+    //               ]
+    //             );
+    //           }
+    //         }
+    //       }
+    //     }
+    //   }
 
-//   // -------------------------------------------------------
-//   // Prefix must exist
-//   // -------------------------------------------------------
+    //   // -------------------------------------------------------
+    //   // Find + LOCK NEW prefix row
+    //   // -------------------------------------------------------
 
-//   if (prefixRows.length === 0) {
-//     await connection.rollback();
+    //   const [prefixRows] =
+    //     await connection.execute(
+    //       `
+    //       SELECT
+    //         id,
+    //         transaction_type,
+    //         prefix_name,
+    //         last_number,
+    //         is_active
+    //       FROM transactions_prefixes
+    //       WHERE transaction_type = 'sale_return'
+    //         AND prefix_name = ?
+    //       LIMIT 1
+    //       FOR UPDATE
+    //       `,
+    //       [returnPrefix]
+    //     );
 
-//     return res.status(400).json({
-//       success: false,
-//       message:
-//         `Return prefix "${returnPrefix}" does not exist.`,
-//     });
-//   }
+    //   // -------------------------------------------------------
+    //   // Prefix must exist
+    //   // -------------------------------------------------------
 
-//   const prefixRow =
-//     prefixRows[0];
+    //   if (prefixRows.length === 0) {
+    //     await connection.rollback();
 
-//   const currentLastNumber =
-//     Number(prefixRow.last_number) || 0;
+    //     return res.status(400).json({
+    //       success: false,
+    //       message:
+    //         `Return prefix "${returnPrefix}" does not exist.`,
+    //     });
+    //   }
 
-//   // -------------------------------------------------------
-//   // Update NEW prefix sequence if necessary
-//   // -------------------------------------------------------
+    //   const prefixRow =
+    //     prefixRows[0];
 
-//   if (
-//     enteredReturnNumber >
-//     currentLastNumber
-//   ) {
-//     await connection.execute(
-//       `
-//       UPDATE transactions_prefixes
-//       SET last_number = ?
-//       WHERE id = ?
-//       `,
-//       [
-//         enteredReturnNumber,
-//         prefixRow.id,
-//       ]
-//     );
-//   }
-// }
-// =========================================================
-// 8. GET OLD RETURN NUMBER DETAILS
-// =========================================================
+    //   const currentLastNumber =
+    //     Number(prefixRow.last_number) || 0;
 
-const [oldReturnRows] = await connection.execute(
-  `
+    //   // -------------------------------------------------------
+    //   // Update NEW prefix sequence if necessary
+    //   // -------------------------------------------------------
+
+    //   if (
+    //     enteredReturnNumber >
+    //     currentLastNumber
+    //   ) {
+    //     await connection.execute(
+    //       `
+    //       UPDATE transactions_prefixes
+    //       SET last_number = ?
+    //       WHERE id = ?
+    //       `,
+    //       [
+    //         enteredReturnNumber,
+    //         prefixRow.id,
+    //       ]
+    //     );
+    //   }
+    // }
+    // =========================================================
+    // 8. GET OLD RETURN NUMBER DETAILS
+    // =========================================================
+
+    const [oldReturnRows] = await connection.execute(
+      `
   SELECT
     Return_Number,
     Return_Number_Prefix,
@@ -2698,97 +2698,97 @@ const [oldReturnRows] = await connection.execute(
   LIMIT 1
   FOR UPDATE
   `,
-  [Sale_Return_Id]
-);
+      [Sale_Return_Id]
+    );
 
-//const oldReturnNumber =oldReturnRows[0]?.Return_Number || null;
+    //const oldReturnNumber =oldReturnRows[0]?.Return_Number || null;
 
-const oldReturnPrefix =
-  String(
-    oldReturnRows[0]?.Return_Number_Prefix ?? ""
-  ).trim() || "None";
+    const oldReturnPrefix =
+      String(
+        oldReturnRows[0]?.Return_Number_Prefix ?? ""
+      ).trim() || "None";
 
-const oldReturnValueRaw =
-  oldReturnRows[0]?.Return_Number_Value;
+    const oldReturnValueRaw =
+      oldReturnRows[0]?.Return_Number_Value;
 
-const oldReturnValue =
-  oldReturnValueRaw === null ||
-  oldReturnValueRaw === undefined
-    ? null
-    : Number(oldReturnValueRaw);
-
-
-// =========================================================
-// 9. CURRENT RETURN NUMBER DETAILS
-// =========================================================
-
-const returnPrefix =
-  String(
-    Return_Number_Prefix ?? ""
-  ).trim() || "None";
-
-const returnValueString =
-  String(
-    Return_Number_Value ?? ""
-  ).trim();
-
-let returnNumberValue = null;
-
-if (returnValueString !== "") {
-
-  // Only digits are allowed
-  if (!/^\d+$/.test(returnValueString)) {
-    await connection.rollback();
-
-    return res.status(400).json({
-      success: false,
-      message:
-        "Return number must contain only digits.",
-    });
-  }
-
-  returnNumberValue =
-    Number(returnValueString);
-
-  // 0 is valid.
-  // It means "no number" for legacy Return_Number.
-}
+    const oldReturnValue =
+      oldReturnValueRaw === null ||
+        oldReturnValueRaw === undefined
+        ? null
+        : Number(oldReturnValueRaw);
 
 
-// =========================================================
-// 10. HANDLE OLD PREFIX SEQUENCE
-// =========================================================
-//
-// If the old return used a number and that number was
-// the latest number for its prefix, release it.
-//
-// Example:
-//
-// SAL1000 -> SAL00
-//
-// SAL last_number:
-// 1000 -> 999
-//
-// Example:
-//
-// SAL1000 -> INV500
-//
-// SAL last_number:
-// 1000 -> 999
-//
-// If old number was NOT the latest, do nothing.
-//
-// =========================================================
+    // =========================================================
+    // 9. CURRENT RETURN NUMBER DETAILS
+    // =========================================================
 
-if (
-  oldReturnValue !== null &&
-  oldReturnValue !== undefined &&
-  Number.isInteger(oldReturnValue)
-) {
+    const returnPrefix =
+      String(
+        Return_Number_Prefix ?? ""
+      ).trim() || "None";
 
-  const oldPrefixRows =
-    await connection.execute(
-      `
+    const returnValueString =
+      String(
+        Return_Number_Value ?? ""
+      ).trim();
+
+    let returnNumberValue = null;
+
+    if (returnValueString !== "") {
+
+      // Only digits are allowed
+      if (!/^\d+$/.test(returnValueString)) {
+        await connection.rollback();
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Return number must contain only digits.",
+        });
+      }
+
+      returnNumberValue =
+        Number(returnValueString);
+
+      // 0 is valid.
+      // It means "no number" for legacy Return_Number.
+    }
+
+
+    // =========================================================
+    // 10. HANDLE OLD PREFIX SEQUENCE
+    // =========================================================
+    //
+    // If the old return used a number and that number was
+    // the latest number for its prefix, release it.
+    //
+    // Example:
+    //
+    // SAL1000 -> SAL00
+    //
+    // SAL last_number:
+    // 1000 -> 999
+    //
+    // Example:
+    //
+    // SAL1000 -> INV500
+    //
+    // SAL last_number:
+    // 1000 -> 999
+    //
+    // If old number was NOT the latest, do nothing.
+    //
+    // =========================================================
+
+    if (
+      oldReturnValue !== null &&
+      oldReturnValue !== undefined &&
+      Number.isInteger(oldReturnValue)
+    ) {
+
+      const oldPrefixRows =
+        await connection.execute(
+          `
       SELECT
         id,
         last_number
@@ -2798,61 +2798,61 @@ if (
       LIMIT 1
       FOR UPDATE
       `,
-      [oldReturnPrefix]
-    );
+          [oldReturnPrefix]
+        );
 
-  const oldPrefixRow =
-    oldPrefixRows[0]?.[0];
+      const oldPrefixRow =
+        oldPrefixRows[0]?.[0];
 
-  if (oldPrefixRow) {
+      if (oldPrefixRow) {
 
-    const oldLastNumber =
-      Number(oldPrefixRow.last_number) || 0;
+        const oldLastNumber =
+          Number(oldPrefixRow.last_number) || 0;
 
-    // Only release the old number when
-    // it was the latest sequence number.
-    //
-    // Also only release when the return number
-    // is actually changing.
-    const numberChanged =
-      oldReturnValue !== returnNumberValue;
+        // Only release the old number when
+        // it was the latest sequence number.
+        //
+        // Also only release when the return number
+        // is actually changing.
+        const numberChanged =
+          oldReturnValue !== returnNumberValue;
 
-    const prefixChanged =
-      oldReturnPrefix !== returnPrefix;
+        const prefixChanged =
+          oldReturnPrefix !== returnPrefix;
 
-    if (
-      (numberChanged || prefixChanged) &&
-      oldReturnValue === oldLastNumber
-    ) {
+        if (
+          (numberChanged || prefixChanged) &&
+          oldReturnValue === oldLastNumber
+        ) {
 
-      await connection.execute(
-        `
+          await connection.execute(
+            `
         UPDATE transactions_prefixes
         SET last_number = ?
         WHERE id = ?
         `,
-        [
-          Math.max(
-            0,
-            oldLastNumber - 1
-          ),
-          oldPrefixRow.id,
-        ]
-      );
+            [
+              Math.max(
+                0,
+                oldLastNumber - 1
+              ),
+              oldPrefixRow.id,
+            ]
+          );
+        }
+      }
     }
-  }
-}
 
 
-// =========================================================
-// 11. HANDLE NEW PREFIX SEQUENCE
-// =========================================================
+    // =========================================================
+    // 11. HANDLE NEW PREFIX SEQUENCE
+    // =========================================================
 
-if (returnNumberValue !== null) {
+    if (returnNumberValue !== null) {
 
-  const [prefixRows] =
-    await connection.execute(
-      `
+      const [prefixRows] =
+        await connection.execute(
+          `
       SELECT
         id,
         transaction_type,
@@ -2865,83 +2865,83 @@ if (returnNumberValue !== null) {
       LIMIT 1
       FOR UPDATE
       `,
-      [returnPrefix]
-    );
+          [returnPrefix]
+        );
 
-  if (prefixRows.length === 0) {
+      if (prefixRows.length === 0) {
 
-    await connection.rollback();
+        await connection.rollback();
 
-    return res.status(400).json({
-      success: false,
-      message:
-        `Return prefix "${returnPrefix}" does not exist.`,
-    });
-  }
+        return res.status(400).json({
+          success: false,
+          message:
+            `Return prefix "${returnPrefix}" does not exist.`,
+        });
+      }
 
-  const prefixRow =
-    prefixRows[0];
+      const prefixRow =
+        prefixRows[0];
 
-  const currentLastNumber =
-    Number(prefixRow.last_number) || 0;
+      const currentLastNumber =
+        Number(prefixRow.last_number) || 0;
 
-  // Update sequence only if the entered number
-  // is greater than the current sequence.
-  if (
-    returnNumberValue >
-    currentLastNumber
-  ) {
+      // Update sequence only if the entered number
+      // is greater than the current sequence.
+      if (
+        returnNumberValue >
+        currentLastNumber
+      ) {
 
-    await connection.execute(
-      `
+        await connection.execute(
+          `
       UPDATE transactions_prefixes
       SET last_number = ?
       WHERE id = ?
       `,
-      [
-        returnNumberValue,
-        prefixRow.id,
-      ]
-    );
-  }
-}
+          [
+            returnNumberValue,
+            prefixRow.id,
+          ]
+        );
+      }
+    }
 
 
-// =========================================================
-// 12. BUILD LEGACY RETURN NUMBER
-// =========================================================
-//
-// New source of truth:
-//   Return_Number_Prefix
-//   Return_Number_Value
-//
-// Legacy Return_Number is still maintained because
-// Item Ledger and existing records use it.
-//
-// Examples:
-//
-// None + 5000 -> 5000
-// SAL  + 5000 -> SAL5000
-// None + 0    -> NULL
-// SAL  + 0    -> NULL
-// SAL  + empty -> NULL
-//
-// =========================================================
+    // =========================================================
+    // 12. BUILD LEGACY RETURN NUMBER
+    // =========================================================
+    //
+    // New source of truth:
+    //   Return_Number_Prefix
+    //   Return_Number_Value
+    //
+    // Legacy Return_Number is still maintained because
+    // Item Ledger and existing records use it.
+    //
+    // Examples:
+    //
+    // None + 5000 -> 5000
+    // SAL  + 5000 -> SAL5000
+    // None + 0    -> NULL
+    // SAL  + 0    -> NULL
+    // SAL  + empty -> NULL
+    //
+    // =========================================================
 
 
 
-const returnNumber =
-  buildLegacyReturnNumber(
-    returnPrefix,
-    returnNumberValue
-);
-// =========================================================
-// CHECK RETURN NUMBER UNIQUENESS
-// =========================================================
+    const returnNumber =
+      buildLegacyReturnNumber(
+        returnPrefix,
+        returnNumberValue
+      );
+    // =========================================================
+    // CHECK RETURN NUMBER UNIQUENESS
+    // =========================================================
 
-if (returnNumber !== null) {
-  const [duplicateRows] = await connection.execute(
-    `
+    if (returnNumber !== null) {
+      const [duplicateRows] = await connection.execute(
+        `
     SELECT id
     FROM sale_return
     WHERE Return_Number = ?
@@ -2949,20 +2949,20 @@ if (returnNumber !== null) {
     LIMIT 1
     FOR UPDATE
     `,
-    [returnNumber, Sale_Return_Id]
-  );
+        [returnNumber, Sale_Return_Id]
+      );
 
-  if (duplicateRows.length > 0) {
-    await connection.rollback();
+      if (duplicateRows.length > 0) {
+        await connection.rollback();
 
-    return res.status(400).json({
-      success: false,
-      message: `Return number "${returnNumber}" already exists.`,
-    });
-  }
-}
+        return res.status(400).json({
+          success: false,
+          message: `Return number "${returnNumber}" already exists.`,
+        });
+      }
+    }
     await connection.query(
-  `UPDATE sale_return
+      `UPDATE sale_return
    SET
      Party_Id = ?,
        Billing_Name = ?,
@@ -2983,27 +2983,27 @@ if (returnNumber !== null) {
      Balance_Due = ?,
      updated_at = NOW()
    WHERE id = ?`,
-  [
-    party.Party_Id,
-    cleanValue(Billing_Name),
-    cleanValue(Billing_Address),
-    returnNumber,
-    returnPrefix,
-    returnNumberValue,
-    Invoice_Number || null,
-    cleanValue(Phone_Number),
-    Invoice_Date || null,
-    Return_Date,
-    State_Of_Supply || null,
-    cleanTransactionDiscountPercentage,
-    cleanTransactionDiscountAmount,
-    totalAmount,
-    roundOffValue,
-    totalPaid,
-    balanceDue,
-    Sale_Return_Id,
-  ]
-);
+      [
+        party.Party_Id,
+        cleanValue(Billing_Name),
+        cleanValue(Billing_Address),
+        returnNumber,
+        returnPrefix,
+        returnNumberValue,
+        Invoice_Number || null,
+        cleanValue(Phone_Number),
+        Invoice_Date || null,
+        Return_Date,
+        State_Of_Supply || null,
+        cleanTransactionDiscountPercentage,
+        cleanTransactionDiscountAmount,
+        totalAmount,
+        roundOffValue,
+        totalPaid,
+        balanceDue,
+        Sale_Return_Id,
+      ]
+    );
 
     // =========================================================
     // 8. REPLACE PAYMENT SPLITS — unchanged
@@ -3042,58 +3042,58 @@ if (returnNumber !== null) {
     //   balanceDue,
     // });
     // =========================================================
-// 9. PARTY LEDGER
-// =========================================================
+    // 9. PARTY LEDGER
+    // =========================================================
 
-// Check whether Party has changed
-const partyChanged =
-  oldPartyId &&
-  party.Party_Id &&
-  oldPartyId !== party.Party_Id;
-
-
-// =========================================================
-// 9A. REMOVE SALE RETURN FROM OLD PARTY
-// =========================================================
-
-if (partyChanged) {
-  await reversePartyLedger({
-    connection,
-
-    // OLD PARTY
-    partyId: oldPartyId,
-
-    // SAME TRANSACTION TYPE
-    txnType: "Sale_Return",
-
-    // SAME SALE RETURN ID
-    referenceId: Number(Sale_Return_Id),
-  });
-}
+    // Check whether Party has changed
+    const partyChanged =
+      oldPartyId &&
+      party.Party_Id &&
+      oldPartyId !== party.Party_Id;
 
 
-// =========================================================
-// 9B. ADD / UPDATE SALE RETURN FOR CURRENT PARTY
-// =========================================================
+    // =========================================================
+    // 9A. REMOVE SALE RETURN FROM OLD PARTY
+    // =========================================================
 
-await recordPartyLedger({
-  connection,
+    if (partyChanged) {
+      await reversePartyLedger({
+        connection,
 
-  // CURRENT PARTY
-  partyId: party.Party_Id,
+        // OLD PARTY
+        partyId: oldPartyId,
 
-  txnType: "Sale_Return",
+        // SAME TRANSACTION TYPE
+        txnType: "Sale_Return",
 
-  referenceId: Number(Sale_Return_Id),
+        // SAME SALE RETURN ID
+        referenceId: Number(Sale_Return_Id),
+      });
+    }
 
-  amount: totalAmount,
 
-  txnDate: Return_Date,
+    // =========================================================
+    // 9B. ADD / UPDATE SALE RETURN FOR CURRENT PARTY
+    // =========================================================
 
-  docNumber: returnNumber,
+    await recordPartyLedger({
+      connection,
 
-  balanceDue,
-});
+      // CURRENT PARTY
+      partyId: party.Party_Id,
+
+      txnType: "Sale_Return",
+
+      referenceId: Number(Sale_Return_Id),
+
+      amount: totalAmount,
+
+      txnDate: Return_Date,
+
+      docNumber: returnNumber,
+
+      balanceDue,
+    });
 
     // =========================================================
     // 10. OLD ITEMS — unchanged
@@ -3132,7 +3132,7 @@ await recordPartyLedger({
         MRP,
         Discount_On_MRP_For_Sale_Percentage,
         Quantity,
-         Free_Quantity,
+        Free_Quantity,
         Sale_Price,
         Discount_On_Sale_Price,
         Discount_Type_On_Sale_Price,
@@ -3270,7 +3270,7 @@ await recordPartyLedger({
       } = resolveUnitAndStockDelta({
         dbItemRow,
         Selected_Unit: Selected_Unit,
-         Quantity:
+        Quantity:
           (Number(Quantity) || 0) +
           (cleanFreeQuantity ?? 0),
         //Quantity: Number(Quantity) || 0,
@@ -3284,7 +3284,7 @@ await recordPartyLedger({
         ...item,
         Item_Id,
         dbItemRow,
-         Free_Quantity: cleanFreeQuantity,
+        Free_Quantity: cleanFreeQuantity,
 
         Primary_Unit_Snapshot: snapshot.Primary_Unit_Snapshot,
         Secondary_Unit_Snapshot: snapshot.Secondary_Unit_Snapshot,
@@ -3361,7 +3361,7 @@ await recordPartyLedger({
         //   Number(old.Quantity) || 0;
 
         // oldBaseQty = rawQty;
-         const oldFreeQty =
+        const oldFreeQty =
           Number(old.Free_Quantity) > 0
             ? Number(old.Free_Quantity)
             : 0;
@@ -3442,7 +3442,7 @@ await recordPartyLedger({
         oldBaseQty
       );
     }
-    
+
 
     // =========================================================
     // 19. STOCK DIFFERENCE — Sale Return ADDS stock
@@ -3894,32 +3894,32 @@ const deleteSaleReturn = async (req, res, next) => {
 };
 
 const getLatestSaleReturnNumber = async (req, res, next) => {
-    let connection;
+  let connection;
 
-    try {
-        const { prefix: requestedPrefix } = req.query;
+  try {
+    const { prefix: requestedPrefix } = req.query;
 
-        // =========================================================
-        // 1. VALIDATE PREFIX
-        // =========================================================
+    // =========================================================
+    // 1. VALIDATE PREFIX
+    // =========================================================
 
-        if (!requestedPrefix) {
-            return res.status(400).json({
-                success: false,
-                message: "Return prefix is required.",
-            });
-        }
+    if (!requestedPrefix) {
+      return res.status(400).json({
+        success: false,
+        message: "Return prefix is required.",
+      });
+    }
 
-        const requestedPrefixName = String(requestedPrefix).trim();
+    const requestedPrefixName = String(requestedPrefix).trim();
 
-        connection = await db.getConnection();
+    connection = await db.getConnection();
 
-        // =========================================================
-        // 2. GET PREFIX + LAST NUMBER
-        // =========================================================
+    // =========================================================
+    // 2. GET PREFIX + LAST NUMBER
+    // =========================================================
 
-        const [prefixRows] = await connection.query(
-            `
+    const [prefixRows] = await connection.query(
+      `
             SELECT
                 id,
                 transaction_type,
@@ -3931,106 +3931,106 @@ const getLatestSaleReturnNumber = async (req, res, next) => {
               AND prefix_name = ?
             LIMIT 1
             `,
-            [requestedPrefixName]
-        );
+      [requestedPrefixName]
+    );
 
-        if (prefixRows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid Sale Return prefix.",
-            });
-        }
+    if (prefixRows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Sale Return prefix.",
+      });
+    }
 
-        const prefixRow = prefixRows[0];
+    const prefixRow = prefixRows[0];
 
-        // =========================================================
-        // 3. GET LAST NUMBER
-        // =========================================================
+    // =========================================================
+    // 3. GET LAST NUMBER
+    // =========================================================
 
-        const lastNumber = Number(prefixRow.last_number) || 0;
+    const lastNumber = Number(prefixRow.last_number) || 0;
 
-        const nextNumber = lastNumber + 1;
+    const nextNumber = lastNumber + 1;
 
-        // =========================================================
-        // 4. FORMAT NEXT NUMBER
-        // =========================================================
+    // =========================================================
+    // 4. FORMAT NEXT NUMBER
+    // =========================================================
 
-        let newReturnNumber;
+    let newReturnNumber;
 
-        // ---------------------------------------------------------
-        // NONE PREFIX
-        // ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // NONE PREFIX
+    // ---------------------------------------------------------
 
-        if (
-            requestedPrefixName.toLowerCase() === "none"
-        ) {
-            newReturnNumber = String(nextNumber);
-        }
+    if (
+      requestedPrefixName.toLowerCase() === "none"
+    ) {
+      newReturnNumber = String(nextNumber);
+    }
 
-        // ---------------------------------------------------------
-        // AEPL-2627-
-        // ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // AEPL-2627-
+    // ---------------------------------------------------------
 
-        else if (
-            requestedPrefixName.toUpperCase() === "AEPL-2627-"
-        ) {
-            newReturnNumber = String(nextNumber).padStart(4, "0");
-        }
+    else if (
+      requestedPrefixName.toUpperCase() === "AEPL-2627-"
+    ) {
+      newReturnNumber = String(nextNumber).padStart(4, "0");
+    }
 
-        // ---------------------------------------------------------
-        // ALL OTHER PREFIXES
-        // ---------------------------------------------------------
+    // ---------------------------------------------------------
+    // ALL OTHER PREFIXES
+    // ---------------------------------------------------------
 
-        else {
-            newReturnNumber = String(nextNumber);
-        }
+    else {
+      newReturnNumber = String(nextNumber);
+    }
 
-        // =========================================================
-        // 5. GET CURRENT FINANCIAL YEAR
-        // =========================================================
+    // =========================================================
+    // 5. GET CURRENT FINANCIAL YEAR
+    // =========================================================
 
-        const [fyRows] = await connection.query(
-            `
+    const [fyRows] = await connection.query(
+      `
             SELECT Financial_Year
             FROM financial_year
             WHERE Current_Financial_Year = 1
             LIMIT 1
             `
-        );
+    );
 
-        if (fyRows.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: "No active financial year found.",
-            });
-        }
-
-        const activeFY = fyRows[0].Financial_Year;
-
-        // =========================================================
-        // 6. RETURN NEXT NUMBER
-        // =========================================================
-
-        return res.status(200).json({
-            success: true,
-            prefix: requestedPrefixName,
-            financialYear: activeFY,
-            newReturnNumber,
-        });
-
-    } catch (err) {
-        console.error(
-            "❌ Error getting latest sale return number:",
-            err
-        );
-
-        next(err);
-
-    } finally {
-        if (connection) {
-            connection.release();
-        }
+    if (fyRows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No active financial year found.",
+      });
     }
+
+    const activeFY = fyRows[0].Financial_Year;
+
+    // =========================================================
+    // 6. RETURN NEXT NUMBER
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+      prefix: requestedPrefixName,
+      financialYear: activeFY,
+      newReturnNumber,
+    });
+
+  } catch (err) {
+    console.error(
+      "❌ Error getting latest sale return number:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
 };
 const exportSaleReturnReportToExcel = async (req, res, next) => {
   let connection;
