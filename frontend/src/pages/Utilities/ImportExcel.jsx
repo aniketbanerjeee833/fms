@@ -323,7 +323,11 @@ const rowVirtualizer = useVirtualizer({
                             </tbody>
                         </table>
                     </div>
-                    <p className="text-gray-500 mt-2" style={{ fontSize: 11 }}>
+                    {/* <p className="text-gray-500 mt-2" style={{ fontSize: 11 }}>
+                        {NOTE_LINE}
+                    </p> */}
+
+                    <p className="text-red-500 mt-2" style={{ fontSize: 11 }}>
                         {NOTE_LINE}
                     </p>
 
@@ -416,165 +420,7 @@ const rowVirtualizer = useVirtualizer({
                     ) 
                     //: (
                         /* ---- preview state ---- */
-                        // <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
-                        //     {/* file + summary */}
-                        //     <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                        //         <div className="flex items-center gap-2 min-w-0">
-                        //             <FileSpreadsheet size={20} style={{ color: PRIMARY }} />
-                        //             <span className="font-semibold text-gray-800 truncate" title={fileName}>
-                        //                 {fileName}
-                        //             </span>
-                        //             <button
-                        //                 type="button"
-                        //                 onClick={resetUpload}
-                        //                 className="p-1 rounded hover:bg-gray-100"
-                        //                 style={{ background: "transparent", border: "none", cursor: "pointer" }}
-                        //                 title="Remove file"
-                        //             >
-                        //                 <X size={16} style={{ color: "#6b7280" }} />
-                        //             </button>
-                        //         </div>
-
-                        //         <div className="flex items-center gap-2 text-sm">
-                        //             <span
-                        //                 className="rounded-full px-3 py-1 font-medium"
-                        //                 style={{ background: "#f1f5f9", color: "#334155" }}
-                        //             >
-                        //                 Total: {rows.length}
-                        //             </span>
-                        //             <span
-                        //                 className="rounded-full px-3 py-1 font-medium"
-                        //                 style={{ background: "#dcfce7", color: "#166534" }}
-                        //             >
-                        //                 Valid: {validRows.length}
-                        //             </span>
-                        //             <span
-                        //                 className="rounded-full px-3 py-1 font-medium"
-                        //                 style={{ background: errorCount ? "#fee2e2" : "#f1f5f9", color: errorCount ? "#991b1b" : "#334155" }}
-                        //             >
-                        //                 Errors: {errorCount}
-                        //             </span>
-                        //         </div>
-                        //     </div>
-
-                        //     {/* table */}
-                        //     <div
-                        //         style={{
-                        //             flex: 1,
-                        //             minHeight: 0,
-                        //             overflow: "auto",
-                        //             border: "1px solid #e2e8f0",
-                        //             borderRadius: 6,
-                        //         }}
-                        //     >
-                        //         <table style={{ borderCollapse: "collapse", width: "100%" }}>
-                        //             <thead>
-                        //                 <tr>
-                        //                     <th style={th}>Row</th>
-                        //                     <th style={{ ...th, minWidth: 220 }}>Status</th>
-                        //                     {activeColumns.map((c) => (
-                        //                         <th key={c.field} style={th}>
-                        //                             {c.header}
-                        //                         </th>
-                        //                     ))}
-                        //                 </tr>
-                        //             </thead>
-                        //             <tbody>
-                        //                 {previewRows.map((row) => {
-                        //                     const hasError = row.errors.length > 0;
-                        //                     return (
-                        //                         <tr key={row.rowNo} style={{ background: hasError ? "#fef2f2" : "transparent" }}>
-                        //                             <td style={cell}>{row.rowNo}</td>
-                        //                             <td style={{ ...cell, whiteSpace: "normal", minWidth: 220 }}>
-                        //                                 {hasError ? (
-                        //                                     <div className="flex items-start gap-1.5" style={{ color: "#b91c1c" }}>
-                        //                                         <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-                        //                                         <div>
-                        //                                             {row.errors.map((e, i) => (
-                        //                                                 <div key={i} style={{ fontSize: 12 }}>
-                        //                                                     {e}
-                        //                                                 </div>
-                        //                                             ))}
-                        //                                         </div>
-                        //                                     </div>
-                        //                                 ) : (
-                        //                                     <div className="flex items-center gap-1.5" style={{ color: "#15803d" }}>
-                        //                                         <CheckCircle2 size={15} />
-                        //                                         <span style={{ fontSize: 12 }}>Ready</span>
-                        //                                     </div>
-                        //                                 )}
-                        //                             </td>
-                        //                             {activeColumns.map((c) => {
-                        //                                 const val = row.data[c.field];
-                        //                                 return (
-                        //                                     <td key={c.field} style={cell}>
-                        //                                         {val === null || val === undefined || val === "" ? "" : String(val)}
-                        //                                     </td>
-                        //                                 );
-                        //                             })}
-                        //                         </tr>
-                        //                     );
-                        //                 })}
-                        //             </tbody>
-                        //         </table>
-                        //     </div>
-
-                        //     {rows.length > PREVIEW_LIMIT && (
-                        //         <p className="text-gray-500 mt-2 mb-0" style={{ fontSize: 12 }}>
-                        //             Showing the first {PREVIEW_LIMIT} of {rows.length} rows. All valid rows will be
-                        //             imported.
-                        //         </p>
-                        //     )}
-
-                        //     {/* footer actions */}
-                        //     <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-                        //         <p className="text-gray-600 m-0" style={{ fontSize: 13 }}>
-                        //             {errorCount > 0
-                        //                 ? "Rows with errors will be skipped. Fix them in your file and upload again to include them."
-                        //                 : "All rows look good."}
-                        //         </p>
-
-                        //         <div className="flex items-center gap-3">
-                        //             <button
-                        //                 type="button"
-                        //                 onClick={resetUpload}
-                        //                 className="rounded-full px-5 py-2 text-sm font-semibold"
-                        //                 style={{
-                        //                     background: "#fff",
-                        //                     border: `1px solid ${PRIMARY}`,
-                        //                     color: PRIMARY,
-                        //                     cursor: "pointer",
-                        //                 }}
-                        //             >
-                        //                 Choose Another File
-                        //             </button>
-
-                         
-                        //             <button
-                        //                 type="button"
-                        //                 onClick={handleImport}
-                        //                 disabled={validRows.length === 0 || importing}
-                        //                 className="rounded-full px-6 py-2 text-sm font-semibold text-white"
-                        //                 style={{
-                        //                     background:
-                        //                         validRows.length === 0 || importing
-                        //                             ? "#cbd5e1"
-                        //                             : PRIMARY,
-                        //                     border: "none",
-                        //                     cursor:
-                        //                         validRows.length === 0 || importing
-                        //                             ? "not-allowed"
-                        //                             : "pointer",
-                        //                 }}
-                        //             >
-                        //                 {importing
-                        //                     ? "Importing..."
-                        //                     : `Import ${validRows.length} ${validRows.length === 1 ? "Item" : "Items"
-                        //                     }`}
-                        //             </button>
-                        //         </div>
-                        //     </div>
-                        // </div>
+                       
                     //)
                     
                     }
@@ -1224,3 +1070,162 @@ const rowVirtualizer = useVirtualizer({
 
 //   return { data, errors };
 // }
+ // <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+                        //     {/* file + summary */}
+                        //     <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                        //         <div className="flex items-center gap-2 min-w-0">
+                        //             <FileSpreadsheet size={20} style={{ color: PRIMARY }} />
+                        //             <span className="font-semibold text-gray-800 truncate" title={fileName}>
+                        //                 {fileName}
+                        //             </span>
+                        //             <button
+                        //                 type="button"
+                        //                 onClick={resetUpload}
+                        //                 className="p-1 rounded hover:bg-gray-100"
+                        //                 style={{ background: "transparent", border: "none", cursor: "pointer" }}
+                        //                 title="Remove file"
+                        //             >
+                        //                 <X size={16} style={{ color: "#6b7280" }} />
+                        //             </button>
+                        //         </div>
+
+                        //         <div className="flex items-center gap-2 text-sm">
+                        //             <span
+                        //                 className="rounded-full px-3 py-1 font-medium"
+                        //                 style={{ background: "#f1f5f9", color: "#334155" }}
+                        //             >
+                        //                 Total: {rows.length}
+                        //             </span>
+                        //             <span
+                        //                 className="rounded-full px-3 py-1 font-medium"
+                        //                 style={{ background: "#dcfce7", color: "#166534" }}
+                        //             >
+                        //                 Valid: {validRows.length}
+                        //             </span>
+                        //             <span
+                        //                 className="rounded-full px-3 py-1 font-medium"
+                        //                 style={{ background: errorCount ? "#fee2e2" : "#f1f5f9", color: errorCount ? "#991b1b" : "#334155" }}
+                        //             >
+                        //                 Errors: {errorCount}
+                        //             </span>
+                        //         </div>
+                        //     </div>
+
+                        //     {/* table */}
+                        //     <div
+                        //         style={{
+                        //             flex: 1,
+                        //             minHeight: 0,
+                        //             overflow: "auto",
+                        //             border: "1px solid #e2e8f0",
+                        //             borderRadius: 6,
+                        //         }}
+                        //     >
+                        //         <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                        //             <thead>
+                        //                 <tr>
+                        //                     <th style={th}>Row</th>
+                        //                     <th style={{ ...th, minWidth: 220 }}>Status</th>
+                        //                     {activeColumns.map((c) => (
+                        //                         <th key={c.field} style={th}>
+                        //                             {c.header}
+                        //                         </th>
+                        //                     ))}
+                        //                 </tr>
+                        //             </thead>
+                        //             <tbody>
+                        //                 {previewRows.map((row) => {
+                        //                     const hasError = row.errors.length > 0;
+                        //                     return (
+                        //                         <tr key={row.rowNo} style={{ background: hasError ? "#fef2f2" : "transparent" }}>
+                        //                             <td style={cell}>{row.rowNo}</td>
+                        //                             <td style={{ ...cell, whiteSpace: "normal", minWidth: 220 }}>
+                        //                                 {hasError ? (
+                        //                                     <div className="flex items-start gap-1.5" style={{ color: "#b91c1c" }}>
+                        //                                         <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
+                        //                                         <div>
+                        //                                             {row.errors.map((e, i) => (
+                        //                                                 <div key={i} style={{ fontSize: 12 }}>
+                        //                                                     {e}
+                        //                                                 </div>
+                        //                                             ))}
+                        //                                         </div>
+                        //                                     </div>
+                        //                                 ) : (
+                        //                                     <div className="flex items-center gap-1.5" style={{ color: "#15803d" }}>
+                        //                                         <CheckCircle2 size={15} />
+                        //                                         <span style={{ fontSize: 12 }}>Ready</span>
+                        //                                     </div>
+                        //                                 )}
+                        //                             </td>
+                        //                             {activeColumns.map((c) => {
+                        //                                 const val = row.data[c.field];
+                        //                                 return (
+                        //                                     <td key={c.field} style={cell}>
+                        //                                         {val === null || val === undefined || val === "" ? "" : String(val)}
+                        //                                     </td>
+                        //                                 );
+                        //                             })}
+                        //                         </tr>
+                        //                     );
+                        //                 })}
+                        //             </tbody>
+                        //         </table>
+                        //     </div>
+
+                        //     {rows.length > PREVIEW_LIMIT && (
+                        //         <p className="text-gray-500 mt-2 mb-0" style={{ fontSize: 12 }}>
+                        //             Showing the first {PREVIEW_LIMIT} of {rows.length} rows. All valid rows will be
+                        //             imported.
+                        //         </p>
+                        //     )}
+
+                        //     {/* footer actions */}
+                        //     <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                        //         <p className="text-gray-600 m-0" style={{ fontSize: 13 }}>
+                        //             {errorCount > 0
+                        //                 ? "Rows with errors will be skipped. Fix them in your file and upload again to include them."
+                        //                 : "All rows look good."}
+                        //         </p>
+
+                        //         <div className="flex items-center gap-3">
+                        //             <button
+                        //                 type="button"
+                        //                 onClick={resetUpload}
+                        //                 className="rounded-full px-5 py-2 text-sm font-semibold"
+                        //                 style={{
+                        //                     background: "#fff",
+                        //                     border: `1px solid ${PRIMARY}`,
+                        //                     color: PRIMARY,
+                        //                     cursor: "pointer",
+                        //                 }}
+                        //             >
+                        //                 Choose Another File
+                        //             </button>
+
+                         
+                        //             <button
+                        //                 type="button"
+                        //                 onClick={handleImport}
+                        //                 disabled={validRows.length === 0 || importing}
+                        //                 className="rounded-full px-6 py-2 text-sm font-semibold text-white"
+                        //                 style={{
+                        //                     background:
+                        //                         validRows.length === 0 || importing
+                        //                             ? "#cbd5e1"
+                        //                             : PRIMARY,
+                        //                     border: "none",
+                        //                     cursor:
+                        //                         validRows.length === 0 || importing
+                        //                             ? "not-allowed"
+                        //                             : "pointer",
+                        //                 }}
+                        //             >
+                        //                 {importing
+                        //                     ? "Importing..."
+                        //                     : `Import ${validRows.length} ${validRows.length === 1 ? "Item" : "Items"
+                        //                     }`}
+                        //             </button>
+                        //         </div>
+                        //     </div>
+                        // </div>
