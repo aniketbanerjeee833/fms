@@ -46,14 +46,15 @@ const MobileSideMenu = ({ onClose }) => {
       setOpenMenu("Purchase");
 
     }
-    if(currentPath.startsWith("/expense/categories") || 
-    currentPath.startsWith("/expense/items") )
-     {
+    if (currentPath.startsWith("/expense/categories") ||
+      currentPath.startsWith("/expense/items")) {
       setOpenMenu("Expense");
-      
+
     }
 
-    if(currentPath.startsWith("/utilities/barcode-generator") )
+   
+    if(currentPath.startsWith("/utilities/barcode-generator") || 
+    currentPath.startsWith("/utilities/import-excel") )
      {
       setOpenMenu("Utilities");
       
@@ -62,11 +63,7 @@ const MobileSideMenu = ({ onClose }) => {
       setOpenMenu("Settings");
 
     }
-    //    if(currentPath.startsWith("/reports/sales-purchases-report") )
-    //  {
-    //   setOpenMenu("Reports");
-
-    // }
+  
     if (currentPath.startsWith("/reports/sales-purchases-report") ||
       currentPath.startsWith("/reports/balance-sheet")) {
       setOpenMenu("Reports");
@@ -138,18 +135,18 @@ const MobileSideMenu = ({ onClose }) => {
       (cleanLink === "/purchase/all-purchases" && current.startsWith("/purchase/all-purchases"))
     )
       return true;
-   
 
-       if(
-      (cleanLink==="/expense/categories" && current.startsWith("/expense/categories")) ||
-      (cleanLink==="/expense/items" && current.startsWith("/expense/items"))
+
+    if (
+      (cleanLink === "/expense/categories" && current.startsWith("/expense/categories")) ||
+      (cleanLink === "/expense/items" && current.startsWith("/expense/items"))
     )
       return true;
-
-      if(
-        (cleanLink==="/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator"))
-      )
-        return true;
+    if (
+      (cleanLink === "/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator") ||
+        (cleanLink === "/utilities/import-excel" && current.startsWith("/utilities/import-excel")))
+    )
+      return true;
 
 
     if (cleanLink === "/financial-year/add" && current.startsWith("/financial-year/add"))
@@ -160,10 +157,10 @@ const MobileSideMenu = ({ onClose }) => {
       return true;
     return false;
   };
-  const handleDashBoardClick = () => {
-    setOpenMenu(null);
-    onClose();
-  };
+  // const handleDashBoardClick = () => {
+  //   setOpenMenu(null);
+  //   onClose();
+  // };
   const renderMenu = (label, iconClass, links, menuKey = label) => {
     return (
       <li key={label}>
@@ -232,10 +229,10 @@ const MobileSideMenu = ({ onClose }) => {
         }}>
         <div className="sb2-12 flex items-center justify-center"
           style={{
-         
-           backgroundColor: "#f4f7f9",
-         
-        }}
+
+            backgroundColor: "#f4f7f9",
+
+          }}
         >
 
           <X onClick={onClose}
@@ -415,25 +412,28 @@ const MobileSideMenu = ({ onClose }) => {
               { to: "/financial-year/add", text: "Financial Year" },
 
             ])} */}
-             {renderMenu("Utilities", <Wrench  size={20} />, [
-                       
-                        
-                        { to: "/utilities/barcode-generator", text: "Barcode Generator" },
-                        
-                      ])}
-                        <NavLink
-                          to="/settings"
-                          className={({ isActive }) => (isActive ? "menu-active" : "")}
-                          style={{ display: 'block', padding: '10px 16px',
-                            color: "#666", textDecoration: 'none',borderBottom:"1px solid #e8edf2" }}
-                              onClick={() => setOpenMenu(null)} // ✅ Close all submenus
-                        >
-                          
-                          {/* <i className="fa fa-bar-chart" aria-hidden="true"></i> Dashboard */}
-                             <span className="flex items-center gap-2"><Settings size={20}/> 
-                            Settings
-                             </span>
-                        </NavLink>
+            {renderMenu("Utilities", <Wrench size={20} />, [
+
+
+              { to: "/utilities/barcode-generator", text: "Barcode Generator" },
+              { to: "/utilities/import-excel", text: "Import Excel" }
+
+            ])}
+            <NavLink
+              to="/settings"
+              className={({ isActive }) => (isActive ? "menu-active" : "")}
+              style={{
+                display: 'block', padding: '10px 16px',
+                color: "#666", textDecoration: 'none', borderBottom: "1px solid #e8edf2"
+              }}
+              onClick={() => setOpenMenu(null)} // ✅ Close all submenus
+            >
+
+              {/* <i className="fa fa-bar-chart" aria-hidden="true"></i> Dashboard */}
+              <span className="flex items-center gap-2"><Settings size={20} />
+                Settings
+              </span>
+            </NavLink>
 
             {/* <NavLink
               to="/reports"

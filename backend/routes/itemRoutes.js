@@ -11,8 +11,11 @@ import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,del
     getAllItemUnits,
     getItemByCode,
     getItemsForDropdown,
-    getItemByName} from "../controllers/itemController.js"
+    getItemByName,
+    
+    importItemsExcel} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
+import uploadExcel from "../middleware/uploadExcel.js";
 
 
 // router.post("/add-item",userAuth,addItem)
@@ -45,6 +48,7 @@ import userAuth from "../middleware/userAuth.js";
 const itemRouter = express.Router();
 const unitRouter = express.Router();
 itemRouter.post("/add-item", userAuth, addItem);
+itemRouter.post("/import-items-excel", userAuth, uploadExcel.single("file"), importItemsExcel);
 itemRouter.patch("/edit-item/:Item_Id", userAuth, editItem);
 itemRouter.delete("/delete-item/:Item_Id", userAuth, deleteItem);
 itemRouter.get("/get-all-items", userAuth, getAllItems);

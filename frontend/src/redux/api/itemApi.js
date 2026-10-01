@@ -158,6 +158,27 @@ getItemByName: builder.query({
          { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
+    importItemsExcel: builder.mutation({
+  query: ({ file, dryRun = false }) => {
+    const formData = new FormData();
+
+    formData.append("file", file);
+    formData.append("dryRun", String(dryRun));
+
+    return {
+      url: "item/import-items-excel",
+      method: "POST",
+      body: formData,
+    };
+  },
+
+  invalidatesTags: [
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+    { type: "Item", id: "DROPDOWN" },
+  ],
+}),
 
     editItem: builder.mutation({
       query: ({ body, Item_Id }) => ({
@@ -534,66 +555,7 @@ getAllItemUnitsCursor: builder.query({
 
   providesTags: ["Unit"],
 }),
-// getUnitConversions: builder.query({
-//   query: ({ unitId, cursor = null, search = "" }) => {
-//     const params = new URLSearchParams();
 
-//     if (cursor) params.set("cursor", cursor);
-//     if (search?.trim()) params.set("search", search.trim());
-
-//     return `unit/${unitId}/conversions?${params.toString()}`;
-//   },
-
-//   serializeQueryArgs: ({ queryArgs }) => {
-//     const { unitId, search } = queryArgs;
-
-//     return {
-//       unitId,
-//       search,
-//     };
-//   },
-
-//   merge: (currentCache, newData, { arg }) => {
-//     // First load / search change / unit change
-//     if (!arg.cursor) {
-//       return newData;
-//     }
-
-//     currentCache.conversions.push(
-//       ...newData.conversions
-//     );
-
-//     currentCache.nextCursor = newData.nextCursor;
-//     currentCache.hasMore = newData.hasMore;
-
-//     if (newData.unit) {
-//       currentCache.unit = newData.unit;
-//     }
-//   },
-// // merge: (currentCache, newData, { arg }) => {
-// //   if (!arg.cursor) {
-// //     currentCache.conversions = newData.conversions;
-// //     currentCache.nextCursor = newData.nextCursor;
-// //     currentCache.hasMore = newData.hasMore;
-// //     currentCache.unit = newData.unit;
-// //     currentCache.totalConversions = newData.totalConversions;
-// //     return;
-// //   }
-
-// //   currentCache.conversions.push(
-// //     ...newData.conversions
-// //   );
-
-// //   currentCache.nextCursor = newData.nextCursor;
-// //   currentCache.hasMore = newData.hasMore;
-// // },
-//   forceRefetch: ({ currentArg, previousArg }) =>
-//     currentArg?.cursor !== previousArg?.cursor ||
-//     currentArg?.search !== previousArg?.search ||
-//     currentArg?.unitId !== previousArg?.unitId,
-// providesTags: ["ItemConversions"],
-//  //providesTags: ["Unit"],
-// }),
 getUnitConversions: builder.query({
   query: ({ unitId, cursor = null, search = "" }) => {
     const params = new URLSearchParams();
@@ -665,6 +627,7 @@ export const {
   useGetItemsForDropdownQuery,
   useLazyGetItemByNameQuery,
   useAddItemMutation,
+  useImportItemsExcelMutation,
   useEditItemMutation,
   useDeleteItemMutation,
   useGetEachItemBillAndInvoiceNumbersQuery,

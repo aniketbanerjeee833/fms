@@ -3,7 +3,7 @@ import { NavLink, useLocation } from "react-router-dom";
 
 import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet, IndianRupee, Wrench } from 'lucide-react'
 
-const REACT_APP_API_URL = "http://localhost:4000";
+//const REACT_APP_API_URL = "http://localhost:4000";
 
 const SideMenu = () => {
   // const { userId } = useSelector((state) => state.user);
@@ -75,7 +75,8 @@ const currentPath = location.pathname;
       
     }
 
-    if(currentPath.startsWith("/utilities/barcode-generator") )
+    if(currentPath.startsWith("/utilities/barcode-generator") || 
+    currentPath.startsWith("/utilities/import-excel") )
      {
       setOpenMenu("Utilities");
       
@@ -172,7 +173,8 @@ if (
       return true;
 
       if(
-        (cleanLink==="/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator"))
+        (cleanLink==="/utilities/barcode-generator" && current.startsWith("/utilities/barcode-generator")||
+        (cleanLink==="/utilities/import-excel" && current.startsWith("/utilities/import-excel")))
       )
         return true;
 
@@ -334,6 +336,7 @@ if (
            
             
             { to: "/utilities/barcode-generator", text: "Barcode Generator" },
+            { to: "/utilities/import-excel", text: "Import Excel" }
             
           ])}
             <NavLink

@@ -77,6 +77,7 @@ const BankAccounts= lazy(() => import('./pages/CashAndBank/BankAccounts'));
 
 
 const BarcodeGenerator = lazy(() => import('./pages/Utilities/BarcodeGenerator'));
+const ImportExcel = lazy(() => import('./pages/Utilities/ImportExcel'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
 const FinancialYear = lazy(() => import('./pages/Settings/FinancialYear'));
 const Items = lazy(() => import('./pages/Settings/Items'));
@@ -501,14 +502,7 @@ function RouterWrapper() {
                              <ExpensePreview />
                            }
                          />
-            {/* <Route
-              path="/reports"
-              element={
-                <Layout>
-                  <Reports />
-                </Layout>
-              }
-            /> */}
+            
              <Route
               path="/reports/sales-purchases-report"
               element={
@@ -553,6 +547,14 @@ function RouterWrapper() {
               element={
                 <Layout>
                   <BarcodeGenerator/>
+                </Layout>
+              }
+            />
+            <Route
+              path="/utilities/import-excel"
+              element={
+                <Layout>
+                  <ImportExcel/>
                 </Layout>
               }
             />
