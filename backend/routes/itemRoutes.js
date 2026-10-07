@@ -13,7 +13,9 @@ import {addCategory, addItem,addItemConversion,addStockAdjustment,deleteItem,del
     getItemsForDropdown,
     getItemByName,
     
-    importItemsExcel} from "../controllers/itemController.js"
+    importItemsExcel,
+    validateImportItemRow,
+    importItemRows} from "../controllers/itemController.js"
 import userAuth from "../middleware/userAuth.js";
 import uploadExcel from "../middleware/uploadExcel.js";
 
@@ -49,6 +51,8 @@ const itemRouter = express.Router();
 const unitRouter = express.Router();
 itemRouter.post("/add-item", userAuth, addItem);
 itemRouter.post("/import-items-excel", userAuth, uploadExcel.single("file"), importItemsExcel);
+itemRouter.post("/validate-import-row", userAuth, validateImportItemRow);
+itemRouter.post("/import-items-rows", userAuth, importItemRows);
 itemRouter.patch("/edit-item/:Item_Id", userAuth, editItem);
 itemRouter.delete("/delete-item/:Item_Id", userAuth, deleteItem);
 itemRouter.get("/get-all-items", userAuth, getAllItems);

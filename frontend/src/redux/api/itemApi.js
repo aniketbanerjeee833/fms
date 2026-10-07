@@ -158,6 +158,18 @@ getItemByName: builder.query({
          { type: "Item", id: "DROPDOWN" },   // ← add
       ],
     }),
+    importItemRows: builder.mutation({
+  query: ({ items }) => ({
+    url: "item/import-items-rows",
+    method: "POST",
+    body: { items, dryRun: false },
+  }),
+  invalidatesTags: [
+    { type: "Item", id: "LIST" },
+    { type: "ItemsByCategory", id: "LIST" },
+    { type: "ItemLedger", id: "LIST" },
+  ],
+}),
     importItemsExcel: builder.mutation({
   query: ({ file, dryRun = false }) => {
     const formData = new FormData();
@@ -178,6 +190,13 @@ getItemByName: builder.query({
     { type: "ItemLedger", id: "LIST" },
     { type: "Item", id: "DROPDOWN" },
   ],
+}),
+validateImportRow: builder.mutation({
+  query: (body) => ({
+    url: "/item/validate-import-row",
+    method: "POST",
+    body,
+  }),
 }),
 
     editItem: builder.mutation({
@@ -628,6 +647,8 @@ export const {
   useLazyGetItemByNameQuery,
   useAddItemMutation,
   useImportItemsExcelMutation,
+  useImportItemRowsMutation,
+  useValidateImportRowMutation,
   useEditItemMutation,
   useDeleteItemMutation,
   useGetEachItemBillAndInvoiceNumbersQuery,

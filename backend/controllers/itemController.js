@@ -766,329 +766,7 @@ const findUnit = (value, units) => {
   });
 };
 
-// const addItemsExcel = async (req, res, next) => {
-//   let connection;
-//   let inTransaction = false;
 
-//   try {
-//     const dryRun = req.body?.dryRun === true;
-//     const items = req.body?.items;
-
-//     if (!Array.isArray(items) || items.length === 0) {
-//       return res.status(400).json({ success: false, message: "No items to import." });
-//     }
-//     if (items.length > MAX_IMPORT_ROWS) {
-//       return res.status(400).json({
-//         success: false,
-//         message: `Too many rows. Maximum ${MAX_IMPORT_ROWS} items per import.`,
-//       });
-//     }
-
-//     connection = await db.getConnection();
-
-//     // =========================================================
-//     // 1. LOAD LOOKUPS (units that exist)
-//     // =========================================================
-//     const [unitRows] = await connection.query(`SELECT Unit_Shorthand FROM units`);
-//     const unitMap = new Map(
-//       unitRows.map((u) => [String(u.Unit_Shorthand).trim().toLowerCase(), u.Unit_Shorthand])
-//     );
-
-//     // =========================================================
-//     // 2. PER-ROW VALIDATION (same schema as addItem)
-//     // =========================================================
-//     const rows = items.map((raw, i) => {
-//       const rowNo = Number(raw?.rowNo) || i + 2;
-//       const errors = [];
-
-//       const { rowNo: _ignored, ...rest } = raw || {};
-
-//       // discount type: accept sheet wording too
-//       const dt = normalizeDiscountType(rest.Discount_Type_On_Sale_Price);
-//       if (dt === null) {
-//         errors.push('Discount Type: use "Discount %" or "Discount Amount"');
-//       }
-//       rest.Discount_Type_On_Sale_Price = dt || "";
-
-//       // drop null / "" so optional fields in the zod schema don't fail
-//       const input = Object.fromEntries(
-//         Object.entries(sanitizeObject({ ...rest, Item_Type: "Product" })).filter(
-//           ([, v]) => v !== null && v !== ""
-//         )
-//       );
-
-//       const parsed = itemFormSchema.safeParse(input);
-//       if (!parsed.success) {
-//         parsed.error.errors.forEach((e) =>
-//           errors.push(`${e.path.join(".") || "Row"}: ${e.message}`)
-//         );
-//       }
-
-//       const data = parsed.success ? { ...parsed.data } : null;
-
-//       // units must exist (use the DB's own spelling/case)
-//       if (data) {
-//         const checkUnit = (field, label) => {
-//           if (!data[field]) return;
-//           const found = unitMap.get(String(data[field]).trim().toLowerCase());
-//           if (!found) {
-//             errors.push(`${label} "${data[field]}" not found. Add it in Units first.`);
-//           } else {
-//             data[field] = found;
-//           }
-//         };
-//         checkUnit("Primary_Unit", "Base Unit");
-//         checkUnit("Secondary_Unit", "Secondary Unit");
-
-//         if (data.Secondary_Unit && !data.Primary_Unit) {
-//           errors.push("Base Unit is required when Secondary Unit is given");
-//         }
-//       }
-
-//       return { rowNo, input, data, errors: [...new Set(errors)] };
-//     });
-
-//     // =========================================================
-//     // 3. DUPLICATES INSIDE THE FILE
-//     // =========================================================
-//     const seenNames = new Map();
-//     const seenCodes = new Map();
-
-//     rows.forEach((r) => {
-//       const name = String(r.input.Item_Name || "").trim().toLowerCase();
-//       const code = String(r.input.Item_Code || "").trim().toLowerCase();
-
-//       if (name) {
-//         if (seenNames.has(name)) {
-//           r.errors.push(`Duplicate item name (also in row ${seenNames.get(name)})`);
-//         } else seenNames.set(name, r.rowNo);
-//       }
-//       if (code) {
-//         if (seenCodes.has(code)) {
-//           r.errors.push(`Duplicate item code (also in row ${seenCodes.get(code)})`);
-//         } else seenCodes.set(code, r.rowNo);
-//       }
-//     });
-
-//     // =========================================================
-//     // 4. DUPLICATES AGAINST THE DATABASE (one query each)
-//     // =========================================================
-//     const names = [...seenNames.keys()];
-//     const codes = [...seenCodes.keys()];
-
-//     const dbNames = new Set();
-//     const dbCodes = new Set();
-
-//     if (names.length) {
-//       const [r1] = await connection.query(
-//         `SELECT LOWER(TRIM(Item_Name)) AS n FROM add_item WHERE LOWER(TRIM(Item_Name)) IN (?)`,
-//         [names]
-//       );
-//       r1.forEach((x) => dbNames.add(x.n));
-//     }
-//     if (codes.length) {
-//       const [r2] = await connection.query(
-//         `SELECT LOWER(TRIM(Item_Code)) AS c FROM add_item WHERE LOWER(TRIM(Item_Code)) IN (?)`,
-//         [codes]
-//       );
-//       r2.forEach((x) => dbCodes.add(x.c));
-//     }
-
-//     rows.forEach((r) => {
-//       const name = String(r.input.Item_Name || "").trim().toLowerCase();
-//       const code = String(r.input.Item_Code || "").trim().toLowerCase();
-//       if (name && dbNames.has(name)) r.errors.push("Item already exists");
-//       if (code && dbCodes.has(code)) r.errors.push("Item Code already exists");
-//     });
-
-//     // =========================================================
-//     // 5. SUMMARY + DRY RUN
-//     // =========================================================
-//     const failed = rows.filter((r) => r.errors.length > 0);
-//     const valid = rows.filter((r) => r.errors.length === 0);
-
-//     const errorList = failed.map((r) => ({ rowNo: r.rowNo, messages: r.errors }));
-
-//     if (dryRun) {
-//       return res.status(200).json({
-//         success: true,
-//         dryRun: true,
-//         summary: { total: rows.length, valid: valid.length, invalid: failed.length },
-//         errors: errorList,
-//       });
-//     }
-
-//     if (valid.length === 0) {
-//       return res.status(200).json({
-//         success: true,
-//         imported: 0,
-//         message: "No valid items to import.",
-//         errors: errorList,
-//       });
-//     }
-
-//     // =========================================================
-//     // 6. INSERT VALID ROWS IN ONE TRANSACTION
-//     // =========================================================
-//     await connection.beginTransaction();
-//     inTransaction = true;
-
-//     // next Item_Id — generated once, then incremented in memory
-//     const [last] = await connection.query(
-//       `SELECT Item_Id FROM add_item ORDER BY id DESC LIMIT 1 FOR UPDATE`
-//     );
-
-//     let nextNumber = 1;
-//     if (last.length > 0) {
-//       const n = parseInt(String(last[0].Item_Id).replace("ITM", ""), 10);
-//       nextNumber = Number.isNaN(n) ? 1 : n + 1;
-//     }
-
-//     const today = toYMD();
-//     const conversionPairs = new Map();
-//     let imported = 0;
-
-//     for (const r of valid) {
-//       try {
-//         const d = r.data;
-//         const itemId = "ITM" + String(nextNumber++).padStart(3, "0");
-
-//         const primaryUnit = d.Primary_Unit || null;
-//         const secondaryUnit = d.Secondary_Unit || null;
-//         const itemUnit = primaryUnit ?? "";
-//         const conversionRate = secondaryUnit ? d.Conversion_Rate ?? null : null;
-
-//         const hasOpening = d.Opening_Quantity !== undefined && d.Opening_Quantity !== null;
-//         const stockQuantity = Number(d.Opening_Quantity ?? 0);
-//         const openingQuantity = hasOpening ? stockQuantity : null;
-
-//         // sheet has no "At price" / "As of date": value stock at purchase price, dated today
-//         const atPrice = stockQuantity > 0 ? d.Purchase_Price ?? null : null;
-//         const asOfDate = hasOpening ? today : null;
-
-//         const [result] = await connection.execute(
-//           `
-//           INSERT INTO add_item
-//           (
-//             Item_Id, Item_Name, Item_Type, Item_HSN, Item_Category, Item_Unit,
-//             Item_Code, MRP, Discount_On_MRP_For_Sale,
-//             Sale_Price, Sale_Price_Type, Discount_On_Sale_Price, Discount_Type_On_Sale_Price,
-//             Purchase_Price, Purchase_Price_Type,
-//             Primary_Unit, Secondary_Unit, Conversion_Rate,
-//             Stock_Quantity, Opening_Quantity, At_Price, As_Of_Date, Min_Stock, Location,
-//             created_at, updated_at
-//           )
-//           VALUES
-//           (
-//             ?, ?, ?, ?, ?, ?,
-//             ?, ?, ?, ?, ?, ?, ?, ?, ?,
-//             ?, ?, ?,
-//             ?, ?, ?, ?, ?, ?,
-//             NOW(), NOW()
-//           )
-//           `,
-//           [
-//             itemId,
-//             d.Item_Name,
-//             "Product",
-//             d.Item_HSN || null,
-//             d.Item_Category || "",
-//             itemUnit,
-
-//             d.Item_Code || null,
-//             normalizeNumber(d.MRP) || null,
-//             null,
-//             d.Sale_Price ?? null,
-//             "Without_Tax",
-//             d.Discount_On_Sale_Price ?? null,
-//             d.Discount_Type_On_Sale_Price || "Percentage",
-//             d.Purchase_Price ?? null,
-//             "Without_Tax",
-
-//             primaryUnit,
-//             secondaryUnit,
-//             conversionRate,
-
-//             stockQuantity,
-//             openingQuantity,
-//             atPrice,
-//             asOfDate,
-//             d.Min_Stock ?? null,
-//             d.Location || null,
-//           ]
-//         );
-
-//         await syncUnitIdsForItem(connection, itemId);
-
-//         if (primaryUnit && secondaryUnit && Number(conversionRate) > 0) {
-//           conversionPairs.set(`${primaryUnit}|${secondaryUnit}|${conversionRate}`, [
-//             primaryUnit,
-//             secondaryUnit,
-//             conversionRate,
-//           ]);
-//         }
-
-//         if (stockQuantity > 0) {
-//           await recordItemLedger({
-//             connection,
-//             itemId,
-//             txnType: "Opening_Stock",
-//             referenceId: result.insertId,
-//             billId: itemId,
-//             billNumber: null,
-//             partyName: null,
-//             quantity: stockQuantity,
-//             selectedUnit: primaryUnit,
-//             baseQty: stockQuantity,
-//             rate: atPrice,
-//             txnDate: asOfDate,
-//           });
-//         }
-
-//         imported++;
-//       } catch (rowErr) {
-//         rowErr.importRowNo = r.rowNo; // tells the catch below which row broke
-//         throw rowErr;
-//       }
-//     }
-
-//     for (const [p, s, rate] of conversionPairs.values()) {
-//       await connection.execute(
-//         `INSERT IGNORE INTO item_unit_conversions (Primary_Unit, Secondary_Unit, Conversion_Rate)
-//          VALUES (?, ?, ?)`,
-//         [p, s, rate]
-//       );
-//     }
-
-//     await connection.commit();
-//     inTransaction = false;
-
-//     return res.status(201).json({
-//       success: true,
-//       imported,
-//       skipped: failed.length,
-//       message: `${imported} item${imported === 1 ? "" : "s"} imported`,
-//       errors: errorList,
-//     });
-//   } catch (err) {
-//     if (connection && inTransaction) {
-//       await connection.rollback();
-//     }
-
-//     console.error("❌ Error importing items:", err);
-
-//     if (err?.importRowNo) {
-//       return res.status(500).json({
-//         success: false,
-//         message: `Import failed at row ${err.importRowNo}. No items were saved.`,
-//       });
-//     }
-
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 const importItemsExcel = async (req, res, next) => {
   let connection;
   let inTransaction = false;
@@ -1209,36 +887,7 @@ const importItemsExcel = async (req, res, next) => {
 let primaryUnit = null;
 let secondaryUnit = null;
 
-// if (rest.Primary_Unit) {
-//   primaryUnit = findUnit(
-//     rest.Primary_Unit,
-//     units
-//   );
 
-//   if (!primaryUnit) {
-//       addFieldError(
-//     "Primary_Unit",
-//     `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
-//   );
-//     // errors.push(
-//     //   `Base Unit "${rest.Primary_Unit}" not found. Add it in Units first.`
-//     // );
-//   }
-// }
-
-// if (rest.Secondary_Unit) {
-//   secondaryUnit = findUnit(
-//     rest.Secondary_Unit,
-//     units
-//   );
-
-//   if (!secondaryUnit) {
-//     addFieldError(
-//       "Secondary_Unit",
-//       `Secondary Unit "${rest.Secondary_Unit}" not found. Add it in Units first.`
-//     );
-//   }
-// }
 
 
 if (rest.Primary_Unit) {
@@ -1258,49 +907,87 @@ if (rest.Secondary_Unit) {
       // Discount type
       // -------------------------------------------------------
 
-      // const dt = normalizeDiscountType(
-      //   rest.Discount_Type_On_Sale_Price
-      // );
+      
+//       const dt = normalizeDiscountType(
+//   rest.Discount_Type_On_Sale_Price
+// );
 
-      // if (
-      //   rest.Discount_Type_On_Sale_Price !== undefined &&
-      //   rest.Discount_Type_On_Sale_Price !== "" &&
-      //   dt === null
-      // ) {
-      //   errors.push(
-      //     'Discount Type: use "Discount %" or "Discount Amount"'
-      //   );
-      // }
-      const dt = normalizeDiscountType(
-  rest.Discount_Type_On_Sale_Price
+// if (
+//   rest.Discount_Type_On_Sale_Price !== undefined &&
+//   rest.Discount_Type_On_Sale_Price !== "" &&
+//   dt === null
+// ) {
+//   addFieldError(
+//     "Discount_Type_On_Sale_Price",
+//     'Discount Type: use "Discount %" or "Discount Amount"'
+//   );
+// }
+
+// // Discount % cannot be greater than 100
+// if (
+//   dt === "Percentage" &&
+//   rest.Discount_On_Sale_Price !== undefined &&
+//   rest.Discount_On_Sale_Price !== "" &&
+//   Number(rest.Discount_On_Sale_Price) > 100
+// ) {
+//   addFieldError(
+//     "Discount_On_Sale_Price",
+//     "Discount percentage cannot be greater than 100"
+//   );
+// }
+
+//       rest.Discount_Type_On_Sale_Price = dt || "";
+// -------------------------------------------------------
+// Discount type
+// -------------------------------------------------------
+
+const rawDiscountType = String(
+  rest.Discount_Type_On_Sale_Price ?? ""
+).trim();
+
+let dt = normalizeDiscountType(rawDiscountType);
+
+// Invalid / empty Discount Type
+// → silently treat it as Amount
+if (dt !== "Percentage" && dt !== "Amount") {
+  dt = "Amount";
+}
+
+// Keep the normalized value so it is sent to the UI
+rest.Discount_Type_On_Sale_Price = dt;
+
+
+// -------------------------------------------------------
+// Discount validation
+// -------------------------------------------------------
+
+const discountValue = Number(
+  rest.Discount_On_Sale_Price
 );
 
 if (
-  rest.Discount_Type_On_Sale_Price !== undefined &&
-  rest.Discount_Type_On_Sale_Price !== "" &&
-  dt === null
-) {
-  addFieldError(
-    "Discount_Type_On_Sale_Price",
-    'Discount Type: use "Discount %" or "Discount Amount"'
-  );
-}
-
-// Discount % cannot be greater than 100
-if (
-  dt === "Percentage" &&
   rest.Discount_On_Sale_Price !== undefined &&
   rest.Discount_On_Sale_Price !== "" &&
-  Number(rest.Discount_On_Sale_Price) > 100
+  !Number.isNaN(discountValue)
 ) {
-  addFieldError(
-    "Discount_On_Sale_Price",
-    "Discount percentage cannot be greater than 100"
-  );
+  // Percentage must be 0–100
+  if (dt === "Percentage") {
+    if (discountValue < 0) {
+      addFieldError(
+        "Discount_On_Sale_Price",
+        "Discount percentage cannot be negative"
+      );
+    } else if (discountValue > 100) {
+      addFieldError(
+        "Discount_On_Sale_Price",
+        "Discount percentage cannot be greater than 100"
+      );
+    }
+  }
+
+  // Amount remains Amount
+  // No Discount Type error
 }
-
-      rest.Discount_Type_On_Sale_Price = dt || "";
-
       // -------------------------------------------------------
       // Sanitize input
       // -------------------------------------------------------
@@ -2062,8 +1749,1158 @@ const conversionRate = secondaryUnit
     }
   }
 };
+const validateImportItemRow = async (req, res, next) => {
+  let connection;
 
+  try {
+    connection = await db.getConnection();
 
+    const cleanData = sanitizeObject(req.body.data || {});
+
+    const errors = [];
+    const fieldErrors = {};
+
+    const addFieldError = (field, message) => {
+      errors.push(message);
+
+      if (!fieldErrors[field]) {
+        fieldErrors[field] = [];
+      }
+
+      fieldErrors[field].push(message);
+    };
+
+    // =========================================================
+    // 1. BASIC VALUES
+    // =========================================================
+
+    const {
+      Item_Name,
+      Item_Type,
+      Item_Code,
+
+      Primary_Unit,
+      Secondary_Unit,
+      Conversion_Rate,
+
+      Opening_Quantity,
+      At_Price,
+      As_Of_Date,
+      Min_Stock,
+      Location,
+    } = cleanData;
+
+    // =========================================================
+    // 2. ITEM NAME VALIDATION
+    // =========================================================
+
+    if (!Item_Name || String(Item_Name).trim() === "") {
+      addFieldError(
+        "Item_Name",
+        "Item Name is required."
+      );
+    } else {
+      const normalizedName = String(Item_Name)
+        .trim()
+        .toLowerCase();
+
+      const [existingItems] = await connection.query(
+        `
+        SELECT Item_Id
+        FROM add_item
+        WHERE LOWER(TRIM(Item_Name)) = ?
+        LIMIT 1
+        `,
+        [normalizedName]
+      );
+
+      if (existingItems.length > 0) {
+        addFieldError(
+          "Item_Name",
+          "Item already exists, please add a new item."
+        );
+      }
+    }
+
+    // =========================================================
+    // 3. ITEM CODE DUPLICATE
+    // =========================================================
+
+    if (
+      Item_Code !== undefined &&
+      Item_Code !== null &&
+      String(Item_Code).trim() !== ""
+    ) {
+      const itemCode = String(Item_Code).trim();
+
+      const [existingCode] = await connection.query(
+        `
+        SELECT Item_Id
+        FROM add_item
+        WHERE Item_Code = ?
+        LIMIT 1
+        `,
+        [itemCode]
+      );
+
+      if (existingCode.length > 0) {
+        addFieldError(
+          "Item_Code",
+          "Item Code already exists, please use a different code."
+        );
+      }
+    }
+
+   
+
+    // =========================================================
+    // 5. SECONDARY UNIT → CONVERSION RATE REQUIRED
+    // =========================================================
+
+    if (
+      Secondary_Unit !== undefined &&
+      Secondary_Unit !== null &&
+      String(Secondary_Unit).trim() !== ""
+    ) {
+      if (
+        Conversion_Rate === undefined ||
+        Conversion_Rate === null ||
+        Conversion_Rate === "" ||
+        Number(Conversion_Rate) <= 0
+      ) {
+        addFieldError(
+          "Conversion_Rate",
+          "Conversion Rate is required when Secondary Unit is provided."
+        );
+      }
+    }
+
+    // =========================================================
+    // 6. CONVERSION RATE WITHOUT SECONDARY UNIT
+    // =========================================================
+
+    if (
+      (!Secondary_Unit ||
+        String(Secondary_Unit).trim() === "") &&
+      Conversion_Rate !== undefined &&
+      Conversion_Rate !== null &&
+      Conversion_Rate !== ""
+    ) {
+      addFieldError(
+        "Conversion_Rate",
+        "Conversion Rate cannot be provided without Secondary Unit."
+      );
+    }
+
+    // =========================================================
+    // 7. PRIMARY + SECONDARY SAME UNIT
+    // =========================================================
+
+    if (
+      Primary_Unit &&
+      Secondary_Unit &&
+      String(Primary_Unit).trim().toLowerCase() ===
+        String(Secondary_Unit).trim().toLowerCase()
+    ) {
+      addFieldError(
+        "Secondary_Unit",
+        "Primary Unit and Secondary Unit cannot be the same."
+      );
+    }
+
+    // =========================================================
+    // 8. RESPONSE
+    // =========================================================
+
+    return res.status(200).json({
+      success: true,
+      errors,
+      fieldErrors,
+    });
+
+  } catch (err) {
+    console.error(
+      "❌ validateImportItemRow:",
+      err
+    );
+
+    next(err);
+
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+const importItemRows = async (req, res, next) => {
+  let connection;
+  let inTransaction = false;
+
+  try {
+    // =========================================================
+    // 1. RECEIVE ROWS
+    // =========================================================
+
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No items were provided for import.",
+      });
+    }
+
+    // =========================================================
+    // 2. MAX ROW LIMIT
+    // =========================================================
+
+    if (items.length > MAX_IMPORT_ROWS) {
+      return res.status(400).json({
+        success: false,
+        message: `Too many rows. Maximum ${MAX_IMPORT_ROWS} items per import.`,
+      });
+    }
+
+    // =========================================================
+    // 3. DB CONNECTION
+    // =========================================================
+
+    connection = await db.getConnection();
+
+    // =========================================================
+    // 4. NORMALIZE INPUT
+    //
+    // IMPORTANT:
+    // Frontend validation is NOT trusted.
+    // We validate again here.
+    // =========================================================
+
+    const rows = items.map((item, index) => {
+      const rowNo = item?.rowNo ?? index + 1;
+
+      const data = sanitizeObject({
+        ...item,
+      });
+
+      // rowNo is metadata, not an add_item column
+      delete data.rowNo;
+
+      return {
+        rowNo,
+        data,
+        errors: [],
+        fieldErrors: {},
+      };
+    });
+
+    // =========================================================
+    // HELPER
+    // =========================================================
+
+    const addFieldError = (row, field, message) => {
+      row.errors.push(message);
+
+      if (!row.fieldErrors[field]) {
+        row.fieldErrors[field] = [];
+      }
+
+      row.fieldErrors[field].push(message);
+    };
+
+    // =========================================================
+    // 5. BASIC / BUSINESS VALIDATION
+    // =========================================================
+
+    for (const row of rows) {
+      const d = row.data;
+
+      // -------------------------------------------------------
+      // ITEM NAME
+      // -------------------------------------------------------
+
+      if (
+        !d.Item_Name ||
+        String(d.Item_Name).trim() === ""
+      ) {
+        addFieldError(
+          row,
+          "Item_Name",
+          "Item Name is required."
+        );
+      }
+
+      // -------------------------------------------------------
+      // ITEM CODE
+      // -------------------------------------------------------
+
+      if (
+        d.Item_Code !== undefined &&
+        d.Item_Code !== null &&
+        String(d.Item_Code).trim() !== ""
+      ) {
+        d.Item_Code = String(d.Item_Code).trim();
+      }
+
+      // -------------------------------------------------------
+      // DISCOUNT TYPE
+      // -------------------------------------------------------
+
+      const dt = normalizeDiscountType(
+        d.Discount_Type_On_Sale_Price
+      );
+
+      if (
+        d.Discount_Type_On_Sale_Price !== undefined &&
+        d.Discount_Type_On_Sale_Price !== null &&
+        d.Discount_Type_On_Sale_Price !== "" &&
+        dt === null
+      ) {
+        addFieldError(
+          row,
+          "Discount_Type_On_Sale_Price",
+          'Discount Type: use "Discount %" or "Discount Amount"'
+        );
+      }
+
+      d.Discount_Type_On_Sale_Price =
+        dt || d.Discount_Type_On_Sale_Price || "";
+
+      // -------------------------------------------------------
+      // DISCOUNT %
+      // -------------------------------------------------------
+
+      if (
+        dt === "Percentage" &&
+        d.Discount_On_Sale_Price !== undefined &&
+        d.Discount_On_Sale_Price !== null &&
+        d.Discount_On_Sale_Price !== "" &&
+        Number(d.Discount_On_Sale_Price) > 100
+      ) {
+        addFieldError(
+          row,
+          "Discount_On_Sale_Price",
+          "Discount percentage cannot be greater than 100"
+        );
+      }
+
+      // -------------------------------------------------------
+      // SECONDARY UNIT → CONVERSION REQUIRED
+      // -------------------------------------------------------
+
+      const hasSecondary =
+        d.Secondary_Unit !== undefined &&
+        d.Secondary_Unit !== null &&
+        String(d.Secondary_Unit).trim() !== "";
+
+      if (hasSecondary) {
+        if (
+          d.Conversion_Rate === undefined ||
+          d.Conversion_Rate === null ||
+          d.Conversion_Rate === "" ||
+          Number(d.Conversion_Rate) <= 0
+        ) {
+          addFieldError(
+            row,
+            "Conversion_Rate",
+            "Conversion Rate is required when Secondary Unit is provided."
+          );
+        }
+      }
+
+      // -------------------------------------------------------
+      // CONVERSION WITHOUT SECONDARY UNIT
+      // -------------------------------------------------------
+
+      if (
+        !hasSecondary &&
+        d.Conversion_Rate !== undefined &&
+        d.Conversion_Rate !== null &&
+        d.Conversion_Rate !== ""
+      ) {
+        addFieldError(
+          row,
+          "Conversion_Rate",
+          "Conversion Rate cannot be provided without Secondary Unit."
+        );
+      }
+
+      // -------------------------------------------------------
+      // PRIMARY + SECONDARY CANNOT BE SAME
+      // -------------------------------------------------------
+
+      if (
+        d.Primary_Unit &&
+        d.Secondary_Unit &&
+        normalizeUnit(d.Primary_Unit) ===
+          normalizeUnit(d.Secondary_Unit)
+      ) {
+        addFieldError(
+          row,
+          "Secondary_Unit",
+          "Primary Unit and Secondary Unit cannot be the same."
+        );
+      }
+
+      // -------------------------------------------------------
+      // ZOD VALIDATION
+      // -------------------------------------------------------
+
+      const input = Object.fromEntries(
+        Object.entries(
+          sanitizeObject({
+            ...d,
+            Item_Type: "Product",
+          })
+        ).filter(
+          ([, value]) =>
+            value !== null &&
+            value !== ""
+        )
+      );
+
+      const parsed = itemFormSchema.safeParse(input);
+
+      if (!parsed.success) {
+        parsed.error.issues.forEach((error) => {
+          const field =
+            error.path[0] || "Row";
+
+          const message =
+            `${error.path.join(".") || "Row"}: ${error.message}`;
+
+          addFieldError(
+            row,
+            field,
+            message
+          );
+        });
+      }
+
+      // Use sanitized data going forward
+      row.data = input;
+    }
+
+    // =========================================================
+    // 6. DUPLICATES INSIDE CURRENT IMPORT
+    // =========================================================
+
+    const seenNames = new Map();
+    const seenCodes = new Map();
+
+    for (const row of rows) {
+      const name = String(
+        row.data.Item_Name || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const code = String(
+        row.data.Item_Code || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      // -------------------------------------------------------
+      // ITEM NAME
+      // -------------------------------------------------------
+
+      if (name) {
+        if (seenNames.has(name)) {
+          const message =
+            `Duplicate item name (also in row ${seenNames.get(name)})`;
+
+          addFieldError(
+            row,
+            "Item_Name",
+            message
+          );
+        } else {
+          seenNames.set(
+            name,
+            row.rowNo
+          );
+        }
+      }
+
+      // -------------------------------------------------------
+      // ITEM CODE
+      // -------------------------------------------------------
+
+      if (code) {
+        if (seenCodes.has(code)) {
+          const message =
+            `Duplicate item code (also in row ${seenCodes.get(code)})`;
+
+          addFieldError(
+            row,
+            "Item_Code",
+            message
+          );
+        } else {
+          seenCodes.set(
+            code,
+            row.rowNo
+          );
+        }
+      }
+    }
+
+    // =========================================================
+    // 7. CHECK DATABASE DUPLICATES
+    // =========================================================
+
+    const names = [...seenNames.keys()];
+    const codes = [...seenCodes.keys()];
+
+    const dbNames = new Set();
+    const dbCodes = new Set();
+
+    // ---------------------------------------------------------
+    // EXISTING ITEM NAMES
+    // ---------------------------------------------------------
+
+    if (names.length > 0) {
+      const [existingNames] =
+        await connection.query(
+          `
+          SELECT LOWER(TRIM(Item_Name)) AS n
+          FROM add_item
+          WHERE LOWER(TRIM(Item_Name)) IN (?)
+          `,
+          [names]
+        );
+
+      existingNames.forEach((item) => {
+        dbNames.add(item.n);
+      });
+    }
+
+    // ---------------------------------------------------------
+    // EXISTING ITEM CODES
+    // ---------------------------------------------------------
+
+    if (codes.length > 0) {
+      const [existingCodes] =
+        await connection.query(
+          `
+          SELECT LOWER(TRIM(Item_Code)) AS c
+          FROM add_item
+          WHERE LOWER(TRIM(Item_Code)) IN (?)
+          `,
+          [codes]
+        );
+
+      existingCodes.forEach((item) => {
+        dbCodes.add(item.c);
+      });
+    }
+
+    // ---------------------------------------------------------
+    // APPLY DB ERRORS
+    // ---------------------------------------------------------
+
+    for (const row of rows) {
+      const name = String(
+        row.data.Item_Name || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      const code = String(
+        row.data.Item_Code || ""
+      )
+        .trim()
+        .toLowerCase();
+
+      if (name && dbNames.has(name)) {
+        addFieldError(
+          row,
+          "Item_Name",
+          "Item already exists."
+        );
+      }
+
+      if (code && dbCodes.has(code)) {
+        addFieldError(
+          row,
+          "Item_Code",
+          "Item Code already exists."
+        );
+      }
+    }
+
+    // =========================================================
+    // 8. REMOVE DUPLICATE ERROR MESSAGES
+    // =========================================================
+
+    rows.forEach((row) => {
+      row.errors = [
+        ...new Set(row.errors),
+      ];
+
+      Object.keys(row.fieldErrors).forEach(
+        (field) => {
+          row.fieldErrors[field] = [
+            ...new Set(
+              row.fieldErrors[field]
+            ),
+          ];
+        }
+      );
+    });
+
+    // =========================================================
+    // 9. FIND VALID ROWS
+    // =========================================================
+
+    const failed = rows.filter(
+      (row) => row.errors.length > 0
+    );
+
+    const valid = rows.filter(
+      (row) => row.errors.length === 0
+    );
+
+    // =========================================================
+    // 10. IF ANY INVALID ROW EXISTS
+    //
+    // Do NOT start transaction.
+    // Do NOT insert anything.
+    // =========================================================
+
+    if (failed.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Some rows failed final validation.",
+        imported: 0,
+        errors: failed.map((row) => ({
+          rowNo: row.rowNo,
+          messages: row.errors,
+          fieldErrors: row.fieldErrors,
+        })),
+      });
+    }
+
+    // =========================================================
+    // 11. BEGIN TRANSACTION
+    // =========================================================
+
+    await connection.beginTransaction();
+
+    inTransaction = true;
+
+    // =========================================================
+    // 12. GET / CREATE UNIT
+    //
+    // Missing units are created ONLY during actual import.
+    //
+    // Excel value:
+    //      kG
+    //
+    // DB:
+    //      Kgs
+    // =========================================================
+
+    const getOrCreateUnit = async (
+      unitValue
+    ) => {
+      if (
+        !unitValue ||
+        String(unitValue).trim() === ""
+      ) {
+        return null;
+      }
+
+      const input =
+        String(unitValue).trim();
+
+      const normalized =
+        normalizeUnit(input);
+
+      const canonicalShorthand =
+        UNIT_ALIASES[normalized] ||
+        normalized;
+
+      // -------------------------------------------------------
+      // CHECK EXISTING UNIT
+      // -------------------------------------------------------
+
+      const [existing] =
+        await connection.query(
+          `
+          SELECT
+            Unit_Name,
+            Unit_Shorthand
+          FROM units
+          WHERE Is_Used = 1
+            AND (
+              LOWER(TRIM(Unit_Name)) = ?
+              OR LOWER(TRIM(Unit_Shorthand)) = ?
+            )
+          LIMIT 1
+          `,
+          [
+            canonicalShorthand,
+            canonicalShorthand,
+          ]
+        );
+
+      if (existing.length > 0) {
+        return existing[0].Unit_Shorthand;
+      }
+
+      // -------------------------------------------------------
+      // CREATE MISSING UNIT
+      // -------------------------------------------------------
+
+      await connection.execute(
+        `
+        INSERT INTO units
+        (
+          Unit_Name,
+          Unit_Shorthand,
+          Is_Used
+        )
+        VALUES (?, ?, 1)
+        `,
+        [
+          input,
+          canonicalShorthand,
+        ]
+      );
+
+      return canonicalShorthand;
+    };
+
+    // =========================================================
+    // 13. GET NEXT ITEM ID
+    // =========================================================
+
+    const [last] =
+      await connection.query(
+        `
+        SELECT Item_Id
+        FROM add_item
+        ORDER BY id DESC
+        LIMIT 1
+        FOR UPDATE
+        `
+      );
+
+    let nextNumber = 1;
+
+    if (last.length > 0) {
+      const n = parseInt(
+        String(last[0].Item_Id)
+          .replace("ITM", ""),
+        10
+      );
+
+      nextNumber =
+        Number.isNaN(n)
+          ? 1
+          : n + 1;
+    }
+
+    // =========================================================
+    // 14. COMMON VALUES
+    // =========================================================
+
+    const today = toYMD();
+
+    const conversionPairs =
+      new Map();
+
+    let imported = 0;
+
+    // =========================================================
+    // 15. INSERT ITEMS
+    // =========================================================
+
+    for (const row of valid) {
+      try {
+        const d = row.data;
+
+        // -----------------------------------------------------
+        // ITEM ID
+        // -----------------------------------------------------
+
+        const itemId =
+          "ITM" +
+          String(nextNumber++)
+            .padStart(3, "0");
+
+        // -----------------------------------------------------
+        // UNITS
+        // -----------------------------------------------------
+
+        const primaryUnit =
+          await getOrCreateUnit(
+            d.Primary_Unit
+          );
+
+        const secondaryUnit =
+          await getOrCreateUnit(
+            d.Secondary_Unit
+          );
+
+        const itemUnit =
+          primaryUnit ?? "";
+
+        const conversionRate =
+          secondaryUnit
+            ? d.Conversion_Rate ?? null
+            : null;
+
+        // -----------------------------------------------------
+        // OPENING STOCK
+        // -----------------------------------------------------
+
+        const hasOpening =
+          d.Opening_Quantity !== undefined &&
+          d.Opening_Quantity !== null &&
+          d.Opening_Quantity !== "";
+
+        const stockQuantity =
+          Number(
+            d.Opening_Quantity ?? 0
+          );
+
+        const openingQuantity =
+          hasOpening
+            ? stockQuantity
+            : null;
+
+        // -----------------------------------------------------
+        // OPENING STOCK PRICE
+        // -----------------------------------------------------
+
+        const atPrice =
+          stockQuantity > 0
+            ? d.Purchase_Price ?? null
+            : null;
+
+        const asOfDate =
+          hasOpening
+            ? today
+            : null;
+
+        // =====================================================
+        // INSERT ITEM
+        // =====================================================
+
+        const [result] =
+          await connection.execute(
+            `
+            INSERT INTO add_item
+            (
+              Item_Id,
+              Item_Name,
+              Item_Type,
+              Item_HSN,
+              Item_Category,
+              Item_Unit,
+
+              Item_Code,
+              MRP,
+              Discount_On_MRP_For_Sale,
+
+              Sale_Price,
+              Sale_Price_Type,
+              Discount_On_Sale_Price,
+              Discount_Type_On_Sale_Price,
+
+              Purchase_Price,
+              Purchase_Price_Type,
+
+              Primary_Unit,
+              Secondary_Unit,
+              Conversion_Rate,
+
+              Stock_Quantity,
+              Opening_Quantity,
+              At_Price,
+              As_Of_Date,
+              Min_Stock,
+              Location,
+
+              created_at,
+              updated_at
+            )
+            VALUES
+            (
+              ?, ?, ?, ?, ?, ?,
+
+              ?, ?, ?,
+
+              ?, ?, ?, ?,
+
+              ?, ?,
+
+              ?, ?, ?,
+
+              ?, ?, ?, ?, ?, ?,
+
+              NOW(),
+              NOW()
+            )
+            `,
+            [
+              // ------------------------------------------------
+              // BASIC
+              // ------------------------------------------------
+
+              itemId,
+
+              d.Item_Name,
+
+              "Product",
+
+              d.Item_HSN || null,
+
+              d.Item_Category || "",
+
+              itemUnit,
+
+              // ------------------------------------------------
+              // CODE / PRICES
+              // ------------------------------------------------
+
+              d.Item_Code || null,
+
+              normalizeNumber(d.MRP) || null,
+
+              null,
+
+              d.Sale_Price ?? null,
+
+              "Without_Tax",
+
+              d.Discount_On_Sale_Price ?? null,
+
+              d.Discount_Type_On_Sale_Price ||
+                "Percentage",
+
+              d.Purchase_Price ?? null,
+
+              "Without_Tax",
+
+              // ------------------------------------------------
+              // UNITS
+              // ------------------------------------------------
+
+              primaryUnit,
+
+              secondaryUnit,
+
+              conversionRate,
+
+              // ------------------------------------------------
+              // STOCK
+              // ------------------------------------------------
+
+              stockQuantity,
+
+              openingQuantity,
+
+              atPrice,
+
+              asOfDate,
+
+              d.Min_Stock ?? null,
+
+              d.Location || null,
+            ]
+          );
+
+        // =====================================================
+        // SYNC UNIT IDS
+        // =====================================================
+
+        await syncUnitIdsForItem(
+          connection,
+          itemId
+        );
+
+        // =====================================================
+        // SAVE CONVERSION PAIR
+        // =====================================================
+
+        if (
+          primaryUnit &&
+          secondaryUnit &&
+          Number(conversionRate) > 0
+        ) {
+          conversionPairs.set(
+            `${primaryUnit}|${secondaryUnit}|${conversionRate}`,
+            [
+              primaryUnit,
+              secondaryUnit,
+              conversionRate,
+            ]
+          );
+        }
+
+        // =====================================================
+        // OPENING STOCK LEDGER
+        // =====================================================
+
+        if (stockQuantity > 0) {
+          await recordItemLedger({
+            connection,
+
+            itemId,
+
+            txnType:
+              "Opening_Stock",
+
+            referenceId:
+              result.insertId,
+
+            billId:
+              itemId,
+
+            billNumber:
+              null,
+
+            partyName:
+              null,
+
+            quantity:
+              stockQuantity,
+
+            selectedUnit:
+              primaryUnit,
+
+            baseQty:
+              stockQuantity,
+
+            rate:
+              atPrice,
+
+            txnDate:
+              asOfDate,
+          });
+        }
+
+        imported++;
+
+      } catch (rowError) {
+        rowError.importRowNo =
+          row.rowNo;
+
+        throw rowError;
+      }
+    }
+
+    // =========================================================
+    // 16. SAVE UNIT CONVERSION PAIRS
+    // =========================================================
+
+    for (const [
+      primaryUnit,
+      secondaryUnit,
+      rate,
+    ] of conversionPairs.values()) {
+      await connection.execute(
+        `
+        INSERT IGNORE INTO item_unit_conversions
+        (
+          Primary_Unit,
+          Secondary_Unit,
+          Conversion_Rate
+        )
+        VALUES (?, ?, ?)
+        `,
+        [
+          primaryUnit,
+          secondaryUnit,
+          rate,
+        ]
+      );
+    }
+
+    // =========================================================
+    // 17. COMMIT
+    // =========================================================
+
+    await connection.commit();
+
+    inTransaction = false;
+
+    // =========================================================
+    // 18. SUCCESS RESPONSE
+    // =========================================================
+
+    return res.status(201).json({
+      success: true,
+
+      imported,
+
+      skipped: 0,
+
+      message:
+        `${imported} item${
+          imported === 1
+            ? ""
+            : "s"
+        } imported`,
+
+      errors: [],
+    });
+
+  } catch (err) {
+
+    // =========================================================
+    // ROLLBACK
+    // =========================================================
+
+    if (
+      connection &&
+      inTransaction
+    ) {
+      await connection.rollback();
+    }
+
+    console.error(
+      "❌ Error importing item rows:",
+      err
+    );
+
+    // =========================================================
+    // ROW-SPECIFIC ERROR
+    // =========================================================
+
+    if (err?.importRowNo) {
+      return res.status(500).json({
+        success: false,
+
+        message:
+          `Import failed at row ${err.importRowNo}. ` +
+          `No items were saved.`,
+
+        errors: [
+          {
+            rowNo: err.importRowNo,
+            messages: [
+              err.message ||
+                "Unexpected import error.",
+            ],
+          },
+        ],
+      });
+    }
+
+    return next(err);
+
+  } finally {
+
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 
 const addItemConversion = async (req, res, next) => {
   let connection;
@@ -9164,7 +10001,7 @@ const getUnitConversions = async (req, res, next) => {
 };
 
 export {
-  addItem, importItemsExcel, editItem, deleteItem, addCategory, editCategory, getAllItems, getItemsForDropdown, getItemByName, getAllCategories, getAllCategoriesCursor,
+  addItem, importItemsExcel, validateImportItemRow,importItemRows,editItem, deleteItem, addCategory, editCategory, getAllItems, getItemsForDropdown, getItemByName, getAllCategories, getAllCategoriesCursor,
   getItemsNotInCategory, moveItemsToCategory,
   eachItemSalesPurchaseDetails,
   printEachItemSalesPurchasesReport, eachItemBillAndInvoiceNumbers, addItemConversion, getItemConversions,
