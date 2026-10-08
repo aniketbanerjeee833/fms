@@ -1000,7 +1000,20 @@ if (
           })
         ).filter(([, value]) => value !== null && value !== "")
       );
+console.log("IMPORT INPUT:", JSON.stringify(input, null, 2));
 
+console.log(
+  "CATEGORY:",
+  itemFormSchema.shape.Item_Category.safeParse(undefined)
+);
+
+console.log(
+  "FULL:",
+  itemFormSchema.safeParse({
+    Item_Name: "TEST ITEM",
+    Item_Type: "Product",
+  })
+);
       // -------------------------------------------------------
       // Zod validation
       // -------------------------------------------------------
