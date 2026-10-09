@@ -101,7 +101,7 @@ function Section({ title, rows = [], total, accent = false, indent = 0 }) {
 }
 
 // ─── Panel ───────────────────────────────────────────────────────────────────
-function Panel({ title, children, total, totalLabel,layout }) {
+function Panel({ title, children, total, totalLabel, layout }) {
   return (
     <div
       style={{
@@ -188,54 +188,54 @@ function Panel({ title, children, total, totalLabel,layout }) {
           {fmt(total)}
         </span>
       </div> */}
-      
-{/* Total footer */}
+
+      {/* Total footer */}
 
 
-<div
-  style={{
-    margin: "10px 12px 18px",
-    padding: "12px 8px 16px",
-    borderTop: "2px solid #4CA1AF",
-    display: "flex",
-    flexDirection: layout === "vertical" ? "column" : "row",
-    justifyContent: "space-between",
-    alignItems: layout === "vertical" ? "stretch" : "center",
-    gap: 10,
-    boxSizing: "border-box",
-  }}
->
-  <span
-    style={{
-      fontFamily: "'DM Sans', sans-serif",
-      fontWeight: 700,
-      fontSize: 13,
-      color: "#4CA1AF",
-      flex: layout === "vertical" ? "none" : 1,
-      minWidth: 0,
-      whiteSpace: "normal",
-      overflowWrap: "anywhere",
-      lineHeight: 1.6,
-    }}
-  >
-    {totalLabel}
-  </span>
+      <div
+        style={{
+          margin: "10px 12px 18px",
+          padding: "12px 8px 16px",
+          borderTop: "2px solid #4CA1AF",
+          display: "flex",
+          flexDirection: layout === "vertical" ? "column" : "row",
+          justifyContent: "space-between",
+          alignItems: layout === "vertical" ? "stretch" : "center",
+          gap: 10,
+          boxSizing: "border-box",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'DM Sans', sans-serif",
+            fontWeight: 700,
+            fontSize: 13,
+            color: "#4CA1AF",
+            flex: layout === "vertical" ? "none" : 1,
+            minWidth: 0,
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+            lineHeight: 1.6,
+          }}
+        >
+          {totalLabel}
+        </span>
 
-  <span
-    style={{
-      fontFamily: "'JetBrains Mono', monospace",
-      fontWeight: 700,
-      fontSize: 14,
-      color: "#4CA1AF",
-      minWidth: 90,
-      textAlign: "right",
-      whiteSpace: "nowrap",
-      alignSelf: layout === "vertical" ? "flex-end" : "auto",
-    }}
-  >
-    {fmt(total)}
-  </span>
-</div>
+        <span
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontWeight: 700,
+            fontSize: 14,
+            color: "#4CA1AF",
+            minWidth: 90,
+            textAlign: "right",
+            whiteSpace: "nowrap",
+            alignSelf: layout === "vertical" ? "flex-end" : "auto",
+          }}
+        >
+          {fmt(total)}
+        </span>
+      </div>
 
 
     </div>
@@ -440,13 +440,13 @@ export default function BalanceSheet() {
       />
       <div className="flex flex-col bg-white"
         style={{
-                    height: "100%",
-                    minHeight: 0,
-                    overflowY: "auto",
-                    overflowX: "hidden",
-                }}
+          height: "100%",
+          minHeight: 0,
+          overflowY: "auto",
+          overflowX: "hidden",
+        }}
       >
-        {/* <div className="inn-title">
+        <div className="inn-title">
           <div className="flex flex-col sm:flex-col sm:flex-row justify-between sm:items-center">
             <div className="flex flex-row justify-between items-center mb-4 sm:mb-4">
               <div>
@@ -545,7 +545,7 @@ export default function BalanceSheet() {
               </div>
 
               
-              <div>
+                <div className="flex justify-end">
               <button
                 type="button"
                 onClick={handlePrint}
@@ -562,126 +562,10 @@ export default function BalanceSheet() {
               </div>
             </div>
           </div>
-        </div> */}
-        
-<div className="inn-title">
-  <div className="flex flex-col gap-3">
-    {/* First row: title on left, filters/toggle on right */}
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="mb-2 lg:mb-0">
-        <h4 className="text-2xl font-bold mb-1">Balance Sheet</h4>
-
-        <p className="text-gray-500 text-sm sm:text-base">
-          As of{" "}
-          {d?.period?.fromDate
-            ? new Date(d.period.fromDate).toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-              })
-            : "—"}{" "}
-          to{" "}
-          {d?.period?.toDate
-            ? new Date(d.period.toDate).toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "long",
-                year: "numeric",
-              })
-            : "—"}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end">
-        <div className="flex flex-col">
-          <span className="text-sm text-gray-600 font-medium mb-1">
-            From Date
-          </span>
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) =>
-              setSearchParams({
-                fromDate: e.target.value,
-                toDate,
-              })
-            }
-            className="border p-1 rounded-md shadow-sm text-gray-700"
-            title="Search from date"
-          />
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-sm text-gray-600 font-medium mb-1">
-            To Date
-          </span>
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) =>
-              setSearchParams({
-                fromDate,
-                toDate: e.target.value,
-              })
-            }
-            className="border p-1 rounded-md shadow-sm text-gray-700"
-            title="Search to date"
-          />
-        </div>
 
-        {/* Layout toggle */}
-        <div
-          className="hidden lg:flex flex-row"
-          style={{
-            background: "#e2e8f0",
-            borderRadius: 8,
-            padding: 3,
-            gap: 2,
-          }}
-        >
-          {["horizontal", "vertical"].map((l) => (
-            <button
-              key={l}
-              onClick={() => setLayout(l)}
-              style={{
-                padding: "5px 14px",
-                borderRadius: 6,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "'DM Sans', sans-serif",
-                fontSize: 12,
-                fontWeight: 600,
-                background: layout === l ? "#4CA1AF" : "transparent",
-                color: layout === l ? "#fff" : "#64748b",
-                transition: "all .15s",
-                textTransform: "capitalize",
-              }}
-            >
-              {l === "horizontal" ? "⇔ Horizontal" : "⇕ Vertical"}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
 
-    {/* Second row: Print button aligned to the far right */}
-    <div className="flex justify-end">
-      <button
-        type="button"
-        onClick={handlePrint}
-        disabled={isBalanceSheetDataLoading || !d}
-        className="group flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
-        title="Print Balance Sheet"
-      >
-        <Printer
-          size={16}
-          strokeWidth={2.2}
-          className="text-blue-600 transition-transform duration-200 group-hover:scale-110"
-        />
-    
-      </button>
-    </div>
-  </div>
-</div>
 
 
         {/* ── Content ── */}
@@ -699,7 +583,7 @@ export default function BalanceSheet() {
               title="Equities & Liabilities"
               total={totalEquities}
               totalLabel="Total Equities & Liabilities"
-               layout={layout}
+              layout={layout}
             >
               {equitiesContent}
             </Panel>
