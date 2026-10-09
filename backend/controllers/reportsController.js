@@ -3065,112 +3065,387 @@ const getFinancialYearDates = () => {
 
   return { fromDate, toDate };
 };
+// const getBalanceSheet = async (req, res, next) => {
+//   try {
+//     // const { fromDate, toDate } = req.query;
+//  let { fromDate, toDate } = req.query;
+
+// if (!fromDate || !toDate) {
+//   const fyDates = getFinancialYearDates();
+//   fromDate = fyDates.fromDate;
+//   toDate = fyDates.toDate;
+// }
+
+// console.log("Using date range:", fromDate, "to", toDate);
+//     // if (!fromDate || !toDate) {
+//     //   return res.status(400).json({
+//     //     success: false,
+//     //     message: "Query params 'fromDate' and 'toDate' are required (YYYY-MM-DD)",
+//     //   });
+//     // }
+ 
+//     // ── helpers ────────────────────────────────────────────────────────────
+//     const n = (val) => parseFloat(val || 0);
+ 
+//     // ══════════════════════════════════════════════════════════════════════
+//     //  ASSETS
+//     // ══════════════════════════════════════════════════════════════════════
+ 
+//     // ── 1. SUNDRY DEBTORS
+//     //    Sales billed up toDate `toDate` whose Balance_Due > 0
+//     const [debtorRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Balance_Due), 0) AS amount
+//        FROM add_sale
+//        WHERE Invoice_Date <= ?`,
+//       [toDate]
+//     );
+//     const sundryDebtors = n(debtorRows[0].amount);
+ 
+//     // ── 2. CASH IN HAND
+//     //    Cash received fromDate sales  minus  cash paid for purchases  minus  cash expenses
+//     const [cashSaleRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Total_Received), 0) AS amount
+//        FROM add_sale
+//        WHERE Invoice_Date <= ? AND Payment_Type = 'Cash'`,
+//       [toDate]
+//     );
+//     const [cashPurRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Total_Paid), 0) AS amount
+//        FROM add_purchase
+//        WHERE Bill_Date <= ? AND Payment_Type = 'Cash'`,
+//       [toDate]
+//     );
+    
+//    const cashAccounts =
+//       n(cashSaleRows[0].amount) -
+//       n(cashPurRows[0].amount)
+//     // ── 3. BANK / NEFT BALANCE
+//     //    Neft/Cheque received  minus  Neft/Cheque paid  minus  Online expenses
+//     const [bankSaleRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Total_Received), 0) AS amount
+//        FROM add_sale
+//        WHERE Invoice_Date <= ? AND Payment_Type IN ('Neft','Cheque')`,
+//       [toDate]
+//     );
+//     const [bankPurRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Total_Paid), 0) AS amount
+//        FROM add_purchase
+//        WHERE Bill_Date <= ? AND Payment_Type IN ('Neft','Cheque')`,
+//       [toDate]
+//     );
+   
+//         const bankAccounts =
+//       n(bankSaleRows[0].amount) -
+//       n(bankPurRows[0].amount)
+ 
+//     // ── 4. INPUT GST (GST paid on purchases — claimable ITC)
+//     //    SUM of Tax_Amount on purchase items within period
+//     const [inputGSTRows] = await db.execute(
+//       `SELECT COALESCE(SUM(pi.Tax_Amount), 0) AS amount
+//        FROM add_purchase_items pi
+//        JOIN add_purchase p ON pi.Purchase_Id = p.Purchase_Id
+//        WHERE p.Bill_Date <= ?
+//          AND pi.Tax_Type NOT IN ('None','none')`,
+//       [toDate]
+//     );
+//     const inputDutiesAndTaxes = n(inputGSTRows[0].amount);
+ 
+//     // ── 5. CLOSING STOCK VALUE
+//     //    Current Stock_Quantity × last Purchase_Price per item
+//     //    (Uses the most recent purchase price recorded in add_purchase_items)
+//     const [stockRows] = await db.execute(
+//       `SELECT
+//          i.Item_Id,
+//          i.Stock_Quantity,
+//          (
+//            SELECT pi2.Purchase_Price
+//            FROM add_purchase_items pi2
+//            JOIN add_purchase p2 ON pi2.Purchase_Id = p2.Purchase_Id
+//            WHERE pi2.Item_Id = i.Item_Id
+//              AND p2.Bill_Date <= ?
+//            ORDER BY p2.Bill_Date DESC, pi2.id DESC
+//            LIMIT 1
+//          ) AS last_price
+//        FROM add_item i
+//        WHERE i.Stock_Quantity > 0`,
+//       [toDate]
+//     );
+//     let closingStock = 0;
+//     for (const row of stockRows) {
+//       if (row.last_price != null) {
+//         closingStock += n(row.Stock_Quantity) * n(row.last_price);
+//       }
+//     }
+ 
+//     // ── Total Current Assets
+//     const currentAssetsTotal =
+//       sundryDebtors +
+//       inputDutiesAndTaxes +
+//       bankAccounts +
+//       cashAccounts +
+//       closingStock;
+ 
+//     // ── Total Assets (no fixed/non-current assets in this DB)
+//     const totalAssets = currentAssetsTotal;
+ 
+//     // ══════════════════════════════════════════════════════════════════════
+//     //  EQUITIES & LIABILITIES
+//     // ══════════════════════════════════════════════════════════════════════
+ 
+//     // ── 6. SUNDRY CREDITORS (purchase bills with outstanding balance)
+//     const [creditorRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Balance_Due), 0) AS amount
+//        FROM add_purchase
+//        WHERE Bill_Date <= ?`,
+//       [toDate]
+//     );
+//     const sundryCreditors = n(creditorRows[0].amount);
+ 
+//     // ── 7. OUTPUT GST PAYABLE (GST collected on sales)
+//     const [outputGSTRows] = await db.execute(
+//       `SELECT COALESCE(SUM(si.Tax_Amount), 0) AS amount
+//        FROM add_sale_items si
+//        JOIN add_sale s ON si.Sale_Id = s.Sale_Id
+//        WHERE s.Invoice_Date <= ?
+//          AND si.Tax_Type NOT IN ('None','none')`,
+//       [toDate]
+//     );
+//     // const dutiesAndTaxes = n(outputGSTRows[0].amount);
+//  const dutiesAndTaxes =
+//   n(outputGSTRows[0].amount) - inputDutiesAndTaxes;
+//     // ── 8. RETAINED EARNINGS  (Net profit within the selected period)
+//     //    = Revenue (sale subtotal excl. tax) − COGS (purchase subtotal excl. tax) − Expenses
+//     const [revenueRows] = await db.execute(
+//       `SELECT COALESCE(SUM(si.Amount - si.Tax_Amount), 0) AS amount
+//        FROM add_sale_items si
+//        JOIN add_sale s ON si.Sale_Id = s.Sale_Id
+//        WHERE s.Invoice_Date BETWEEN ? AND ?`,
+//       [fromDate, toDate]
+//     );
+//     const [cogsRows] = await db.execute(
+//       `SELECT COALESCE(SUM(pi.Amount - pi.Tax_Amount), 0) AS amount
+//        FROM add_purchase_items pi
+//        JOIN add_purchase p ON pi.Purchase_Id = p.Purchase_Id
+//        WHERE p.Bill_Date BETWEEN ? AND ?`,
+//       [fromDate, toDate]
+//     );
+//     const [expenseRows] = await db.execute(
+//       `SELECT COALESCE(SUM(Amount), 0) AS amount
+//        FROM daily_expense
+//        WHERE Date BETWEEN ? AND ?`,
+//       [fromDate, toDate]
+//     );
+//     const retainedEarnings =
+//       n(revenueRows[0].amount) -
+//       n(cogsRows[0].amount) -
+//       n(expenseRows[0].amount);
+ 
+//     // ── Total Current Liabilities
+//     const currentLiabTotal = sundryCreditors + dutiesAndTaxes;
+ 
+//     // ── Owner's Equity = Total Assets − Total Liabilities − Retained Earnings
+//     //    (Back-calculated since there is no capital_transactions table)
+//     // const ownerEquity =
+//     //   totalAssets - currentLiabTotal - retainedEarnings;
+//  const ownerEquity = totalAssets - currentLiabTotal;
+//     const totalEquities =
+//       ownerEquity + retainedEarnings + currentLiabTotal;
+ 
+//     // ══════════════════════════════════════════════════════════════════════
+//     //  RESPONSE
+//     // ══════════════════════════════════════════════════════════════════════
+//     return res.status(200).json({
+//       success: true,
+//       data: {
+//         asOf: toDate,
+//         period: { fromDate, toDate },
+ 
+//         equities: {
+//           capitalAccount: {
+//             ownerEquity: parseFloat(ownerEquity.toFixed(2)),
+//           },
+//           reservesSurplus: {
+//             reservesSurplusDefault: 0,
+//             revaluationReserve: 0,
+//             retainedEarnings: parseFloat(retainedEarnings.toFixed(2)),
+//           },
+//           longTermLiabilities: 0,
+//           currentLiabilities: {
+//             sundryCreditors: parseFloat(sundryCreditors.toFixed(2)),
+//             dutiesAndTaxes: parseFloat(dutiesAndTaxes.toFixed(2)),
+//             otherCurrentLiabilities: 0,
+//           },
+//           total: parseFloat(totalEquities.toFixed(2)),
+//         },
+ 
+//         assets: {
+//           fixedAssets: 0,
+//           nonCurrentAssets: 0,
+//           currentAssets: {
+//             sundryDebtors: parseFloat(sundryDebtors.toFixed(2)),
+//             inputDutiesAndTaxes: parseFloat(inputDutiesAndTaxes.toFixed(2)),
+//             bankAccounts: parseFloat(bankAccounts.toFixed(2)),
+//             cashAccounts: parseFloat(cashAccounts.toFixed(2)),
+//             closingStock: parseFloat(closingStock.toFixed(2)),
+//             otherCurrentAssets: 0,
+//           },
+//           otherAssets: 0,
+//           total: parseFloat(totalAssets.toFixed(2)),
+//         },
+//       },
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 const getBalanceSheet = async (req, res, next) => {
   try {
-    // const { fromDate, toDate } = req.query;
- let { fromDate, toDate } = req.query;
+    const { fromDate, toDate } = req.query;
 
-if (!fromDate || !toDate) {
-  const fyDates = getFinancialYearDates();
-  fromDate = fyDates.fromDate;
-  toDate = fyDates.toDate;
-}
+    if (!fromDate || !toDate) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Query params 'fromDate' and 'toDate' are required (YYYY-MM-DD)",
+      });
+    }
 
-console.log("Using date range:", fromDate, "to", toDate);
-    // if (!fromDate || !toDate) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "Query params 'fromDate' and 'toDate' are required (YYYY-MM-DD)",
-    //   });
-    // }
- 
-    // ── helpers ────────────────────────────────────────────────────────────
-    const n = (val) => parseFloat(val || 0);
- 
-    // ══════════════════════════════════════════════════════════════════════
-    //  ASSETS
-    // ══════════════════════════════════════════════════════════════════════
- 
-    // ── 1. SUNDRY DEBTORS
-    //    Sales billed up toDate `toDate` whose Balance_Due > 0
-    const [debtorRows] = await db.execute(
-      `SELECT COALESCE(SUM(Balance_Due), 0) AS amount
-       FROM add_sale
-       WHERE Invoice_Date <= ?`,
+    if (fromDate > toDate) {
+      return res.status(400).json({
+        success: false,
+        message: "fromDate cannot be after toDate.",
+      });
+    }
+
+    const n = (value) => Number(value) || 0;
+    const money = (value) => Number(n(value).toFixed(2));
+
+    const getAmount = async (sql, params = []) => {
+      const [rows] = await db.execute(sql, params);
+      return n(rows[0]?.amount);
+    };
+
+    // ============================================================
+    // 1. CASH IN HAND
+    // Use cash_transactions only.
+    // Do not add payment_splits again.
+    // ============================================================
+
+    const cashAccounts = await getAmount(
+      `SELECT COALESCE(
+         SUM(
+           CASE
+             WHEN Direction = 'Credit' THEN Amount
+             WHEN Direction = 'Debit' THEN -Amount
+             ELSE 0
+           END
+         ), 0
+       ) AS amount
+       FROM cash_transactions
+       WHERE Txn_Date <= ?`,
       [toDate]
     );
-    const sundryDebtors = n(debtorRows[0].amount);
- 
-    // ── 2. CASH IN HAND
-    //    Cash received fromDate sales  minus  cash paid for purchases  minus  cash expenses
-    const [cashSaleRows] = await db.execute(
-      `SELECT COALESCE(SUM(Total_Received), 0) AS amount
-       FROM add_sale
-       WHERE Invoice_Date <= ? AND Payment_Type = 'Cash'`,
+
+    // ============================================================
+    // 2. BANK BALANCE
+    // Bank transactions are stored per bank account.
+    // Cheque/Neft splits are not counted until posted to the bank
+    // ledger by your application.
+    // ============================================================
+
+    const bankAccounts = await getAmount(
+      `SELECT COALESCE(
+         SUM(
+           CASE
+             WHEN Direction = 'Credit' THEN Amount
+             WHEN Direction = 'Debit' THEN -Amount
+             ELSE 0
+           END
+         ), 0
+       ) AS amount
+       FROM bank_transactions
+       WHERE DATE(Txn_Date) <= ?`,
       [toDate]
     );
-    const [cashPurRows] = await db.execute(
-      `SELECT COALESCE(SUM(Total_Paid), 0) AS amount
-       FROM add_purchase
-       WHERE Bill_Date <= ? AND Payment_Type = 'Cash'`,
+
+    // ============================================================
+    // 3. SUNDRY DEBTORS AND SUNDRY CREDITORS
+    //
+    // Use party_ledger because it records:
+    // Sale, Purchase, Payment_In, Payment_Out,
+    // Sale_Return and Purchase_Return.
+    //
+    // Credit = customer owes us more / we owe supplier less.
+    // Debit  = customer owes us less / we owe supplier more.
+    // ============================================================
+
+    const [partyBalanceRows] = await db.execute(
+      `SELECT
+         Party_Id,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN Direction = 'Credit' THEN Amount
+               WHEN Direction = 'Debit' THEN -Amount
+               ELSE 0
+             END
+           ), 0
+         ) AS balance
+       FROM party_ledger
+       WHERE Txn_Date <= ?
+       GROUP BY Party_Id`,
       [toDate]
     );
-    // const [cashExpRows] = await db.execute(
-    //   `SELECT COALESCE(SUM(Amount), 0) AS amount
-    //    FROM daily_expense
-    //    WHERE Date <= ? AND Payment_Method = 'Cash'`,
-    //   [toDate]
-    // );
-    // const cashAccounts =
-    //   n(cashSaleRows[0].amount) -
-    //   n(cashPurRows[0].amount) -
-    //   n(cashExpRows[0].amount);
-   const cashAccounts =
-      n(cashSaleRows[0].amount) -
-      n(cashPurRows[0].amount)
-    // ── 3. BANK / NEFT BALANCE
-    //    Neft/Cheque received  minus  Neft/Cheque paid  minus  Online expenses
-    const [bankSaleRows] = await db.execute(
-      `SELECT COALESCE(SUM(Total_Received), 0) AS amount
-       FROM add_sale
-       WHERE Invoice_Date <= ? AND Payment_Type IN ('Neft','Cheque')`,
-      [toDate]
-    );
-    const [bankPurRows] = await db.execute(
-      `SELECT COALESCE(SUM(Total_Paid), 0) AS amount
-       FROM add_purchase
-       WHERE Bill_Date <= ? AND Payment_Type IN ('Neft','Cheque')`,
-      [toDate]
-    );
-    // const [onlineExpRows] = await db.execute(
-    //   `SELECT COALESCE(SUM(Amount), 0) AS amount
-    //    FROM daily_expense
-    //    WHERE Date <= ? AND Payment_Method IN ('Online','Cheque')`,
-    //   [toDate]
-    // );
-    // const bankAccounts =
-    //   n(bankSaleRows[0].amount) -
-    //   n(bankPurRows[0].amount) -
-    //   n(onlineExpRows[0].amount);
-        const bankAccounts =
-      n(bankSaleRows[0].amount) -
-      n(bankPurRows[0].amount)
- 
-    // ── 4. INPUT GST (GST paid on purchases — claimable ITC)
-    //    SUM of Tax_Amount on purchase items within period
-    const [inputGSTRows] = await db.execute(
+
+    let sundryDebtors = 0;
+    let sundryCreditors = 0;
+
+    for (const row of partyBalanceRows) {
+      const balance = n(row.balance);
+
+      if (balance > 0) {
+        sundryDebtors += balance;
+      } else if (balance < 0) {
+        sundryCreditors += Math.abs(balance);
+      }
+    }
+
+    // ============================================================
+    // 4. INPUT GST ON PURCHASES
+    // ============================================================
+
+    const inputDutiesAndTaxes = await getAmount(
       `SELECT COALESCE(SUM(pi.Tax_Amount), 0) AS amount
        FROM add_purchase_items pi
-       JOIN add_purchase p ON pi.Purchase_Id = p.Purchase_Id
+       JOIN add_purchase p
+         ON pi.Purchase_Id = p.Purchase_Id
        WHERE p.Bill_Date <= ?
-         AND pi.Tax_Type NOT IN ('None','none')`,
+         AND LOWER(COALESCE(pi.Tax_Type, '')) <> 'none'`,
       [toDate]
     );
-    const inputDutiesAndTaxes = n(inputGSTRows[0].amount);
- 
-    // ── 5. CLOSING STOCK VALUE
-    //    Current Stock_Quantity × last Purchase_Price per item
-    //    (Uses the most recent purchase price recorded in add_purchase_items)
+
+    // ============================================================
+    // 5. OUTPUT GST ON SALES
+    // ============================================================
+
+    const dutiesAndTaxes = await getAmount(
+      `SELECT COALESCE(SUM(si.Tax_Amount), 0) AS amount
+       FROM add_sale_items si
+       JOIN add_sale s
+         ON si.Sale_Id = s.Sale_Id
+       WHERE s.Invoice_Date <= ?
+         AND LOWER(COALESCE(si.Tax_Type, '')) <> 'none'`,
+      [toDate]
+    );
+
+    // ============================================================
+    // 6. CLOSING STOCK
+    //
+    // Preserves your existing stock valuation approach:
+    // Stock_Quantity x most recent purchase price.
+    // ============================================================
+
     const [stockRows] = await db.execute(
       `SELECT
          i.Item_Id,
@@ -3178,7 +3453,8 @@ console.log("Using date range:", fromDate, "to", toDate);
          (
            SELECT pi2.Purchase_Price
            FROM add_purchase_items pi2
-           JOIN add_purchase p2 ON pi2.Purchase_Id = p2.Purchase_Id
+           JOIN add_purchase p2
+             ON pi2.Purchase_Id = p2.Purchase_Id
            WHERE pi2.Item_Id = i.Item_Id
              AND p2.Bill_Date <= ?
            ORDER BY p2.Bill_Date DESC, pi2.id DESC
@@ -3188,127 +3464,174 @@ console.log("Using date range:", fromDate, "to", toDate);
        WHERE i.Stock_Quantity > 0`,
       [toDate]
     );
+
     let closingStock = 0;
+
     for (const row of stockRows) {
-      if (row.last_price != null) {
-        closingStock += n(row.Stock_Quantity) * n(row.last_price);
+      if (row.last_price !== null) {
+        closingStock +=
+          n(row.Stock_Quantity) * n(row.last_price);
       }
     }
- 
-    // ── Total Current Assets
+
+    // ============================================================
+    // 7. SALES AND PURCHASE RETURNS
+    //
+    // Header totals are used here because the return-item schemas
+    // have not yet been confirmed.
+    // ============================================================
+
+    const saleReturns = await getAmount(
+      `SELECT COALESCE(SUM(Total_Amount), 0) AS amount
+       FROM sale_return
+       WHERE Return_Date BETWEEN ? AND ?`,
+      [fromDate, toDate]
+    );
+
+    const purchaseReturns = await getAmount(
+      `SELECT COALESCE(SUM(Total_Amount), 0) AS amount
+       FROM purchase_return
+       WHERE Return_Date BETWEEN ? AND ?`,
+      [fromDate, toDate]
+    );
+
+    // ============================================================
+    // 8. REVENUE FOR THE SELECTED PERIOD
+    // ============================================================
+
+    const revenue = await getAmount(
+      `SELECT COALESCE(
+         SUM(si.Amount - si.Tax_Amount), 0
+       ) AS amount
+       FROM add_sale_items si
+       JOIN add_sale s
+         ON si.Sale_Id = s.Sale_Id
+       WHERE s.Invoice_Date BETWEEN ? AND ?`,
+      [fromDate, toDate]
+    );
+
+    // ============================================================
+    // 9. PURCHASE COST FOR THE SELECTED PERIOD
+    //
+    // This is purchase cost, not true cost of goods sold (COGS).
+    // Proper COGS needs inventory movement/opening stock data.
+    // ============================================================
+
+    const purchaseCost = await getAmount(
+      `SELECT COALESCE(
+         SUM(pi.Amount - pi.Tax_Amount), 0
+       ) AS amount
+       FROM add_purchase_items pi
+       JOIN add_purchase p
+         ON pi.Purchase_Id = p.Purchase_Id
+       WHERE p.Bill_Date BETWEEN ? AND ?`,
+      [fromDate, toDate]
+    );
+
+    // ============================================================
+    // 10. EXPENSES
+    // Keeps your existing daily_expense table.
+    // ============================================================
+
+    const expenses = await getAmount(
+      `SELECT COALESCE(SUM(Amount), 0) AS amount
+       FROM daily_expense
+       WHERE Date BETWEEN ? AND ?`,
+      [fromDate, toDate]
+    );
+
+    // ============================================================
+    // 11. RETAINED EARNINGS
+    //
+    // INTERIM calculation: return header totals may include GST.
+    // Replace with return-item net amounts when those schemas
+    // are confirmed. Purchase cost is not true COGS.
+    // ============================================================
+
+    const retainedEarnings =
+      revenue -
+      saleReturns -
+      purchaseCost +
+      purchaseReturns -
+      expenses;
+
+    // ============================================================
+    // 12. TOTAL ASSETS AND LIABILITIES
+    // ============================================================
+
     const currentAssetsTotal =
       sundryDebtors +
       inputDutiesAndTaxes +
       bankAccounts +
       cashAccounts +
       closingStock;
- 
-    // ── Total Assets (no fixed/non-current assets in this DB)
+
     const totalAssets = currentAssetsTotal;
- 
-    // ══════════════════════════════════════════════════════════════════════
-    //  EQUITIES & LIABILITIES
-    // ══════════════════════════════════════════════════════════════════════
- 
-    // ── 6. SUNDRY CREDITORS (purchase bills with outstanding balance)
-    const [creditorRows] = await db.execute(
-      `SELECT COALESCE(SUM(Balance_Due), 0) AS amount
-       FROM add_purchase
-       WHERE Bill_Date <= ?`,
-      [toDate]
-    );
-    const sundryCreditors = n(creditorRows[0].amount);
- 
-    // ── 7. OUTPUT GST PAYABLE (GST collected on sales)
-    const [outputGSTRows] = await db.execute(
-      `SELECT COALESCE(SUM(si.Tax_Amount), 0) AS amount
-       FROM add_sale_items si
-       JOIN add_sale s ON si.Sale_Id = s.Sale_Id
-       WHERE s.Invoice_Date <= ?
-         AND si.Tax_Type NOT IN ('None','none')`,
-      [toDate]
-    );
-    // const dutiesAndTaxes = n(outputGSTRows[0].amount);
- const dutiesAndTaxes =
-  n(outputGSTRows[0].amount) - inputDutiesAndTaxes;
-    // ── 8. RETAINED EARNINGS  (Net profit within the selected period)
-    //    = Revenue (sale subtotal excl. tax) − COGS (purchase subtotal excl. tax) − Expenses
-    const [revenueRows] = await db.execute(
-      `SELECT COALESCE(SUM(si.Amount - si.Tax_Amount), 0) AS amount
-       FROM add_sale_items si
-       JOIN add_sale s ON si.Sale_Id = s.Sale_Id
-       WHERE s.Invoice_Date BETWEEN ? AND ?`,
-      [fromDate, toDate]
-    );
-    const [cogsRows] = await db.execute(
-      `SELECT COALESCE(SUM(pi.Amount - pi.Tax_Amount), 0) AS amount
-       FROM add_purchase_items pi
-       JOIN add_purchase p ON pi.Purchase_Id = p.Purchase_Id
-       WHERE p.Bill_Date BETWEEN ? AND ?`,
-      [fromDate, toDate]
-    );
-    const [expenseRows] = await db.execute(
-      `SELECT COALESCE(SUM(Amount), 0) AS amount
-       FROM daily_expense
-       WHERE Date BETWEEN ? AND ?`,
-      [fromDate, toDate]
-    );
-    const retainedEarnings =
-      n(revenueRows[0].amount) -
-      n(cogsRows[0].amount) -
-      n(expenseRows[0].amount);
- 
-    // ── Total Current Liabilities
-    const currentLiabTotal = sundryCreditors + dutiesAndTaxes;
- 
-    // ── Owner's Equity = Total Assets − Total Liabilities − Retained Earnings
-    //    (Back-calculated since there is no capital_transactions table)
-    // const ownerEquity =
-    //   totalAssets - currentLiabTotal - retainedEarnings;
- const ownerEquity = totalAssets - currentLiabTotal;
+
+    const currentLiabTotal =
+      sundryCreditors + dutiesAndTaxes;
+
+    // No separate capital transaction table is currently used.
+    // This is a balancing figure, not verified owner capital.
+    const ownerEquity =
+      totalAssets - currentLiabTotal - retainedEarnings;
+
     const totalEquities =
-      ownerEquity + retainedEarnings + currentLiabTotal;
- 
-    // ══════════════════════════════════════════════════════════════════════
-    //  RESPONSE
-    // ══════════════════════════════════════════════════════════════════════
+      ownerEquity +
+      retainedEarnings +
+      currentLiabTotal;
+
+    // ============================================================
+    // 13. RESPONSE
+    // Keep the existing response shape for the frontend.
+    // ============================================================
+
     return res.status(200).json({
       success: true,
       data: {
         asOf: toDate,
-        period: { fromDate, toDate },
- 
+        period: {
+          fromDate,
+          toDate,
+        },
+
         equities: {
           capitalAccount: {
-            ownerEquity: parseFloat(ownerEquity.toFixed(2)),
+            ownerEquity: money(ownerEquity),
           },
+
           reservesSurplus: {
             reservesSurplusDefault: 0,
             revaluationReserve: 0,
-            retainedEarnings: parseFloat(retainedEarnings.toFixed(2)),
+            retainedEarnings: money(retainedEarnings),
           },
+
           longTermLiabilities: 0,
+
           currentLiabilities: {
-            sundryCreditors: parseFloat(sundryCreditors.toFixed(2)),
-            dutiesAndTaxes: parseFloat(dutiesAndTaxes.toFixed(2)),
+            sundryCreditors: money(sundryCreditors),
+            dutiesAndTaxes: money(dutiesAndTaxes),
             otherCurrentLiabilities: 0,
           },
-          total: parseFloat(totalEquities.toFixed(2)),
+
+          total: money(totalEquities),
         },
- 
+
         assets: {
           fixedAssets: 0,
           nonCurrentAssets: 0,
+
           currentAssets: {
-            sundryDebtors: parseFloat(sundryDebtors.toFixed(2)),
-            inputDutiesAndTaxes: parseFloat(inputDutiesAndTaxes.toFixed(2)),
-            bankAccounts: parseFloat(bankAccounts.toFixed(2)),
-            cashAccounts: parseFloat(cashAccounts.toFixed(2)),
-            closingStock: parseFloat(closingStock.toFixed(2)),
+            sundryDebtors: money(sundryDebtors),
+            inputDutiesAndTaxes: money(inputDutiesAndTaxes),
+            bankAccounts: money(bankAccounts),
+            cashAccounts: money(cashAccounts),
+            closingStock: money(closingStock),
             otherCurrentAssets: 0,
           },
+
           otherAssets: 0,
-          total: parseFloat(totalAssets.toFixed(2)),
+          total: money(totalAssets),
         },
       },
     });
@@ -3326,120 +3649,3 @@ export {getSalesNewSalesPurchasesEachDay,
   printDailyReport,
   getBalanceSheet};
 
-// const getPartyWiseSalesAndPurchasesDailyYearMonthWise = async (req, res, next) => {
-//   let connection;
-
-//   try {
-//     connection = await db.getConnection();
-
-//     const MONTH_MAP = {
-//       january: 1, jan: 1,
-//       february: 2, feb: 2,
-//       march: 3, mar: 3,
-//       april: 4, apr: 4,
-//       may: 5,
-//       june: 6, jun: 6,
-//       july: 7, jul: 7,
-//       august: 8, aug: 8,
-//       september: 9, sep: 9, sept: 9,
-//       october: 10, oct: 10,
-//       november: 11, nov: 11,
-//       december: 12, dec: 12,
-//     };
-
-//     const year = Number(req.query.year) || new Date().getFullYear();
-
-//     const month =
-//       MONTH_MAP[req.query.month?.toLowerCase()] ||
-//       new Date().getMonth() + 1;
-
-//     // SALES
-//     const [sales] = await connection.query(
-//       `
-//       SELECT 
-//         DAY(s.Invoice_Date) AS day,
-//         s.Party_Id,
-//         p.Party_Name,
-//         SUM(s.Total_Amount) AS total_sales
-//       FROM add_sale s
-//       JOIN add_party p ON p.Party_Id = s.Party_Id
-//       WHERE YEAR(s.Invoice_Date)=?
-//       AND MONTH(s.Invoice_Date)=?
-//       GROUP BY day, s.Party_Id, p.Party_Name
-//       ORDER BY day
-//       `,
-//       [year, month]
-//     );
-
-//     // PURCHASES
-//     const [purchases] = await connection.query(
-//       `
-//       SELECT 
-//         DAY(pr.Bill_Date) AS day,
-//         pr.Party_Id,
-//         p.Party_Name,
-//         SUM(pr.Total_Amount) AS total_purchases
-//       FROM add_purchase pr
-//       JOIN add_party p ON p.Party_Id = pr.Party_Id
-//       WHERE YEAR(pr.Bill_Date)=?
-//       AND MONTH(pr.Bill_Date)=?
-//       GROUP BY day, pr.Party_Id, p.Party_Name
-//       ORDER BY day
-//       `,
-//       [year, month]
-//     );
-
-//     const map = {};
-
-//     // Merge sales
-//     for (const s of sales) {
-//       const key = `${s.day}-${s.Party_Id}`;
-
-//       map[key] = {
-//         date: String(s.day).padStart(2, "0"),
-//         partyId: s.Party_Id,
-//         partyName: s.Party_Name,
-//         sales: Number(s.total_sales) || 0,
-//         purchases: 0,
-//       };
-//     }
-
-//     // Merge purchases
-//     for (const p of purchases) {
-//       const key = `${p.day}-${p.Party_Id}`;
-
-//       if (map[key]) {
-//         map[key].purchases = Number(p.total_purchases) || 0;
-//       } else {
-//         map[key] = {
-//           date: String(p.day).padStart(2, "0"),
-//           partyId: p.Party_Id,
-//           partyName: p.Party_Name,
-//           sales: 0,
-//           purchases: Number(p.total_purchases) || 0,
-//         };
-//       }
-//     }
-
-//     const combined = Object.values(map).map((row) => ({
-//       ...row,
-//       profit: row.sales - row.purchases,
-//     }));
-
-//     combined.sort((a, b) => Number(a.date) - Number(b.date));
-
-//     return res.status(200).json({
-//       success: true,
-//       year,
-//       month,
-//       totalRecords: combined.length,
-//       data: combined,
-//     });
-
-//   } catch (err) {
-//     console.error("❌ Error getting party-wise daily sales and purchases:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };

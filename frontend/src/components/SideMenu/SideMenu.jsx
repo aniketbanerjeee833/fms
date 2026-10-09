@@ -1,7 +1,7 @@
 import  { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import {LayoutDashboard,Users, Package, ShoppingCart, DollarSign, ClipboardMinus, CalendarDays, Settings, Wallet, IndianRupee, Wrench } from 'lucide-react'
+import {LayoutDashboard,Users, Package, ShoppingCart, CalendarDays, Settings, Wallet, IndianRupee, Wrench, ClipboardMinus } from 'lucide-react'
 
 //const REACT_APP_API_URL = "http://localhost:4000";
 
@@ -380,15 +380,15 @@ if (
                  Barcode Scanner
                  </span>
             </NavLink> */}
-                  {/* {
+                   {
   renderMenu(
     "Reports",
     <ClipboardMinus size={20} />,
     [
-      { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
+      // { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
        { to: "/reports/balance-sheet", text: "Balance Sheet" },
     ]
-  )} */}
+  )} 
         </ul>
       </div>
     </>

@@ -1,0 +1,371 @@
+
+/* =========================================================
+   BALANCE SHEET BASE
+========================================================= */
+
+.balance-sheet-print {
+    width: 100%;
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 24px;
+    box-sizing: border-box;
+
+    background: #fff;
+    color: #111;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   COMPANY HEADER
+========================================================= */
+
+.balance-sheet-company-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+
+    width: 100%;
+    box-sizing: border-box;
+
+    border: 1px solid #777;
+    border-bottom: 2px solid #000;
+
+    padding: 8px;
+}
+
+.balance-sheet-logo {
+    width: 42%;
+    flex-shrink: 0;
+}
+
+.balance-sheet-logo img {
+    display: block;
+    width: 180px;
+    max-width: 100%;
+    height: 75px;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.balance-sheet-company-details {
+    width: 58%;
+    min-width: 0;
+
+    text-align: right;
+    font-size: 11px;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.balance-sheet-company-name {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.balance-sheet-company-address {
+    font-size: 11px;
+}
+
+.balance-sheet-company-contact,
+.balance-sheet-company-gstin {
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   TITLE AND DATE PERIOD
+========================================================= */
+
+.balance-sheet-title-container {
+    text-align: center;
+    margin: 14px 0;
+}
+
+.balance-sheet-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.balance-sheet-period {
+    font-size: 12px;
+    color: #475569;
+}
+
+
+/* =========================================================
+   TWO-COLUMN LAYOUT
+========================================================= */
+
+.balance-sheet-panels {
+    display: flex;
+    align-items: stretch;
+    gap: 12px;
+
+    width: 100%;
+}
+
+.balance-sheet-column {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+
+    min-width: 0;
+    box-sizing: border-box;
+
+    border: 1px solid #777;
+}
+
+
+/* =========================================================
+   COLUMN HEADER
+========================================================= */
+
+.balance-sheet-column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+
+    padding: 6px 10px;
+
+    background: #6de4ec;
+    color: #fff;
+
+    border: 1px solid #777;
+
+    font-size: 11px;
+    font-weight: bold;
+
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+.balance-sheet-column-header span:last-child {
+    text-align: right;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   SECTION BODY
+========================================================= */
+
+.balance-sheet-column-body {
+    flex: 1;
+    padding: 6px 10px;
+}
+
+.balance-sheet-section {
+    margin-bottom: 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.balance-sheet-section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.4;
+}
+
+.balance-sheet-section-title span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.balance-sheet-section-title span:last-child {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.balance-sheet-section-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+
+    padding: 3px 0 3px 14px;
+
+    font-size: 10px;
+    color: #475569;
+    line-height: 1.4;
+}
+
+.balance-sheet-section-row span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.balance-sheet-section-row span:last-child {
+    text-align: right;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   COLUMN TOTAL
+========================================================= */
+
+.balance-sheet-column-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+
+    padding: 8px 10px;
+
+    border-top: 2px solid #000;
+
+    font-size: 11px;
+    font-weight: bold;
+
+    break-inside: avoid;
+    page-break-inside: avoid;
+     background: #6de4ec !important;
+}
+
+.balance-sheet-column-total span:first-child {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.balance-sheet-column-total span:last-child {
+   
+    text-align: right;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   BALANCE CHECK
+========================================================= */
+
+.balance-sheet-check {
+    margin-top: 12px;
+    padding: 8px;
+
+    border: 1px solid #cbd5e1;
+
+    font-size: 11px;
+    font-weight: bold;
+
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.balance-sheet-check-balanced {
+    color: #166534;
+    background: #f0fdf4;
+}
+
+.balance-sheet-check-difference {
+    color: #b91c1c;
+    background: #fef2f2;
+}
+
+
+/* =========================================================
+   PRINT
+========================================================= */
+
+@media print {
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    html,
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+    }
+
+    .balance-sheet-print {
+        width: 100%;
+        max-width: none;
+
+        margin: 0;
+        padding: 8mm;
+
+        box-sizing: border-box;
+        background: #fff !important;
+    }
+
+    .balance-sheet-company-header,
+    .balance-sheet-title-container,
+    .balance-sheet-panels,
+    .balance-sheet-check {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .balance-sheet-column-header {
+        background: #6de4ec !important;
+        color: #fff !important;
+
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .balance-sheet-section,
+    .balance-sheet-column-total,
+    .balance-sheet-check {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+
+    @page {
+        size: A4;
+        margin: 0;
+    }
+}
+
+
+/* =========================================================
+   SMALL SCREEN PREVIEW
+========================================================= */
+
+@media screen and (max-width: 650px) {
+    .balance-sheet-print {
+        padding: 12px;
+    }
+
+    .balance-sheet-company-header {
+        gap: 8px;
+    }
+
+    .balance-sheet-company-name {
+        font-size: 16px;
+    }
+
+    .balance-sheet-company-details {
+        font-size: 10px;
+    }
+
+    .balance-sheet-panels {
+        gap: 6px;
+    }
+
+    .balance-sheet-column-header {
+        padding: 6px;
+        font-size: 10px;
+    }
+
+    .balance-sheet-column-body {
+        padding: 6px;
+    }
+
+    .balance-sheet-column-total {
+        padding: 6px;
+        font-size: 10px;
+    }
+}
