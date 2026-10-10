@@ -3045,26 +3045,26 @@ const docDefinition = {
 
 //BALANCE SHEET
 
-const getFinancialYearDates = () => {
-  const today = new Date();
+// const getFinancialYearDates = () => {
+//   const today = new Date();
 
-  const year = today.getFullYear();
-  const month = today.getMonth(); // 0 = Jan, 3 = April
+//   const year = today.getFullYear();
+//   const month = today.getMonth(); // 0 = Jan, 3 = April
 
-  let fromDate, toDate;
+//   let fromDate, toDate;
 
-  if (month >= 3) {
-    // April or later → current FY
-    fromDate = `${year}-04-01`;
-    toDate = `${year + 1}-03-31`;
-  } else {
-    // Jan–March → previous FY
-    fromDate = `${year - 1}-04-01`;
-    toDate = `${year}-03-31`;
-  }
+//   if (month >= 3) {
+//     // April or later → current FY
+//     fromDate = `${year}-04-01`;
+//     toDate = `${year + 1}-03-31`;
+//   } else {
+//     // Jan–March → previous FY
+//     fromDate = `${year - 1}-04-01`;
+//     toDate = `${year}-03-31`;
+//   }
 
-  return { fromDate, toDate };
-};
+//   return { fromDate, toDate };
+// };
 // const getBalanceSheet = async (req, res, next) => {
 //   try {
 //     // const { fromDate, toDate } = req.query;
