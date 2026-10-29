@@ -1,10 +1,9 @@
 import db from "../config/db.js"; // mysql2/promise connection
 import { getPaymentInsForPrint } from "../helpers/printReportHelpers.js";
-import { recordBankTransaction } from "../utils/bankAccountHelper.js";
-import { recordCashTransaction } from "../utils/cashTransactionHelper.js";
+
 import { recordPartyLedger, reversePartyLedger } from "../utils/partyLedgerHelper.js";
 import { deletePaymentSplits, insertPaymentSplits, validateSplits } from "../utils/paymentSplitHelper.js";
-import { validateDateRange } from "../utils/validateDate.js";
+
 import ExcelJS from "exceljs";
 
 // CREATE TABLE IF NOT EXISTS payment_in (

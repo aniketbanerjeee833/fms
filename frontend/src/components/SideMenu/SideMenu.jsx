@@ -387,6 +387,7 @@ if (
     [
       // { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
        { to: "/reports/balance-sheet", text: "Balance Sheet" },
+       { to: "/reports/all-transactions", text: "All Transactions" },
     ]
   )} 
         </ul>

@@ -18,596 +18,7 @@ import db from "../config/db.js";
         IGST28: "IGST 28%",
         IGST40: "IGST 40%"
     }
-// const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
 
-//     // const { date, year, month } = req.query;
-//     const {date} = req.query;
-//     console.log(date);
-//     // const [year, month, day] = date.split("-");
-//     // const fullDate = `${year}-${month}-${day}`; 
-// if (!date) {
-//      connection.release();
-//   return res.status(400).json({ message: "Date is required" });
-// }
-
-// const fullDate = date; // already YYYY-MM-DD
-//     const formatIndianDate = (date) =>
-//       new Date(date).toLocaleString("en-IN", {
-//         day: "2-digit",
-//         month: "2-digit",
-//         year: "numeric"
-//       });
-
-//     const formatIndianDateTime = (timestamp) =>
-//       new Date(timestamp).toLocaleString("en-IN", {
-//         day: "2-digit",
-//         month: "2-digit",
-//         year: "numeric",
-//         hour: "2-digit",
-//         minute: "2-digit"
-//       });
-
-//     // ---------------------------------------------------
-//     // SALES + ITEMS
-//     // ---------------------------------------------------
-//     const [sales] = await db.query(
-//       `SELECT s.*, p.Party_Name,p.GSTIN
-//        FROM add_sale s
-//        LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//        WHERE DATE(s.created_at) = ?
-//        ORDER BY s.created_at ASC`,
-//       [fullDate]
-//     );
-
-//     const saleIds = sales.map((s) => s.Sale_Id);
-
-//     let saleItems = [];
-//     if (saleIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT si.*,i.Item_Name,i.Item_HSN,i.Item_Category,i.Item_Unit FROM add_sale_items si
-//         LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
-//         WHERE si.Sale_Id IN (?)`,
-//         [saleIds]
-//       );
-//       saleItems = items;
-//     }
-
-//     const salesWithItems = sales.map((sale) => ({
-//       sale_id: sale.Sale_Id,
-//       Party_Name: sale.Party_Name,
-//       GSTIN: sale.GSTIN,
-//       Invoice_Number: sale.Invoice_Number,
-//       Invoice_Date: formatIndianDate(sale.Invoice_Date),
-//       State_Of_Supply: sale.State_Of_Supply,
-//       Payment_Type: sale.Payment_Type,
-//       Referrence_Number: sale.Referrence_Number,
-//     //   bill_number: sale.Bill_Number,
-//       Total_Received: sale.Total_Received,
-//       Balance_Due: sale.Balance_Due,
-//       created_at: formatIndianDate(sale.created_at),
-//       Total_Amount: sale.Total_Amount,
-//       items: saleItems.filter((i) => i.Sale_Id === sale.Sale_Id),
-//     }));
-
-//     // ---------------------------------------------------
-//     // NEW SALES + ITEMS
-//     // ---------------------------------------------------
-//     const [newSales] = await db.query(
-//       `SELECT ns.*, p.Party_Name,p.GSTIN 
-//        FROM add_new_sale ns
-//        LEFT JOIN add_party p ON ns.Party_Id = p.Party_Id
-//        WHERE DATE(ns.created_at) = ?
-//        ORDER BY ns.created_at ASC`,
-//       [fullDate]
-//     );
-//     console.log(newSales);
-
-//     const newSaleIds = newSales.map((n) => n.Sale_Id);
-//     console.log(newSaleIds);
-//     let newSaleItems = [];
-//     if (newSaleIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT nsi.*,i.Item_Name,i.Item_HSN,i.Item_Category,i.Item_Unit
-//         FROM add_new_sale_items nsi
-//          LEFT JOIN add_item_sale i ON nsi.Item_Id = i.Item_Id
-//          WHERE nsi.Sale_Id IN (?)`,
-//         [newSaleIds]
-//       );
-//       newSaleItems = items;
-//     }
-//     console.log(newSaleItems);
-
-//     const newSalesWithItems = newSales.map((ns) => ({
-//       sale_id: ns.Sale_Id,
-//       Party_Name: ns.Party_Name,
-//       GSTIN: ns.GSTIN,
-//       Invoice_Number: ns.Invoice_Number,
-//       Invoice_Date: formatIndianDate(ns.Invoice_Date),
-//       State_Of_Supply: ns.State_Of_Supply,
-//       Payment_Type: ns.Payment_Type,
-//       Referrence_Number: ns.Referrence_Number,
-//       Total_Received: ns.Total_Received,
-//       Balance_Due: ns.Balance_Due,
-//       created_at: formatIndianDate(ns.created_at),
-//       Total_Amount: ns.Total_Amount,
-//       items: newSaleItems.filter((i) => i.Sale_Id === ns.Sale_Id),
-//     }));
-
-//     // ---------------------------------------------------
-//     // PURCHASES + ITEMS
-//     // ---------------------------------------------------
-//     const [purchases] = await db.query(
-//       `SELECT pu.*, p.Party_Name,p.GSTIN 
-//        FROM add_purchase pu
-//        LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-//        WHERE DATE(pu.created_at) = ?
-//        ORDER BY pu.created_at ASC`,
-//       [fullDate]
-//     );
-
-//     const purchaseIds = purchases.map((pu) => pu.Purchase_Id);
-
-//     let purchaseItems = [];
-//     if (purchaseIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT pu.*,i.Item_Name,i.Item_HSN,i.Item_Category,i.Item_Unit
-//          FROM add_purchase_items pu
-//          LEFT JOIN add_item i ON pu.Item_Id = i.Item_Id
-//           WHERE pu.Purchase_Id IN (?)`,
-//         [purchaseIds]
-//       );
-//       purchaseItems = items;
-//     }
-
-//     const purchasesWithItems = purchases.map((pu) => ({
-//       purchase_id: pu.Purchase_Id,
-//       Party_Name: pu.Party_Name,
-//       GSTIN: pu.GSTIN,
-//       Bill_Number: pu.Bill_Number,
-//       Bill_Date: formatIndianDate(pu.Bill_Date),
-//       State_Of_Supply: pu.State_Of_Supply,
-//       Payment_Type: pu.Payment_Type,
-//       Referrence_Number: pu.Referrence_Number,
-//       Total_Paid: pu.Total_Paid,
-//       Balance_Due: pu.Balance_Due,
-//       created_at: formatIndianDate(pu.created_at),
-//       Total_Amount: pu.Total_Amount,
-//       items: purchaseItems.filter((i) => i.Purchase_Id === pu.Purchase_Id),
-//     }));
-// const totalPurchasesAmount = purchases.reduce(
-//   (sum, p) => sum + Number(p.Total_Amount || 0),0);
-// const totalPurchasePaidAmount = purchases.reduce(
-//   (sum, p) => sum + Number(p.Total_Paid || 0),0)
-// const totalSalesAmount = sales.reduce(
-//   (sum, s) => sum + Number(s.Total_Amount || 0),0);
-// const totalSalesReceivedAmount = sales.reduce(
-//   (sum, s) => sum + Number(s.Total_Received || 0),0)
-// const totalNewSalesAmount = newSales.reduce(
-//   (sum, s) => sum + Number(s.Total_Amount || 0),0);
-// const totalNewSalesReceivedAmount = newSales.reduce(
-//   (sum, s) => sum + Number(s.Total_Received || 0),0)
-//     // ---------------------------------------------------
-//     // RESPONSE
-//     // ---------------------------------------------------
-//     return res.status(200).json({
-//       success: true,
-//       date: fullDate,
-//       data:{
-//         sales:{salesWithItems,totalSalesAmount,totalSalesReceivedAmount},
-//       newSales: {newSalesWithItems,totalNewSalesAmount,totalNewSalesReceivedAmount},
-//       purchases: {purchasesWithItems,totalPurchasesAmount,totalPurchasePaidAmount },
-//       }
- 
-//     });
-
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-
-// const fonts = {
-//   Helvetica: {
-//     normal: "Helvetica",
-//     bold: "Helvetica-Bold",
-//     italics: "Helvetica-Oblique",
-//     bolditalics: "Helvetica-BoldOblique",
-//   },
-// };
-// const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     const { date } = req.query;
-
-//     if (!date) {
-//       connection.release();
-//       return res.status(400).json({ message: "Date is required" });
-//     }
-
-//     const fullDate = date; // Already YYYY-MM-DD
-
-//     // Date formatter
-//     const formatIndianDate = (date) =>
-//       new Date(date).toLocaleString("en-IN", {
-//         day: "2-digit",
-//         month: "2-digit",
-//         year: "numeric"
-//       });
-
-//     // ---------------------------------------------------
-//     // 1️⃣ SALES (DATA + ITEMS)
-//     // ---------------------------------------------------
-//     const [sales] = await db.query(
-//       `SELECT s.*, p.Party_Name, p.GSTIN
-//        FROM add_sale s
-//        LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//        WHERE DATE(s.financial_year) = ?
-//        ORDER BY s.created_at ASC`,
-//       [fullDate]
-//     );
-
-//     const saleIds = sales.map((s) => s.Sale_Id);
-
-//     let saleItems = [];
-//     if (saleIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT si.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
-//          FROM add_sale_items si
-//          LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
-//          WHERE si.Sale_Id IN (?)`,
-//         [saleIds]
-//       );
-//       saleItems = items;
-//     }
-
-//     const salesWithItems = sales.map((sale) => ({
-//       sale_id: sale.Sale_Id,
-//       Party_Name: sale.Party_Name,
-//       GSTIN: sale.GSTIN,
-//       Invoice_Number: sale.Invoice_Number,
-//       Invoice_Date: formatIndianDate(sale.Invoice_Date),
-//       State_Of_Supply: sale.State_Of_Supply,
-//       Payment_Type: sale.Payment_Type,
-//       Referrence_Number: sale.Referrence_Number,
-//       Total_Received: sale.Total_Received,
-//       Balance_Due: sale.Balance_Due,
-//       created_at: formatIndianDate(sale.created_at),
-//       Total_Amount: sale.Total_Amount,
-//       items: saleItems.filter((i) => i.Sale_Id === sale.Sale_Id),
-//     }));
-
-//     // 👉 SQL TOTALS
-//     const [salesTotals] = await db.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0) AS totalSalesAmount,
-//           COALESCE(SUM(Total_Received),0) AS totalSalesReceivedAmount,
-//           COALESCE(SUM(Balance_Due),0) AS totalSalesBalanceDue
-//        FROM add_sale
-//        WHERE DATE(created_at) = ?`,
-//       [fullDate]
-//     );
-
-//     // ---------------------------------------------------
-//     // 2️⃣ NEW SALES (DATA + ITEMS)
-//     // ---------------------------------------------------
-    
-
-//     // ---------------------------------------------------
-//     // 3️⃣ PURCHASES (DATA + ITEMS)
-//     // ---------------------------------------------------
-//     const [purchases] = await db.query(
-//       `SELECT pu.*, p.Party_Name, p.GSTIN
-//        FROM add_purchase pu
-//        LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-//        WHERE DATE(pu.financial_year) = ?
-//        ORDER BY pu.created_at ASC`,
-//       [fullDate]
-//     );
-
-//     const purchaseIds = purchases.map((pu) => pu.Purchase_Id);
-
-//     let purchaseItems = [];
-//     if (purchaseIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT pu.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
-//          FROM add_purchase_items pu
-//          LEFT JOIN add_item i ON pu.Item_Id = i.Item_Id
-//          WHERE pu.Purchase_Id IN (?)`,
-//         [purchaseIds]
-//       );
-//       purchaseItems = items;
-//     }
-
-//     const purchasesWithItems = purchases.map((pu) => ({
-//       purchase_id: pu.Purchase_Id,
-//       Party_Name: pu.Party_Name,
-//       GSTIN: pu.GSTIN,
-//       Bill_Number: pu.Bill_Number,
-//       Bill_Date: formatIndianDate(pu.Bill_Date),
-//       State_Of_Supply: pu.State_Of_Supply,
-//       Payment_Type: pu.Payment_Type,
-//       Referrence_Number: pu.Referrence_Number,
-//       Total_Paid: pu.Total_Paid,
-//       Balance_Due: pu.Balance_Due,
-//       created_at: formatIndianDate(pu.created_at),
-//       Total_Amount: pu.Total_Amount,
-//       items: purchaseItems.filter((i) => i.Purchase_Id === pu.Purchase_Id),
-//     }));
-
-//     // 👉 SQL TOTALS
-//     const [purchaseTotals] = await db.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0) AS totalPurchasesAmount,
-//           COALESCE(SUM(Total_Paid),0) AS totalPurchasePaidAmount,
-//           COALESCE(SUM(Balance_Due),0) AS totalPurchasesBalanceDue
-//        FROM add_purchase
-//        WHERE DATE(created_at) = ?`,
-//       [fullDate]
-//     );
-
-//     // ---------------------------------------------------
-//     // FINAL RESPONSE
-//     // ---------------------------------------------------
-
-// console.log(salesTotals);
-//     return res.status(200).json({
-//       success: true,
-//       date: fullDate,
-//       data: {
-//         sales: {
-//           items: salesWithItems,
-//           totalSalesAmount: salesTotals[0].totalSalesAmount,
-//          totalSalesReceivedAmount: salesTotals[0].totalSalesReceivedAmount,
-//          totalSalesBalanceDue: salesTotals[0].totalSalesBalanceDue
-//         },
-     
-//         purchases: {
-//           items: purchasesWithItems,
-//           totalPurchasesAmount: purchaseTotals[0].totalPurchasesAmount,
-//           totalPurchasePaidAmount: purchaseTotals[0].totalPurchasePaidAmount,
-//           totalPurchasesBalanceDue: purchaseTotals[0].totalPurchasesBalanceDue
-//         }
-//       }
-//     });
-
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
-// const getSalesNewSalesPurchasesInDateRange = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     const { fromDate, toDate } = req.query;
-
-//     if (!fromDate || !toDate) {
-//       connection.release();
-//       return res.status(400).json({ message: "From and To Date is required" });
-//     }
- 
-
-//     const fullFromDate = fromDate; // Already YYYY-MM-DD
-//     const fullToDate = toDate; // Already YYYY-MM-DD
-
-//     // Date formatter
-//     const formatIndianDate = (date) =>
-//       new Date(date).toLocaleString("en-IN", {
-//         day: "2-digit",
-//         month: "2-digit",
-//         year: "numeric"
-//       });
-
-//     // ---------------------------------------------------
-//     // 1️⃣ SALES (DATA + ITEMS)
-//     // ---------------------------------------------------
-//     const [sales] = await db.query(
-//       `SELECT s.*, p.Party_Name, p.GSTIN
-//        FROM add_sale s
-//        LEFT JOIN add_party p ON s.Party_Id = p.Party_Id
-//        WHERE DATE(s.created_at) BETWEEN ? AND ?
-//        ORDER BY s.created_at ASC`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     const saleIds = sales.map((s) => s.Sale_Id);
-
-//     let saleItems = [];
-//     if (saleIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT si.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
-//          FROM add_sale_items si
-//          LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
-//          WHERE si.Sale_Id IN (?)`,
-//         [saleIds]
-//       );
-//       saleItems = items;
-//     }
-
-//     const salesWithItems = sales.map((sale) => ({
-//       sale_id: sale.Sale_Id,
-//       Party_Name: sale.Party_Name,
-//       GSTIN: sale.GSTIN,
-//       Invoice_Number: sale.Invoice_Number,
-//       Invoice_Date: formatIndianDate(sale.Invoice_Date),
-//       State_Of_Supply: sale.State_Of_Supply,
-//       Payment_Type: sale.Payment_Type,
-//       Referrence_Number: sale.Referrence_Number,
-//       Total_Received: sale.Total_Received,
-//       Balance_Due: sale.Balance_Due,
-//       created_at: formatIndianDate(sale.created_at),
-//       Total_Amount: sale.Total_Amount,
-//       items: saleItems.filter((i) => i.Sale_Id === sale.Sale_Id),
-//     }));
-
-//     // 👉 SQL TOTALS
-//     const [salesTotals] = await db.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0) AS totalSalesAmount,
-//           COALESCE(SUM(Total_Received),0) AS totalSalesReceivedAmount,
-//           COALESCE(SUM(Balance_Due),0) AS totalSalesBalanceDue
-//        FROM add_sale
-//       WHERE DATE(created_at) BETWEEN ? AND ?`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     // ---------------------------------------------------
-//     // 2️⃣ NEW SALES (DATA + ITEMS)
-//     // ---------------------------------------------------
-//     const [newSales] = await db.query(
-//       `SELECT ns.*, p.Party_Name, p.GSTIN
-//        FROM add_new_sale ns
-//        LEFT JOIN add_party p ON ns.Party_Id = p.Party_Id
-//        WHERE DATE(ns.created_at) BETWEEN ? AND ?
-//        ORDER BY ns.created_at ASC`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     const newSaleIds = newSales.map((ns) => ns.Sale_Id);
-
-//     let newSaleItems = [];
-//     if (newSaleIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT nsi.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
-//          FROM add_new_sale_items nsi
-//          LEFT JOIN add_item_sale i ON nsi.Item_Id = i.Item_Id
-//          WHERE nsi.Sale_Id IN (?)`,
-//         [newSaleIds]
-//       );
-//       newSaleItems = items;
-//     }
-
-//     const newSalesWithItems = newSales.map((ns) => ({
-//       sale_id: ns.Sale_Id,
-//       Party_Name: ns.Party_Name,
-//       GSTIN: ns.GSTIN,
-//       Invoice_Number: ns.Invoice_Number,
-//       Invoice_Date: formatIndianDate(ns.Invoice_Date),
-//       State_Of_Supply: ns.State_Of_Supply,
-//       Payment_Type: ns.Payment_Type,
-//       Referrence_Number: ns.Referrence_Number,
-//       Total_Received: ns.Total_Received,
-//       Balance_Due: ns.Balance_Due,
-//       created_at: formatIndianDate(ns.created_at),
-//       Total_Amount: ns.Total_Amount,
-//       items: newSaleItems.filter((i) => i.Sale_Id === ns.Sale_Id),
-//     }));
-
-//     // 👉 SQL TOTALS
-//     const [newSalesTotals] = await db.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount), 0) AS totalNewSalesAmount,
-//           COALESCE(SUM(Total_Received), 0) AS totalNewSalesReceivedAmount,
-//           COALESCE(SUM(Balance_Due), 0) AS totalNewSalesBalanceDue
-//        FROM add_new_sale
-//       WHERE DATE(created_at) BETWEEN ? AND ?`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     // ---------------------------------------------------
-//     // 3️⃣ PURCHASES (DATA + ITEMS)
-//     // ---------------------------------------------------
-//     const [purchases] = await db.query(
-//       `SELECT pu.*, p.Party_Name, p.GSTIN
-//        FROM add_purchase pu
-//        LEFT JOIN add_party p ON pu.Party_Id = p.Party_Id
-//        WHERE DATE(pu.created_at) BETWEEN ? AND ?
-//        ORDER BY pu.created_at ASC`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     const purchaseIds = purchases.map((pu) => pu.Purchase_Id);
-
-//     let purchaseItems = [];
-//     if (purchaseIds.length > 0) {
-//       const [items] = await db.query(
-//         `SELECT pu.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
-//          FROM add_purchase_items pu
-//          LEFT JOIN add_item i ON pu.Item_Id = i.Item_Id
-//          WHERE pu.Purchase_Id IN (?)`,
-//         [purchaseIds]
-//       );
-//       purchaseItems = items;
-//     }
-
-//     const purchasesWithItems = purchases.map((pu) => ({
-//       purchase_id: pu.Purchase_Id,
-//       Party_Name: pu.Party_Name,
-//       GSTIN: pu.GSTIN,
-//       Bill_Number: pu.Bill_Number,
-//       Bill_Date: formatIndianDate(pu.Bill_Date),
-//       State_Of_Supply: pu.State_Of_Supply,
-//       Payment_Type: pu.Payment_Type,
-//       Referrence_Number: pu.Referrence_Number,
-//       Total_Paid: pu.Total_Paid,
-//       Balance_Due: pu.Balance_Due,
-//       created_at: formatIndianDate(pu.created_at),
-//       Total_Amount: pu.Total_Amount,
-//       items: purchaseItems.filter((i) => i.Purchase_Id === pu.Purchase_Id),
-//     }));
-
-//     // 👉 SQL TOTALS
-//     const [purchaseTotals] = await db.query(
-//       `SELECT 
-//           COALESCE(SUM(Total_Amount),0) AS totalPurchasesAmount,
-//           COALESCE(SUM(Total_Paid),0) AS totalPurchasePaidAmount,
-//           COALESCE(SUM(Balance_Due),0) AS totalPurchasesBalanceDue
-//        FROM add_purchase
-//       WHERE DATE(created_at) BETWEEN ? AND ?`,
-//       [fullFromDate, fullToDate]
-//     );
-
-//     // ---------------------------------------------------
-//     // FINAL RESPONSE
-//     // ---------------------------------------------------
-
-// console.log(salesTotals);
-//     return res.status(200).json({
-//       success: true,
-//       fromDate: fromDate,
-//       toDate: toDate,
-//       data: {
-//         sales: {
-//           items: salesWithItems,
-//           totalSalesAmount: salesTotals[0].totalSalesAmount,
-//          totalSalesReceivedAmount: salesTotals[0].totalSalesReceivedAmount,
-//          totalSalesBalanceDue: salesTotals[0].totalSalesBalanceDue
-//         },
-//         newSales: {
-//           items: newSalesWithItems,
-//         totalNewSalesAmount: newSalesTotals[0].totalNewSalesAmount,
-//         totalNewSalesReceivedAmount: newSalesTotals[0].totalNewSalesReceivedAmount,
-//         totalNewSalesBalanceDue: newSalesTotals[0].totalNewSalesBalanceDue
-//         },
-//         purchases: {
-//           items: purchasesWithItems,
-//           totalPurchasesAmount: purchaseTotals[0].totalPurchasesAmount,
-//           totalPurchasePaidAmount: purchaseTotals[0].totalPurchasePaidAmount,
-//           totalPurchasesBalanceDue: purchaseTotals[0].totalPurchasesBalanceDue
-//         }
-//       }
-//     });
-
-//   } catch (err) {
-//     if (connection) connection.release();
-//     console.error("❌ Error:", err);
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
 
 //DAILY SALES AND PURCHASES
 
@@ -3639,6 +3050,379 @@ const getBalanceSheet = async (req, res, next) => {
     next(error);
   }
 };
+
+const getDayWiseTransactionsCount = async (req, res, next) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const { startDate, endDate } = req.query;
+
+    // Validate date range when provided
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (
+      (startDate && !dateRegex.test(startDate)) ||
+      (endDate && !dateRegex.test(endDate))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Dates must be in YYYY-MM-DD format",
+      });
+    }
+
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide both startDate and endDate",
+      });
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate cannot be after endDate",
+      });
+    }
+
+    /*
+      IMPORTANT:
+      The first two table/date-column combinations are from your code.
+      The remaining four are example names.
+      Replace them with your actual database table and column names.
+    */
+
+    const transactions = [
+      {
+        key: "total_sales",
+        table: "add_sale",
+        dateColumn: "Invoice_Date",
+      },
+      {
+        key: "total_purchases",
+        table: "add_purchase",
+        dateColumn: "Bill_Date",
+      },
+      {
+        key: "total_sales_returns",
+        table: "sale_return", // Replace if different
+        dateColumn: "Invoice_Date", // Replace if different
+      },
+      {
+        key: "total_purchase_returns",
+        table: "purchase_return", // Replace if different
+        dateColumn: "Bill_Date", // Replace if different
+      },
+      {
+        key: "total_payments_in",
+        table: "payment_in", // Replace if different
+        dateColumn: "Payment_Date", // Replace if different
+      },
+      {
+        key: "total_payments_out",
+        table: "payment_out", // Replace if different
+        dateColumn: "Payment_Date", // Replace if different
+      },
+    ];
+
+    // Optional date filtering
+    const dateCondition = startDate
+      ? `WHERE ${"`DATE_COLUMN`"} >= ? AND ${"`DATE_COLUMN`"} < DATE_ADD(?, INTERVAL 1 DAY)`
+      : "";
+
+    const params = startDate ? [startDate, endDate] : [];
+
+    // Run one daily aggregation query per transaction type.
+    // Promise.all executes the queries concurrently.
+    const queryResults = await Promise.all(
+      transactions.map(async ({ key, table, dateColumn }) => {
+        const sql = `
+          SELECT
+            DATE_FORMAT(\`${dateColumn}\`, '%Y-%m-%d') AS transaction_date,
+            COUNT(*) AS total
+          FROM \`${table}\`
+          ${
+            startDate
+              ? `WHERE \`${dateColumn}\` >= ?
+                 AND \`${dateColumn}\` < DATE_ADD(?, INTERVAL 1 DAY)`
+              : ""
+          }
+          GROUP BY DATE(\`${dateColumn}\`)
+          ORDER BY DATE(\`${dateColumn}\`) ASC
+        `;
+
+        const [rows] = await connection.query(sql, params);
+
+        return {
+          key,
+          rows,
+        };
+      })
+    );
+
+    // Merge every transaction type into one object per date.
+    const dailyMap = new Map();
+
+    for (const { key, rows } of queryResults) {
+      for (const row of rows) {
+        const date = row.transaction_date;
+
+        if (!dailyMap.has(date)) {
+          dailyMap.set(date, {
+            date,
+            total_sales: 0,
+            total_purchases: 0,
+            total_sales_returns: 0,
+            total_purchase_returns: 0,
+            total_payments_in: 0,
+            total_payments_out: 0,
+          });
+        }
+
+        dailyMap.get(date)[key] = Number(row.total);
+      }
+    }
+
+    // Sort dates chronologically.
+    const result = Array.from(dailyMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (err) {
+    console.error("Error getting day-wise transactions:", err);
+    next(err);
+  } finally {
+    if (connection) connection.release();
+  }
+};
+
+
+const getDayWiseTransactionsDetails = async (req, res, next) => {
+  let connection;
+
+  try {
+    const { date } = req.query;
+
+    // Validate date format
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide a valid date in YYYY-MM-DD format.",
+      });
+    }
+
+    // Validate actual calendar date
+    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+    if (
+      Number.isNaN(parsedDate.getTime()) ||
+      parsedDate.toISOString().slice(0, 10) !== date
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid calendar date.",
+      });
+    }
+
+    connection = await db.getConnection();
+
+    // Fetch all seven transaction types in parallel.
+    const [
+      [sales],
+      [purchases],
+      [saleReturns],
+      [purchaseReturns],
+      [expenses],
+      [paymentIns],
+      [paymentOuts],
+    ] = await Promise.all([
+      // 1. Sales
+      connection.query(
+        `SELECT s.*, a.Party_Name
+         FROM add_sale s
+         LEFT JOIN add_party a
+           ON a.Party_Id = s.Party_Id
+         WHERE s.Invoice_Date >= ?
+           AND s.Invoice_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY s.Invoice_Date DESC, s.id DESC`,
+        [date, date]
+      ),
+
+      // 2. Purchases
+      connection.query(
+        `SELECT p.*, a.Party_Name
+         FROM add_purchase p
+         LEFT JOIN add_party a
+           ON a.Party_Id = p.Party_Id
+         WHERE p.Bill_Date >= ?
+           AND p.Bill_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY p.Bill_Date DESC, p.id DESC`,
+        [date, date]
+      ),
+
+      // 3. Sales Returns
+      connection.query(
+        `SELECT sr.*, a.Party_Name
+         FROM sale_return sr
+         LEFT JOIN add_party a
+           ON a.Party_Id = sr.Party_Id
+         WHERE sr.Return_Date >= ?
+           AND sr.Return_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY sr.Return_Date DESC, sr.id DESC`,
+        [date, date]
+      ),
+
+      // 4. Purchase Returns
+      connection.query(
+        `SELECT pr.*, a.Party_Name
+         FROM purchase_return pr
+         LEFT JOIN add_party a
+           ON a.Party_Id = pr.Party_Id
+         WHERE pr.Return_Date >= ?
+           AND pr.Return_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY pr.Return_Date DESC, pr.id DESC`,
+        [date, date]
+      ),
+
+      // 5. Expenses
+      connection.query(
+        `SELECT e.*, a.Party_Name
+         FROM expenses e
+         LEFT JOIN add_party a
+           ON a.Party_Id = e.Party_Id
+         WHERE e.Expense_Date >= ?
+           AND e.Expense_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY e.Expense_Date DESC, e.id DESC`,
+        [date, date]
+      ),
+
+      // 6. Payment In
+      connection.query(
+        `SELECT pi.*, a.Party_Name
+         FROM payment_in pi
+         LEFT JOIN add_party a
+           ON a.Party_Id = pi.Party_Id
+         WHERE pi.Payment_Date >= ?
+           AND pi.Payment_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY pi.Payment_Date DESC, pi.id DESC`,
+        [date, date]
+      ),
+
+      // 7. Payment Out
+      connection.query(
+        `SELECT po.*, a.Party_Name
+         FROM payment_out po
+         LEFT JOIN add_party a
+           ON a.Party_Id = po.Party_Id
+         WHERE po.Payment_Date >= ?
+           AND po.Payment_Date < DATE_ADD(?, INTERVAL 1 DAY)
+         ORDER BY po.Payment_Date DESC, po.id DESC`,
+        [date, date]
+      ),
+    ]);
+
+    // Attach payment splits to Payment In and Payment Out.
+    const attachPaymentSplits = async (rows, sourceType) => {
+      if (!rows.length) {
+        return;
+      }
+
+      const paymentIds = rows.map((row) => row.id);
+      const placeholders = paymentIds.map(() => "?").join(",");
+
+      const [splits] = await connection.query(
+        `SELECT
+           ps.Source_Id,
+           ps.Payment_Type,
+           ps.Bank_Account_Id,
+           ps.Reference_Number,
+           ps.Amount,
+           ba.Account_Display_Name
+         FROM payment_splits ps
+         LEFT JOIN bank_accounts ba
+           ON ba.id = ps.Bank_Account_Id
+         WHERE ps.Source_Type = ?
+           AND ps.Source_Id IN (${placeholders})`,
+        [sourceType, ...paymentIds]
+      );
+
+      const splitMap = {};
+
+      for (const split of splits) {
+        if (!splitMap[split.Source_Id]) {
+          splitMap[split.Source_Id] = [];
+        }
+
+        splitMap[split.Source_Id].push({
+          Payment_Type: split.Payment_Type,
+          Bank_Account_Id: split.Bank_Account_Id,
+          Reference_Number: split.Reference_Number,
+          Amount: Number(split.Amount),
+          Bank_Display_Name: split.Account_Display_Name,
+        });
+      }
+
+      for (const row of rows) {
+        row.splits = splitMap[row.id] || [];
+
+        row.Payment_Type_Display =
+          row.splits
+            .map((split) =>
+              split.Payment_Type === "Bank"
+                ? split.Bank_Display_Name
+                : split.Payment_Type
+            )
+            .filter(Boolean)
+            .join(", ") || "—";
+      }
+    };
+
+    await Promise.all([
+      attachPaymentSplits(paymentIns, "Payment_In"),
+      attachPaymentSplits(paymentOuts, "Payment_Out"),
+    ]);
+
+    // Return all transaction categories.
+    return res.status(200).json({
+      success: true,
+      date,
+
+      transactions: {
+        sales,
+        purchases,
+        saleReturns,
+        purchaseReturns,
+        expenses,
+        paymentIns,
+        paymentOuts,
+      },
+
+      counts: {
+        sales: sales.length,
+        purchases: purchases.length,
+        saleReturns: saleReturns.length,
+        purchaseReturns: purchaseReturns.length,
+        expenses: expenses.length,
+        paymentIns: paymentIns.length,
+        paymentOuts: paymentOuts.length,
+      },
+    });
+  } catch (err) {
+    console.error("Error fetching transactions by date:", err);
+    next(err);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
+
+
 export {getSalesNewSalesPurchasesEachDay,
   getSalesNewSalesPurchasesInDateRange,
   getSalesAndPurchasesDailyYearMonthWise,
@@ -3647,5 +3431,5 @@ export {getSalesNewSalesPurchasesEachDay,
   getSalesAndPurchasesYearWise,
   getPartyWiseSalesAndPurchasesOverall,
   printDailyReport,
-  getBalanceSheet};
+  getBalanceSheet,getDayWiseTransactionsCount,getDayWiseTransactionsDetails};
 

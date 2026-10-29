@@ -52,30 +52,7 @@ getSalesAndPurchasesWeeklyYearMonthWise: builder.query({
   getPartyWiseSalesAndPurchasesOverall: builder.query({
     query: () => `report/party-wise-sales-purchases-overall`,
   }),
-    //     getSalesNewSalesPurchasesInDateRange  : builder.query({
-    //     query: ({ fromDate, toDate }) =>
-            
-    //     `report/get-sales-new-sales-purchases-in-date-range?fromDate=${fromDate}&toDate=${toDate}`,
-    //   providesTags: ["Sales", "Purchases", "NewSales"],
-    // }),
-//     getSalesNewSalesPurchasesInDateRange: builder.query({
-//   query: ({ page, search = "", fromDate = "", toDate = "" } = {}) => {
-//     const params = new URLSearchParams();
 
-//     // ✅ Append only when defined
-//     if (page) params.append("page", page);
-//     if (search) params.append("search", search);
-//     if (fromDate) params.append("fromDate", fromDate);
-//     if (toDate) params.append("toDate", toDate);
-
-//     const queryString = params.toString();
-//     return `report/get-sales-new-sales-purchases-in-date-range?${queryString}`
-//     // return queryString
-//     //   ? `report/get-sales-new-sales-purchases-in-date-range?${queryString}`
-//     //   : `item/get-all-items`;
-//   },
-//    providesTags: ["Sales", "Purchases", "NewSales"],
-// }),
   printDailyReport: builder.mutation({
   query: (payload) => ({
     url: "report/print-daily-report",
@@ -91,6 +68,13 @@ getBalanceSheet: builder.query({
   query: ({fromDate, toDate}) => `report/balance-sheet?fromDate=${fromDate}&toDate=${toDate}`,
   
 }),
+getDayWiseTransactions: builder.query({
+  query: ({ startDate, endDate }) =>
+    `report/day-wise-transactions-count?startDate=${startDate}&endDate=${endDate}`,
+}),
+getDayWiseTransactionsDetails: builder.query({
+  query: (date) => `report/day-wise-transactions-details?date=${date}`
+}),
   }),
 
   })
@@ -104,4 +88,4 @@ useGetSalesAndPurchasesYearWiseQuery,
 // useGetPartyWiseSalesAndPurchasesDailyYearMonthWiseQuery,
 useGetPartyWiseSalesAndPurchasesOverallQuery,
 usePrintDailyReportMutation,
-useGetBalanceSheetQuery} = reportApi
+useGetBalanceSheetQuery, useGetDayWiseTransactionsQuery,useGetDayWiseTransactionsDetailsQuery} = reportApi

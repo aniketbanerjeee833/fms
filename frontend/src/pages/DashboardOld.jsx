@@ -44,70 +44,7 @@ export default function Dashboard() {
     "#84cc16", // Lime
   ];
 
-  // 🌈 Generate a new color if we run out of base colors
-  // const generateDynamicColor = (index) => {
-  //   const hue = (index * 137.5) % 360; // golden angle → well-distributed hues
-  //   return `hsl(${hue}, 70%, 55%)`;
-  // };
 
-  //  const generateColor = (partyId, index = 0) => {
-  //   if (partyColorMap.has(partyId)) {
-  //     return partyColorMap.get(partyId);
-  //   }
-
-  //   // Pick from base palette first, then generate dynamically
-  //   const color =
-  //     BASE_COLORS[index % BASE_COLORS.length] ||
-  //     generateDynamicColor(index);
-
-  //   partyColorMap.set(partyId, color);
-  //   return color;
-  // };
-  // const generateCategoryColor = (str) => {
-  //   let hash = 0;
-  //   for (let i = 0; i < str.length; i++) {
-  //     hash = str.charCodeAt(i) + ((hash << 5) - hash);
-  //   }
-  //   const hue = Math.abs(hash % 360); // ensures it's within 0–360
-  //   return `hsl(${hue}, 70%, 55%)`; // vivid, medium-light colors
-  // };
-
-  // const formatDateDDMMYYYY = (dateStr) => {
-  //   if (!dateStr) return "";
-  //   const [y, m, d] = dateStr.split("-");
-  //   return `${d}-${m}-${y}`;
-  // };
-  //  const today = new Date().toLocaleDateString("en-CA");
-  //const currentYear=new Date().getFullYear();
-  //const currentMonth=new Date().toLocaleString('default', { month: 'long' });
-
-  // const[selectedYear, setSelectedYear] = useState("2025");
-  // const[selectedMonth, setSelectedMonth] = useState("October");
-  // const[selectedYear, setSelectedYear] = useState(currentYear);
-  // const[selectedMonth, setSelectedMonth] = useState(currentMonth);
-  //const[selectedYearForCategory, setSelectedYearForCategory] = useState(currentYear);
-  //const[selectedYearForPartyPurchases, setSelectedYearForPartyPurchases] = useState(currentYear);
-  //const[selectedMonthForPartyPurchases, setSelectedMonthForPartyPurchases] = useState(currentMonth);
-
-  // const months=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-  // const year="2025"
-
-  // const {data: salesPurchasesProfitData} =
-  //    useGetAllSalesAndPurchasesYearWiseQuery({year:selectedYear})
-  //Calculate metrics
-
-  // const {data: categoryWiseItemCount}
-  // =useGetCategoriesWiseItemCountQuery({month:selectedMonth,year:selectedYearForCategory});
-
-
-
-
-  // const profitMargin=totalSalesPurchasesReceivablesPayablesProfit?.profit
-  //    const{data: partyWiseSalesAndPurchases} =
-  //    useGetPartyWiseSalesAndPurchasesQuery({month:selectedMonthForPartyPurchases,year:selectedYearForPartyPurchases});
-
-
-  //const navigate = useNavigate();
   const { data: salesData } = useGetTotalSalesEachDayQuery();
   const [reportType, setReportType] = useState('');
   // const { data: newSalesData } = useGetTotalNewSalesEachDayQuery();

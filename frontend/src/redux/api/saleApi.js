@@ -198,7 +198,7 @@ export const saleApi = createApi({
     // ------------------------------------
     getTotalSalesEachDay: builder.query({
       query: () => `sale/total-sales-by-day`,
-      providesTags: [{ type: "Sale", id: "DASHBOARD" }],
+      providesTags: [{ type: "Sale", id: "LIST" }],
     }),
   //      deleteSale: builder.mutation({
   //     query: (Sale_Id) => ({

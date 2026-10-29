@@ -89,6 +89,8 @@ const Transactions= lazy(() => import('./pages/Settings/Transactions'));
 //REPORTS
 const SalesPurchasesReport= lazy(() => import('./pages/Reports/SalesPurchasesReport'));
 const BalanceSheet = lazy(() => import('./pages/Reports/BalanceSheet'));
+const AllTransactions = lazy(() => import('./pages/Reports/AllTransactions'));
+const AllTransactionsDetails= lazy(() => import('./pages/Reports/AllTransactionsDetails'));
 
 // ==========================================
 // 🔒 Auth Route Guards
@@ -132,7 +134,7 @@ function RouterWrapper() {
   const location = useLocation();
   console.log(location);
   const hideHeader = location.pathname === "/login" || 
-  location.pathname.startsWith("/day-wise-report") ||
+  location.pathname.startsWith("/reports/all-transactions-details-day-wise") ||
   location.pathname.startsWith("/date-range-report");
 
   return (
@@ -517,6 +519,22 @@ function RouterWrapper() {
                 <Layout>
                   <BalanceSheet/>
                 </Layout>
+              }
+            />
+              <Route
+              path="/reports/all-transactions"
+              element={
+                <Layout>
+                  <AllTransactions/>
+                </Layout>
+              }
+            />
+            <Route
+              path="/reports/all-transactions-details-day-wise/:date"
+              element={
+                
+                  <AllTransactionsDetails/>
+                
               }
             />
               <Route
