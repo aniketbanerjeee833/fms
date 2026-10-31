@@ -32,6 +32,7 @@ import {
 import EditExpenseCategoryModal from "../../components/Modal/EditExpenseCategoryModal";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import { useDispatch } from "react-redux";
+import { reportApi } from "../../redux/api/reportApi";
 
 
 
@@ -238,6 +239,10 @@ const handleRightLoadMore = useCallback(() => {
         res?.message || "Expense deleted successfully"
       );
       // Remove deleted expense immediately from RTK Query cache
+      dispatch(reportApi.util.invalidateTags([
+                    "DayWiseTransactions",
+                       ]));
+      
 dispatch(
   expenseApi.util.updateQueryData(
     "getExpensesByCategory",

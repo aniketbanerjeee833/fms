@@ -21,6 +21,7 @@ import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintT
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import useListRestore from "../../utils/useListRestore";
+import { reportApi } from "../../redux/api/reportApi";
 
 
 
@@ -147,6 +148,9 @@ export default function PurchaseReturn() {
           "ItemLedger",
         ])
       );
+       dispatch(reportApi.util.invalidateTags([
+              "DayWiseTransactions",
+                 ]));
     } catch (err) {
       console.log(err);
       toast.error(err?.data?.message || "Failed to delete debit note");

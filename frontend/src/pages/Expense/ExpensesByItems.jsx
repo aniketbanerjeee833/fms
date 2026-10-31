@@ -28,6 +28,7 @@ import {
 } from "../../redux/api/expenseApi";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import { useDispatch } from "react-redux";
+import { reportApi } from "../../redux/api/reportApi";
 
 const fmt = (n) =>
   Number(n || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -252,6 +253,9 @@ export default function ExpensesByItems() {
         toast.success(
           res?.message || "Expense item deleted successfully"
         );
+        dispatch(reportApi.util.invalidateTags([
+                    "DayWiseTransactions",
+                       ]));
         dispatch(
   expenseApi.util.updateQueryData(
     "getExpenseItemUsage",

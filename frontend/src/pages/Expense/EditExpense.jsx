@@ -30,6 +30,8 @@ import {
 import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxesAndGSTSettingsApi";
 import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
+import { useDispatch } from "react-redux";
 
 
 
@@ -78,6 +80,7 @@ const emptyRow = () => ({
 export default function EditExpense() {
     const navigate = useNavigate();
     const location = useLocation();
+    const dispatch=useDispatch()
     const { id } = useParams();
 
     // NEW 
@@ -945,7 +948,9 @@ const handleDeleteRow = (i) => {
                 toast.error(response.message || "Failed to create expense");
                 return;
             }
-
+                       dispatch(
+              reportApi.util.invalidateTags(["DayWiseTransactions"])
+            );
             toast.success("Expense updated successfully");
 
             // NEW

@@ -3093,38 +3093,43 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
       Replace them with your actual database table and column names.
     */
 
-    const transactions = [
-      {
-        key: "total_sales",
-        table: "add_sale",
-        dateColumn: "Invoice_Date",
-      },
-      {
-        key: "total_purchases",
-        table: "add_purchase",
-        dateColumn: "Bill_Date",
-      },
-      {
-        key: "total_sales_returns",
-        table: "sale_return", // Replace if different
-        dateColumn: "Invoice_Date", // Replace if different
-      },
-      {
-        key: "total_purchase_returns",
-        table: "purchase_return", // Replace if different
-        dateColumn: "Bill_Date", // Replace if different
-      },
-      {
-        key: "total_payments_in",
-        table: "payment_in", // Replace if different
-        dateColumn: "Payment_Date", // Replace if different
-      },
-      {
-        key: "total_payments_out",
-        table: "payment_out", // Replace if different
-        dateColumn: "Payment_Date", // Replace if different
-      },
-    ];
+   const transactions = [
+  {
+    key: "total_sales",
+    table: "add_sale",
+    dateColumn: "Invoice_Date",
+  },
+  {
+    key: "total_purchases",
+    table: "add_purchase",
+    dateColumn: "Bill_Date",
+  },
+  {
+    key: "total_sales_returns",
+    table: "sale_return",
+    dateColumn: "Invoice_Date",
+  },
+  {
+    key: "total_purchase_returns",
+    table: "purchase_return",
+    dateColumn: "Bill_Date",
+  },
+  {
+    key: "total_expenses",
+    table: "expenses",
+    dateColumn: "Expense_Date",
+  },
+  {
+    key: "total_payments_in",
+    table: "payment_in",
+    dateColumn: "Payment_Date",
+  },
+  {
+    key: "total_payments_out",
+    table: "payment_out",
+    dateColumn: "Payment_Date",
+  },
+];
 
     // Optional date filtering
     const dateCondition = startDate
@@ -3177,6 +3182,7 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
             total_purchase_returns: 0,
             total_payments_in: 0,
             total_payments_out: 0,
+            total_expenses: 0,
           });
         }
 
@@ -3202,13 +3208,21 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
 };
 
 
+
 const getDayWiseTransactionsDetails = async (req, res, next) => {
   let connection;
 
   try {
-    const { date } = req.query;
+    const { date, cursor = null } = req.query;
+    const search = String(req.query.search || "").trim();
 
-    // Validate date format
+    // Default page size: 50. Maximum: 100.
+    const parsedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isInteger(parsedLimit)
+      ? Math.min(Math.max(parsedLimit, 1), 100)
+      : 50;
+
+    // Validate date format.
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       return res.status(400).json({
         success: false,
@@ -3216,7 +3230,6 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       });
     }
 
-    // Validate actual calendar date
     const parsedDate = new Date(`${date}T00:00:00.000Z`);
 
     if (
@@ -3229,104 +3242,353 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       });
     }
 
+    // Decode and validate the pagination cursor.
+    let cursorData = null;
+
+    if (cursor) {
+      try {
+        cursorData = JSON.parse(
+          Buffer.from(cursor, "base64url").toString("utf8")
+        );
+
+        if (
+          typeof cursorData.date !== "string" ||
+          !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(
+            cursorData.date
+          ) ||
+          !Number.isInteger(cursorData.rank) ||
+          cursorData.rank < 1 ||
+          cursorData.rank > 7 ||
+          cursorData.id === undefined ||
+          cursorData.id === null
+        ) {
+          throw new Error("Invalid cursor fields");
+        }
+      } catch {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid pagination cursor.",
+        });
+      }
+    }
+
     connection = await db.getConnection();
 
-    // Fetch all seven transaction types in parallel.
-    const [
-      [sales],
-      [purchases],
-      [saleReturns],
-      [purchaseReturns],
-      [expenses],
-      [paymentIns],
-      [paymentOuts],
-    ] = await Promise.all([
-      // 1. Sales
-      connection.query(
-        `SELECT s.*, a.Party_Name
-         FROM add_sale s
-         LEFT JOIN add_party a
-           ON a.Party_Id = s.Party_Id
-         WHERE s.Invoice_Date >= ?
-           AND s.Invoice_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY s.Invoice_Date DESC, s.id DESC`,
-        [date, date]
+    /*
+     * IMPORTANT:
+     * Verify numberColumns and amountColumns against your database.
+     *
+     * Global ordering:
+     * 1. Transaction date DESC
+     * 2. Category rank ASC
+     * 3. Transaction ID DESC
+     */
+    const transactionTypes = [
+      {
+        key: "sales",
+        table: "add_sale",
+        alias: "s",
+        dateColumn: "Invoice_Date",
+        rank: 1,
+        label: "sales",
+        numberColumns: ["Invoice_Number"],
+        amountColumns: ["Total_Amount", "Balance_Due"],
+      },
+      {
+        key: "purchases",
+        table: "add_purchase",
+        alias: "p",
+        dateColumn: "Bill_Date",
+        rank: 2,
+        label: "purchases",
+        numberColumns: ["Bill_Number"],
+        amountColumns: ["Total_Amount", "Balance_Due"],
+      },
+      {
+        key: "saleReturns",
+        table: "sale_return",
+        alias: "sr",
+        dateColumn: "Invoice_Date",
+        rank: 3,
+        label: "sale returns",
+        numberColumns: ["Return_Number"],
+        amountColumns: ["Total_Amount"],
+      },
+      {
+        key: "purchaseReturns",
+        table: "purchase_return",
+        alias: "pr",
+        dateColumn: "Bill_Date",
+        rank: 4,
+        label: "purchase returns",
+        numberColumns: ["Return_Number"],
+        amountColumns: ["Total_Amount"],
+      },
+      {
+        key: "expenses",
+        table: "expenses",
+        alias: "e",
+        dateColumn: "Expense_Date",
+        rank: 5,
+        label: "expenses",
+        numberColumns: ["Expense_Number"],
+        amountColumns: ["Total_Amount"],
+      },
+      {
+        key: "paymentIns",
+        table: "payment_in",
+        alias: "pi",
+        dateColumn: "Payment_Date",
+        rank: 6,
+        label: "payment in",
+        numberColumns: ["Receipt_No"],
+        //amountColumns: ["Amount", "Total_Amount"],
+      },
+      {
+        key: "paymentOuts",
+        table: "payment_out",
+        alias: "po",
+        dateColumn: "Payment_Date",
+        rank: 7,
+        label: "payment out",
+        numberColumns: ["Receipt_No"],
+        //amountColumns: ["Amount", "Total_Amount"],
+      },
+    ];
+
+    /*
+     * Build the search condition for a transaction category.
+     *
+     * Searches:
+     * - Party name
+     * - Database transaction ID
+     * - Invoice/bill/return/receipt/payment numbers
+     * - Expense category, if that column exists
+     * - Transaction amounts
+     * - Transaction category label
+     */
+    const buildSearchCondition = (type) => {
+      if (!search) {
+        return {
+          sql: "",
+          params: [],
+        };
+      }
+
+      const {
+        alias,
+        label,
+        numberColumns = [],
+        amountColumns = [],
+      } = type;
+
+      const searchPattern = `%${search}%`;
+
+      const conditions = [
+        `CAST(${alias}.id AS CHAR) LIKE ?`,
+        `a.Party_Name LIKE ?`,
+      ];
+
+      const params = [searchPattern, searchPattern];
+
+      // Search transaction number columns.
+      for (const column of numberColumns) {
+        conditions.push(
+          `CAST(${alias}.${column} AS CHAR) LIKE ?`
+        );
+
+        params.push(searchPattern);
+      }
+
+      // Search amounts using partial text matching.
+      for (const column of amountColumns) {
+        conditions.push(
+          `CAST(${alias}.${column} AS CHAR) LIKE ?`
+        );
+
+        params.push(searchPattern);
+      }
+
+      // Searching "sales", "purchases", etc. matches the category.
+      if (label.includes(search.toLowerCase())) {
+        conditions.push("1 = 1");
+      }
+
+      return {
+        sql: `AND (${conditions.join(" OR ")})`,
+        params,
+      };
+    };
+
+    // Fetch transaction candidates for one category.
+    const fetchTransactionPage = async (type) => {
+      const {
+        key,
+        table,
+        alias,
+        dateColumn,
+        rank,
+      } = type;
+
+      // Parameters follow the placeholder order in the SQL query.
+      const params = [date, date];
+
+      let cursorCondition = "";
+
+      if (cursorData) {
+        cursorCondition = `
+          AND (
+            ${alias}.${dateColumn} < ?
+            OR (
+              ${alias}.${dateColumn} = ?
+              AND (
+                ${rank} > ?
+                OR (
+                  ${rank} = ?
+                  AND ${alias}.id < ?
+                )
+              )
+            )
+          )
+        `;
+
+        params.push(
+          cursorData.date,
+          cursorData.date,
+          cursorData.rank,
+          cursorData.rank,
+          cursorData.id
+        );
+      }
+
+      const searchCondition = buildSearchCondition(type);
+
+      params.push(...searchCondition.params);
+
+      // Fetch one extra candidate to determine whether another page exists.
+      params.push(limit + 1);
+
+      const sql = `
+        SELECT
+          ${alias}.*,
+          a.Party_Name,
+          DATE_FORMAT(
+            ${alias}.${dateColumn},
+            '%Y-%m-%d %H:%i:%s.%f'
+          ) AS _cursorDate,
+          ${rank} AS _typeRank,
+          '${key}' AS _transactionType
+        FROM ${table} ${alias}
+        LEFT JOIN add_party a
+          ON a.Party_Id = ${alias}.Party_Id
+        WHERE ${alias}.${dateColumn} >= ?
+          AND ${alias}.${dateColumn} < DATE_ADD(?, INTERVAL 1 DAY)
+          ${cursorCondition}
+          ${searchCondition.sql}
+        ORDER BY
+          ${alias}.${dateColumn} DESC,
+          ${alias}.id DESC
+        LIMIT ?
+      `;
+
+      const [rows] = await connection.query(sql, params);
+
+      return rows;
+    };
+
+    // Count matching transactions per category.
+    // Counts use the search filter but do not use the pagination cursor.
+    const fetchTransactionCount = async (type) => {
+      const {
+        table,
+        alias,
+        dateColumn,
+      } = type;
+
+      const searchCondition = buildSearchCondition(type);
+
+      const params = [
+        date,
+        date,
+        ...searchCondition.params,
+      ];
+
+      const sql = `
+        SELECT COUNT(*) AS total
+        FROM ${table} ${alias}
+        LEFT JOIN add_party a
+          ON a.Party_Id = ${alias}.Party_Id
+        WHERE ${alias}.${dateColumn} >= ?
+          AND ${alias}.${dateColumn} < DATE_ADD(?, INTERVAL 1 DAY)
+          ${searchCondition.sql}
+      `;
+
+      const [rows] = await connection.query(sql, params);
+
+      return Number(rows[0].total);
+    };
+
+    // Fetch transaction candidates and matching counts concurrently.
+    const [categoryResults, countResults] = await Promise.all([
+      Promise.all(
+        transactionTypes.map((type) =>
+          fetchTransactionPage(type)
+        )
       ),
 
-      // 2. Purchases
-      connection.query(
-        `SELECT p.*, a.Party_Name
-         FROM add_purchase p
-         LEFT JOIN add_party a
-           ON a.Party_Id = p.Party_Id
-         WHERE p.Bill_Date >= ?
-           AND p.Bill_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY p.Bill_Date DESC, p.id DESC`,
-        [date, date]
-      ),
-
-      // 3. Sales Returns
-      connection.query(
-        `SELECT sr.*, a.Party_Name
-         FROM sale_return sr
-         LEFT JOIN add_party a
-           ON a.Party_Id = sr.Party_Id
-         WHERE sr.Return_Date >= ?
-           AND sr.Return_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY sr.Return_Date DESC, sr.id DESC`,
-        [date, date]
-      ),
-
-      // 4. Purchase Returns
-      connection.query(
-        `SELECT pr.*, a.Party_Name
-         FROM purchase_return pr
-         LEFT JOIN add_party a
-           ON a.Party_Id = pr.Party_Id
-         WHERE pr.Return_Date >= ?
-           AND pr.Return_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY pr.Return_Date DESC, pr.id DESC`,
-        [date, date]
-      ),
-
-      // 5. Expenses
-      connection.query(
-        `SELECT e.*, a.Party_Name
-         FROM expenses e
-         LEFT JOIN add_party a
-           ON a.Party_Id = e.Party_Id
-         WHERE e.Expense_Date >= ?
-           AND e.Expense_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY e.Expense_Date DESC, e.id DESC`,
-        [date, date]
-      ),
-
-      // 6. Payment In
-      connection.query(
-        `SELECT pi.*, a.Party_Name
-         FROM payment_in pi
-         LEFT JOIN add_party a
-           ON a.Party_Id = pi.Party_Id
-         WHERE pi.Payment_Date >= ?
-           AND pi.Payment_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY pi.Payment_Date DESC, pi.id DESC`,
-        [date, date]
-      ),
-
-      // 7. Payment Out
-      connection.query(
-        `SELECT po.*, a.Party_Name
-         FROM payment_out po
-         LEFT JOIN add_party a
-           ON a.Party_Id = po.Party_Id
-         WHERE po.Payment_Date >= ?
-           AND po.Payment_Date < DATE_ADD(?, INTERVAL 1 DAY)
-         ORDER BY po.Payment_Date DESC, po.id DESC`,
-        [date, date]
+      Promise.all(
+        transactionTypes.map((type) =>
+          fetchTransactionCount(type)
+        )
       ),
     ]);
 
-    // Attach payment splits to Payment In and Payment Out.
+    /*
+     * Merge all category candidates into one globally ordered list.
+     * Each category supplies at most limit + 1 rows.
+     */
+    const combinedRows = categoryResults
+      .flat()
+      .sort((a, b) => {
+        // Newest transaction first.
+        const dateComparison = b._cursorDate.localeCompare(
+          a._cursorDate
+        );
+
+        if (dateComparison !== 0) {
+          return dateComparison;
+        }
+
+        // Stable category order when timestamps match.
+        if (Number(a._typeRank) !== Number(b._typeRank)) {
+          return Number(a._typeRank) - Number(b._typeRank);
+        }
+
+        // Newest transaction ID first within the same category.
+        return Number(b.id) - Number(a.id);
+      });
+
+    const hasMore = combinedRows.length > limit;
+    const pageRows = combinedRows.slice(0, limit);
+
+    // Group the current page by category.
+    const transactions = {
+      sales: [],
+      purchases: [],
+      saleReturns: [],
+      purchaseReturns: [],
+      expenses: [],
+      paymentIns: [],
+      paymentOuts: [],
+    };
+
+    for (const row of pageRows) {
+      transactions[row._transactionType].push(row);
+    }
+
+    /*
+     * Attach payment splits to payment-in and payment-out records.
+     */
     const attachPaymentSplits = async (rows, sourceType) => {
       if (!rows.length) {
         return;
@@ -3336,29 +3598,33 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       const placeholders = paymentIds.map(() => "?").join(",");
 
       const [splits] = await connection.query(
-        `SELECT
-           ps.Source_Id,
-           ps.Payment_Type,
-           ps.Bank_Account_Id,
-           ps.Reference_Number,
-           ps.Amount,
-           ba.Account_Display_Name
-         FROM payment_splits ps
-         LEFT JOIN bank_accounts ba
-           ON ba.id = ps.Bank_Account_Id
-         WHERE ps.Source_Type = ?
-           AND ps.Source_Id IN (${placeholders})`,
+        `
+          SELECT
+            ps.Source_Id,
+            ps.Payment_Type,
+            ps.Bank_Account_Id,
+            ps.Reference_Number,
+            ps.Amount,
+            ba.Account_Display_Name
+          FROM payment_splits ps
+          LEFT JOIN bank_accounts ba
+            ON ba.id = ps.Bank_Account_Id
+          WHERE ps.Source_Type = ?
+            AND ps.Source_Id IN (${placeholders})
+        `,
         [sourceType, ...paymentIds]
       );
 
-      const splitMap = {};
+      const splitMap = new Map();
 
       for (const split of splits) {
-        if (!splitMap[split.Source_Id]) {
-          splitMap[split.Source_Id] = [];
+        const sourceId = String(split.Source_Id);
+
+        if (!splitMap.has(sourceId)) {
+          splitMap.set(sourceId, []);
         }
 
-        splitMap[split.Source_Id].push({
+        splitMap.get(sourceId).push({
           Payment_Type: split.Payment_Type,
           Bank_Account_Id: split.Bank_Account_Id,
           Reference_Number: split.Reference_Number,
@@ -3368,7 +3634,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       }
 
       for (const row of rows) {
-        row.splits = splitMap[row.id] || [];
+        row.splits = splitMap.get(String(row.id)) || [];
 
         row.Payment_Type_Display =
           row.splits
@@ -3383,37 +3649,55 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
     };
 
     await Promise.all([
-      attachPaymentSplits(paymentIns, "Payment_In"),
-      attachPaymentSplits(paymentOuts, "Payment_Out"),
+      attachPaymentSplits(
+        transactions.paymentIns,
+        "Payment_In"
+      ),
+
+      attachPaymentSplits(
+        transactions.paymentOuts,
+        "Payment_Out"
+      ),
     ]);
 
-    // Return all transaction categories.
+    // Category counts for the selected date and search term.
+    const counts = {};
+
+    transactionTypes.forEach((type, index) => {
+      counts[type.key] = countResults[index];
+    });
+
+    // Create the next cursor from the last returned row.
+    let nextCursor = null;
+
+    if (hasMore && pageRows.length > 0) {
+      const lastRow = pageRows[pageRows.length - 1];
+
+      nextCursor = Buffer.from(
+        JSON.stringify({
+          date: lastRow._cursorDate,
+          rank: Number(lastRow._typeRank),
+          id: lastRow.id,
+        })
+      ).toString("base64url");
+    }
+
     return res.status(200).json({
       success: true,
       date,
-
-      transactions: {
-        sales,
-        purchases,
-        saleReturns,
-        purchaseReturns,
-        expenses,
-        paymentIns,
-        paymentOuts,
-      },
-
-      counts: {
-        sales: sales.length,
-        purchases: purchases.length,
-        saleReturns: saleReturns.length,
-        purchaseReturns: purchaseReturns.length,
-        expenses: expenses.length,
-        paymentIns: paymentIns.length,
-        paymentOuts: paymentOuts.length,
-      },
+      search,
+      limit,
+      transactions,
+      counts,
+      hasMore,
+      nextCursor,
     });
   } catch (err) {
-    console.error("Error fetching transactions by date:", err);
+    console.error(
+      "Error fetching transactions by date:",
+      err
+    );
+
     next(err);
   } finally {
     if (connection) {
@@ -3421,7 +3705,6 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
     }
   }
 };
-
 
 export {getSalesNewSalesPurchasesEachDay,
   getSalesNewSalesPurchasesInDateRange,

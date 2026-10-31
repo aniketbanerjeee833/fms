@@ -40,6 +40,7 @@ import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxe
 import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -1414,7 +1415,11 @@ export default function PurchaseReturndEdit() {
           "PurchaseReturn",
         ])
       );
-
+dispatch(
+        reportApi.util.invalidateTags([
+                      "DayWiseTransactions",
+                    ])
+                  );
 
       dispatch(
         itemApi.util.invalidateTags([

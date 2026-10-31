@@ -26,6 +26,7 @@ import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import useListRestore from "../../utils/useListRestore";
+import { reportApi } from "../../redux/api/reportApi";
 
 
 export default function AllPurchaseList() {
@@ -179,6 +180,9 @@ export default function AllPurchaseList() {
       dispatch(
         bankAccountApi.util.invalidateTags(["BankAccount"])
       );
+      dispatch(reportApi.util.invalidateTags([
+              "DayWiseTransactions",
+                 ]));
 
       dispatch(
         itemApi.util.invalidateTags([

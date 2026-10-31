@@ -24,6 +24,7 @@ import { useReactToPrint } from "react-to-print";
 import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import useListRestore from "../../utils/useListRestore";
+import { reportApi } from "../../redux/api/reportApi";
 
 export default function AllSaleList() {
   const dispatch = useDispatch()
@@ -154,6 +155,9 @@ export default function AllSaleList() {
           "ItemLedger",
         ])
       );
+       dispatch(reportApi.util.invalidateTags([
+        "DayWiseTransactions",
+           ]));
     } catch (err) {
       console.log(err);
       toast.error(err?.data?.message || "Failed to delete sale");
@@ -581,15 +585,16 @@ export default function AllSaleList() {
                       rowHeight={52}
                       height="100%"
                       //dynamicHeight={true}
-                      onLoadMore={() => {
-                        if (
-                          sales?.hasMore &&
-                          sales?.nextCursor &&
-                          !isFetching
-                        ) {
-                          setCursor(sales.nextCursor);
-                        }
-                      }}
+                      // onLoadMore={() => {
+                      //   if (
+                      //     sales?.hasMore &&
+                      //     sales?.nextCursor &&
+                      //     !isFetching
+                      //   ) {
+                      //     setCursor(sales.nextCursor);
+                      //   }
+                      // }}
+                       onLoadMore={handleLoadMore}
                       isFetching={isFetching}
                       hasMore={sales?.hasMore || false}
                       getItemKey={(sale) => sale?.Sale_Id}

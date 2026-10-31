@@ -26,6 +26,8 @@ import {
     useCreateExpenseMutation,
 } from "../../redux/api/expenseApi";
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
+import { useDispatch } from "react-redux";
 
 
 
@@ -74,6 +76,7 @@ const emptyRow = () => ({
 export default function AddExpense() {
     const navigate = useNavigate();
     const location = useLocation();
+    const dispatch=useDispatch()
 
 
     /* ───────────────────────── MOCK DATA (replace with API) ───────────────────────── */
@@ -630,6 +633,9 @@ const handleDeleteRow = (i) => {
                 toast.error(response.message || "Failed to create expense");
                 return;
             }
+            dispatch(
+  reportApi.util.invalidateTags(["DayWiseTransactions"])
+);
 
             toast.success("Expense created successfully");
 

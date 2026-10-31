@@ -26,6 +26,7 @@ import { useReactToPrint } from "react-to-print";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import PaymentInOutBulkReportPrintTemplate from "../../components/Print/PaymentInOutBulkReportPrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
+import { reportApi } from "../../redux/api/reportApi";
 
 
 export default function PaymentOut() {
@@ -143,6 +144,9 @@ export default function PaymentOut() {
             } else {
                 await addPaymentOut(formData).unwrap();
             }
+            dispatch(reportApi.util.invalidateTags([
+                     "DayWiseTransactions",
+                      ]));
             dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
             dispatch(bankAccountApi.util.invalidateTags([
                 { type: "BankAccount", id: formData.Bank_Account_Id },
@@ -173,6 +177,9 @@ export default function PaymentOut() {
             dispatch(
                 bankAccountApi.util.invalidateTags(["BankAccount"])
             );
+             dispatch(reportApi.util.invalidateTags([
+              "DayWiseTransactions",
+                 ]));
 
             dispatch(
                 itemApi.util.invalidateTags([

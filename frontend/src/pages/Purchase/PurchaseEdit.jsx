@@ -34,6 +34,7 @@ import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxe
 import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -1416,14 +1417,27 @@ export default function PurchaseEdit() {
       console.log("Purchase updated successfully:", res);
 
       const resData = res?.data || res;
+      // =======================================================
+      // 7. RESPONSE CHECK
+      // =======================================================
+
+      if (!resData?.success) {
+        toast.error("Failed to update purchase");
+        return;
+      }
 
       // =======================================================
-      // 7. INVALIDATE CACHE
+      // 8. INVALIDATE CACHE
       // =======================================================
 
       dispatch(
         purchaseApi.util.invalidateTags(["Purchase"])
       );
+        dispatch(
+              reportApi.util.invalidateTags([
+                "DayWiseTransactions",
+              ])
+            );
 
       // dispatch(
       //   itemApi.util.invalidateTags(["Item", "ItemLedger"])
@@ -1460,14 +1474,7 @@ export default function PurchaseEdit() {
         ])
       );
 
-      // =======================================================
-      // 8. RESPONSE CHECK
-      // =======================================================
-
-      if (!resData?.success) {
-        toast.error("Failed to update purchase");
-        return;
-      }
+      
 
       toast.success("Purchase updated successfully!");
 

@@ -88,7 +88,8 @@ const currentPath = location.pathname;
       
     // }
      if(currentPath.startsWith("/reports/sales-purchases-report") ||
-    currentPath.startsWith("/reports/balance-sheet") )
+    currentPath.startsWith("/reports/balance-sheet") ||
+    currentPath.startsWith("/reports/all-transactions") )
      {
       setOpenMenu("Reports");
       
@@ -183,7 +184,8 @@ if (
 
     if((cleanLink==="/reports/sales-purchases-report" && 
       current.startsWith("/reports/sales-purchases-report"))||
-      (cleanLink==="/reports/balance-sheet" && current.startsWith("/reports/balance-sheet")))
+      (cleanLink==="/reports/balance-sheet" && current.startsWith("/reports/balance-sheet"))||
+      (cleanLink==="/reports/all-transactions" && current.startsWith("/reports/all-transactions")))
       return true;
   return false;
 };

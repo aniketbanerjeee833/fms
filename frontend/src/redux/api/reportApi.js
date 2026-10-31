@@ -6,7 +6,7 @@ export const reportApi = createApi({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
- tagTypes: ["Sales", "Purchases", "New-Sale"],
+ tagTypes: ["Sales", "Purchases", "New-Sale","DayWiseTransactions"],
   endpoints: (builder) => ({
     getSalesNewSalesPurchasesEachDay: builder.query({
         query: ({ date }) =>
@@ -69,12 +69,80 @@ getBalanceSheet: builder.query({
   
 }),
 getDayWiseTransactions: builder.query({
-  query: ({ startDate, endDate }) =>
-    `report/day-wise-transactions-count?startDate=${startDate}&endDate=${endDate}`,
-}),
+      query: ({ startDate, endDate }) =>
+        `report/day-wise-transactions-count?startDate=${startDate}&endDate=${endDate}`,
+
+      providesTags: ["DayWiseTransactions"],
+    }),
+
+    // getDayWiseTransactionsDetails: builder.query({
+    //   query: (date) =>
+    //     `report/day-wise-transactions-details?date=${date}`,
+
+    //   providesTags: ["DayWiseTransactions"],
+    // })
+
 getDayWiseTransactionsDetails: builder.query({
-  query: (date) => `report/day-wise-transactions-details?date=${date}`
+  query: ({ date, cursor = null, limit = 50, search = "" }) => {
+    const params = new URLSearchParams({
+      date,
+      limit: String(limit),
+    });
+
+    if (cursor) {
+      params.set("cursor", cursor);
+    }
+
+    if (search.trim()) {
+      params.set("search", search.trim());
+    }
+
+    return `report/day-wise-transactions-details?${params.toString()}`;
+  },
+
+  // Separate cached results for each date and search term.
+  serializeQueryArgs: ({ queryArgs }) => ({
+    date: queryArgs.date,
+    limit: queryArgs.limit ?? 50,
+    search: queryArgs.search?.trim() ?? "",
+  }),
+
+  merge: (currentCache, newData, { arg }) => {
+    // Replace cached results for the first page.
+    if (!arg.cursor) {
+      return newData;
+    }
+
+    const categories = [
+      "sales",
+      "purchases",
+      "saleReturns",
+      "purchaseReturns",
+      "expenses",
+      "paymentIns",
+      "paymentOuts",
+    ];
+
+    for (const category of categories) {
+      currentCache.transactions[category].push(
+        ...(newData.transactions?.[category] || [])
+      );
+    }
+
+    currentCache.counts = newData.counts;
+    currentCache.hasMore = newData.hasMore;
+    currentCache.nextCursor = newData.nextCursor;
+  },
+
+  forceRefetch: ({ currentArg, previousArg }) =>
+    currentArg?.date !== previousArg?.date ||
+    currentArg?.cursor !== previousArg?.cursor ||
+    currentArg?.limit !== previousArg?.limit ||
+    currentArg?.search?.trim() !== previousArg?.search?.trim(),
+
+  providesTags: ["DayWiseTransactions"],
 }),
+
   }),
 
   })

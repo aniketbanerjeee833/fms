@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, forwardRef } from "react";
-import { NavLink, useNavigate, useParams } from "react-router-dom";
+import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { useReactToPrint } from "react-to-print";
@@ -16,8 +16,11 @@ import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
-import { useGetPaymentInByIdQuery } from "../../redux/api/paymentInApi";
-import { useGetPaymentOutByIdQuery } from "../../redux/api/paymentOutApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery } from "../../redux/api/paymentOutApi";
+import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
+import { useDeleteExpenseMutation, useGetExpenseByIdQuery } from "../../redux/api/expenseApi";
+import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
 
 /* ------------------------------------------------------------------ */
 /*  TRANSACTION TYPE CONFIG                                            */
@@ -99,9 +102,9 @@ const TXN_TYPES = [
     amountOf: (r) => r.Amount ?? r.Total_Amount,
     hasBalance: false,
     canReturn: false,
-    printMode: "generic",
+    printMode: "paymentIn",
     editPath: (id) => `/payment-in/edit/${id}`,
-    deleteMessage: "Are you sure you want to delete this payment-in entry?",
+    deleteMessage: "Are you sure you want to delete this payment in ? This action cannot be undone",
   },
   {
     key: "paymentOuts",
@@ -113,9 +116,9 @@ const TXN_TYPES = [
     amountOf: (r) => r.Amount ?? r.Total_Amount,
     hasBalance: false,
     canReturn: false,
-    printMode: "generic",
+    printMode: "paymentOut",
     editPath: (id) => `/payment-out/edit/${id}`,
-    deleteMessage: "Are you sure you want to delete this payment-out entry?",
+    deleteMessage: "Are you sure you want to delete this payment out ? This action cannot be undone",
   },
   {
     key: "expenses",
@@ -127,9 +130,9 @@ const TXN_TYPES = [
     amountOf: (r) => r.Total_Amount ?? r.Amount,
     hasBalance: false,
     canReturn: false,
-    printMode: "generic",
+   printMode: "expense",
     editPath: (id) => `/expense/edit/${id}`,
-    deleteMessage: "Are you sure you want to delete this expense?",
+    deleteMessage: "Are you sure you want to delete this expense? This action cannot be undone",
   },
 ];
 
@@ -194,39 +197,96 @@ const DayTxnPrintTemplate = forwardRef(({ title, rows }, ref) => {
 /* ------------------------------------------------------------------ */
 /*  PAGE                                                               */
 /* ------------------------------------------------------------------ */
-export default function AllTransactionsDetails() {
+export default function AllTransactionsDailyDetails() {
   const { date } = useParams();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const [activeType, setActiveType] = useState("all");
-  const [search, setSearch] = useState("");
+  // const [search, setSearch] = useState("");
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [clickHighlightId, setClickHighlightId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [print, setPrint] = useState(null); // { mode, id?, rows?, title? }
   const printRef = useRef(null);
+  const [cursor, setCursor] = useState(null);
+  const LIMIT = 50;
 
-  const { data, isLoading, isFetching, isError, refetch } =
-    useGetDayWiseTransactionsDetailsQuery(date, { skip: !date });
+const [searchParams, setSearchParams] = useSearchParams();
 
+const search = searchParams.get("search") || "";
+
+const [debouncedSearch, setDebouncedSearch] = useState(search);
+const handleSearchChange = (e) => {
+  const value = e.target.value;
+  const params = new URLSearchParams(searchParams);
+
+  if (value) {
+    params.set("search", value);
+  } else {
+    params.delete("search");
+  }
+
+  params.delete("cursor");
+  setSearchParams(params);
+};
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setDebouncedSearch(search.trim());
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [search]);
+  // const { data, isLoading, isFetching, isError, refetch } =
+  //   useGetDayWiseTransactionsDetailsQuery(date, { skip: !date });
+const {
+  data: alltransactionDailyDetails,
+  isLoading,
+  isFetching,
+  isError,
+  refetch,
+} = useGetDayWiseTransactionsDetailsQuery(
+  {
+    date,
+    cursor,
+    limit: LIMIT,
+    search: debouncedSearch,
+  },
+  { skip: !date }
+);
+const handleLoadMore = () => {
+  if (isFetching || !alltransactionDailyDetails?.hasMore || !alltransactionDailyDetails?.nextCursor) {
+    return;
+  }
+
+  setCursor(alltransactionDailyDetails.nextCursor);
+};
+useEffect(() => {
+  setCursor(null);
+}, [date, debouncedSearch]);
   /* ---------- delete mutations (only sale & purchase wired) ---------- */
   const [deleteSale, { isLoading: deletingSale }] = useDeleteSaleMutation();
   const [deletePurchase, { isLoading: deletingPurchase }] = useDeletePurchaseMutation();
-    const [deletePurchaseReturn, { isLoading: deletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
-    const [deleteSaleReturn, { isLoading: deletingSaleReturn }] = useDeleteSaleReturnMutation();
+  const [deletePurchaseReturn, { isLoading: deletingPurchaseReturn }] = useDeletePurchaseReturnMutation();
+  const [deleteSaleReturn, { isLoading: deletingSaleReturn }] = useDeleteSaleReturnMutation();
+  const [deletePaymentIn, { isLoading: deletingPaymentIn }] = useDeletePaymentInMutation();
+  const [deletePaymentOut, { isLoading: deletingPaymentOut }] = useDeletePaymentOutMutation();
+    const [deleteExpense, { isLoading: deletingExpense }] =useDeleteExpenseMutation();
   // To enable delete for other types, add their mutation here, e.g.
   // saleReturns: (id) => deleteSaleReturn(id).unwrap(),
   const deleteFns = {
     sales: (id) => deleteSale(id).unwrap(),
     purchases: (id) => deletePurchase(id).unwrap(),
-    purchaseReturns:(id)=>deletePurchaseReturn(id).unwrap(),
+    purchaseReturns: (id) => deletePurchaseReturn(id).unwrap(),
     saleReturns: (id) => deleteSaleReturn(id).unwrap(),
+    paymentIns: (id) => deletePaymentIn(id).unwrap(),
+    paymentOuts: (id) => deletePaymentOut(id).unwrap(),
+    expenses: (id) => deleteExpense(id).unwrap(),
   };
 
   /* ---------- flatten all types into one list ---------- */
   const allRows = useMemo(() => {
-    const t = data?.transactions || {};
+    const t = alltransactionDailyDetails?.transactions || {};
     return TXN_TYPES.flatMap((cfg) =>
       (t[cfg.key] || []).map((r) => {
         const id = cfg.idOf(r);
@@ -242,19 +302,30 @@ export default function AllTransactionsDetails() {
         };
       })
     );
-  }, [data]);
+  }, [alltransactionDailyDetails]);
 
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allRows.filter((r) => {
-      if (activeType !== "all" && r._type !== activeType) return false;
-      if (!q) return true;
-      return (
-        String(r.Party_Name || "").toLowerCase().includes(q) ||
-        String(r._number || "").toLowerCase().includes(q)
-      );
-    });
-  }, [allRows, activeType, search]);
+  // const rows = useMemo(() => {
+  //   const q = search.trim().toLowerCase();
+  //   return allRows.filter((r) => {
+  //     if (activeType !== "all" && r._type !== activeType) return false;
+  //     if (!q) return true;
+  //     return (
+  //       String(r.Party_Name || "").toLowerCase().includes(q) ||
+  //       String(r._number || "").toLowerCase().includes(q)
+  //     );
+  //   });
+  // }, [allRows, activeType, search]);
+ 
+const rows = useMemo(() => {
+  return allRows.filter((r) => {
+    if (activeType !== "all" && r._type !== activeType) {
+      return false;
+    }
+
+    return true;
+  });
+}, [allRows, activeType]);
+
 
   const totalsByType = useMemo(() => {
     const out = {};
@@ -273,6 +344,7 @@ export default function AllTransactionsDetails() {
     return () => document.removeEventListener("click", close);
   }, []);
 
+
   /* ---------- printing ---------- */
   const { currentData: saleData } = useGetSingleSaleQuery(print?.id, {
     skip: print?.mode !== "sale",
@@ -287,12 +359,18 @@ export default function AllTransactionsDetails() {
     skip: print?.mode !== "purchaseReturn",
   });
   const { currentData: paymentInData } = useGetPaymentInByIdQuery(print?.id, {
-  skip: print?.mode !== "paymentIn",
-});
-const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
+    skip: print?.mode !== "paymentIn",
+  });
+  const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
+    print?.id,
+    {
+      skip: print?.mode !== "paymentOut",
+    }
+  );
+  const { currentData: expenseData } = useGetExpenseByIdQuery(
   print?.id,
   {
-    skip: print?.mode !== "paymentOut",
+    skip: print?.mode !== "expense",
   }
 );
 
@@ -311,9 +389,10 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
       (print.mode === "purchaseReturn" && purchaseReturnData?.purchaseReturn) ||
       (print.mode === "paymentIn" && paymentInData?.paymentIn) ||
       (print.mode === "paymentOut" && paymentOutData?.paymentOut) ||
+      (print.mode === "expense" && expenseData?.expense) ||
       print.mode === "generic";
     if (ready) handlePrint();
-  }, [print, saleData, purchaseData, saleReturnData, purchaseReturnData,paymentInData,paymentOutData, handlePrint]);
+  }, [print, saleData, purchaseData, saleReturnData, purchaseReturnData, paymentInData, paymentOutData,expenseData, handlePrint]);
 
   const startRowPrint = (row) => {
     const mode = row._cfg.printMode;
@@ -328,11 +407,11 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
     }
   };
 
-  const startListPrint = () => {
-    if (!rows.length) return toast.info("Nothing to print");
-    const label = activeType === "all" ? "All Transactions" : TYPE_MAP[activeType].plural;
-    setPrint({ mode: "generic", rows, title: `${label} - ${date}` });
-  };
+  // const startListPrint = () => {
+  //   if (!rows.length) return toast.info("Nothing to print");
+  //   const label = activeType === "all" ? "All Transactions" : TYPE_MAP[activeType].plural;
+  //   setPrint({ mode: "generic", rows, title: `${label} - ${date}` });
+  // };
 
   /* ---------- delete ---------- */
   const handleConfirmDelete = async () => {
@@ -352,11 +431,11 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
   /* ---------- helpers ---------- */
   const prettyDate = date
     ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
-        weekday: "long",
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
     : "";
 
   const chip = (key, label, count, color) => {
@@ -384,7 +463,8 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
     );
   };
 
-  const isDeleting = deletingSale || deletingPurchase || deletingPurchaseReturn || deletingSaleReturn;
+  const isDeleting = deletingSale || deletingPurchase || deletingPurchaseReturn ||
+   deletingSaleReturn || deletingPaymentIn || deletingPaymentOut||deletingExpense;
 
   return (
     <>
@@ -400,7 +480,7 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
               <p className="text-gray-500 text-sm sm:text-base">{prettyDate}</p>
             </div>
 
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               {/* <div className="flex flex-col">
                 <span className="text-sm text-gray-600 font-medium mb-1">Date</span>
                 <input
@@ -409,7 +489,7 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
                   onChange={(e) => e.target.value && navigate(`/day-wise-report/${e.target.value}`)}
                   className="border p-1 rounded-md shadow-sm text-gray-700"
                 />
-              </div> */}
+              </div> 
               <input
                 type="text"
                 placeholder="Search party / number ..."
@@ -424,7 +504,31 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
                 title="Print list"
               >
                 <PrinterIcon size={16} strokeWidth={2.2} className="text-blue-600" />
-              </button> */}
+              </button> 
+            </div> */}
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() =>
+                  navigate("/reports/all-transactions", {
+                    state: { selectedDate: date },
+                  })
+                }
+                className="text-white font-bold py-2 px-4 rounded-md whitespace-nowrap"
+                style={{ backgroundColor: "#4CA1AF" }}
+              >
+                All Transactions
+              </button>
+              <div>
+                <input
+                  type="text"
+                  placeholder="Search ..."
+                  value={search}
+                  onChange={handleSearchChange}
+                  //onChange={(e) => setSearch(e.target.value)}
+                  className="w-full sm:w-56"
+                />
+              </div>
             </div>
           </div>
 
@@ -515,9 +619,9 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
                     items={rows}
                     rowHeight={52}
                     height="100%"
-                    onLoadMore={() => {}}
+                    onLoadMore={handleLoadMore }
                     isFetching={isFetching}
-                    hasMore={false}
+                    hasMore={Boolean(alltransactionDailyDetails?.hasMore)}
                     getItemKey={(r) => r._key}
                     emptyMessage="No transactions found"
                     endMessage="— End of transactions —"
@@ -770,20 +874,28 @@ const { currentData: paymentOutData } = useGetPaymentOutByIdQuery(
         </div>
       )}
       {print?.mode === "paymentIn" && paymentInData?.paymentIn && (
-  <div style={{ display: "none" }}>
-    <PaymentInOutPrintTemplate
+        <div style={{ display: "none" }}>
+          <PaymentInOutPrintTemplate
+            ref={printRef}
+            payment={paymentInData.paymentIn}
+            type="in"
+          />
+        </div>
+      )}
+      {print?.mode === "paymentOut" && paymentOutData?.paymentOut && (
+        <div style={{ display: "none" }}>
+          <PaymentInOutPrintTemplate
+            ref={printRef}
+            payment={paymentOutData.paymentOut}
+            type="out"
+          />
+        </div>
+      )}
+      {print?.mode === "expense" && expenseData?.expense && (
+<div style={{ display: "none" }}>
+    <ExpensePrintTemplate
       ref={printRef}
-      payment={paymentInData.paymentIn}
-      type="in"
-    />
-  </div>
-)}
-{print?.mode === "paymentOut" && paymentOutData?.paymentOut && (
-  <div style={{ display: "none" }}>
-    <PaymentInOutPrintTemplate
-      ref={printRef}
-      payment={paymentOutData.paymentOut}
-      type="out"
+      expense={expenseData.expense}
     />
   </div>
 )}

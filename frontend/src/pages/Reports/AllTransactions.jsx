@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState,useEffect } from 'react';
 
 // import {
 //   TrendingUp, TrendingDown, DollarSign, ShoppingCart,
@@ -18,7 +18,7 @@ import { toast } from 'react-toastify';
 // import { useGetTotalPurchasesEachDayQuery } from "../../redux/api/purchaseApi";
 import { Filter, X } from 'lucide-react';
 import { useGetDayWiseTransactionsQuery } from '../../redux/api/reportApi';
-
+import { useNavigate, useLocation } from 'react-router-dom';
 
 
 
@@ -27,7 +27,8 @@ export default function AllTransactions() {
   // const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
   // 🎨 Generate consistent color for each partyId
   //const partyColorMap = new Map();
-
+const navigate = useNavigate();
+const location = useLocation();
 
   // 🎨 Base color palette to start cycling from
   const BASE_COLORS = [
@@ -63,6 +64,16 @@ export default function AllTransactions() {
   console.log(today);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(today);
+  useEffect(() => {
+  const savedDate = location.state?.selectedDate;
+
+  if (savedDate) {
+    const [year, month] = savedDate.split("-").map(Number);
+
+    setCurrentDate(new Date(year, month - 1, 1));
+    setSelectedDate(savedDate);
+  }
+}, [location.key]);
   const selectedYear = currentDate.getFullYear();
   const selectedMonth = currentDate.getMonth() + 1; // JS month is 0-based
   console.log("selectedMonth", selectedMonth, selectedYear);
@@ -127,7 +138,14 @@ const transactionsByDate = Object.fromEntries(
     // dispatch(clearSelectedLeads());
     setSelectedDate(dateStr);
     //navigate(`/day-wise-report/${dateStr}`);
-    window.open(`/reports/all-transactions-details-day-wise/${dateStr}`, "_blank");
+    //window.open(`/reports/all-transactions-details-day-wise/${dateStr}`, "_blank");
+   navigate(`/reports/all-transactions-details-day-wise/${dateStr}`, {
+state: {
+selectedDate: dateStr,
+calendarYear: year,
+calendarMonth: month,
+},
+});
     // Remove the manual fetchLeadsByDate call - let the query handle it
   };
 
@@ -218,7 +236,7 @@ const transactionsByDate = Object.fromEntries(
     const totalSalesReturns = Number(
       dayTransactions?.total_sales_returns ?? 0
     );
-
+const totalExpenses = Number(dayTransactions?.total_expenses ?? 0);
     const totalPurchaseReturns = Number(
       dayTransactions?.total_purchase_returns ?? 0
     );
@@ -273,6 +291,14 @@ const transactionsByDate = Object.fromEntries(
               {totalPurchases.toLocaleString("en-IN")}
             </div>
           )}
+          {/* Expenses */}
+{totalExpenses > 0 && (
+  <div className="text-[7px] sm:text-xs text-amber-700 font-medium whitespace-nowrap">
+    <span className="sm:hidden">E:</span>
+    <span className="hidden sm:inline">Expenses:</span>{" "}
+    {totalExpenses.toLocaleString("en-IN")}
+  </div>
+)}
 
           {/* Sales Returns */}
           {totalSalesReturns > 0 && (

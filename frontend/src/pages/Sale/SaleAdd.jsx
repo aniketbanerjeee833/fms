@@ -41,6 +41,7 @@ import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxe
 import { useGetAllTransactionsSettingsQuery, useGetTransactionPrefixesByTypeQuery } from "../../redux/api/Settings/transactionsSettingApi";
 
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -1344,7 +1345,11 @@ export default function SaleAdd() {
       // CACHE INVALIDATION
       // =======================================================
 
-
+dispatch(
+  reportApi.util.invalidateTags([
+    "DayWiseTransactions",
+  ])
+);
       dispatch(
         itemApi.util.invalidateTags([
           { type: "Item", id: "LIST" },

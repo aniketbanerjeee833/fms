@@ -38,6 +38,7 @@ import { useGetAllTaxesAndGSTSettingsQuery } from "../../redux/api/Settings/taxe
 import { useGetAllTransactionsSettingsQuery } from "../../redux/api/Settings/transactionsSettingApi";
 import VirtualScrollList from "../../components/VirtualScrollList";
 import VirtualPartyScrollList from "../../components/VirtualPartyScrollList";
+import { reportApi } from "../../redux/api/reportApi";
 function ItemDropdownVirtualized({
 
   items,
@@ -1136,10 +1137,22 @@ export default function PurchaseAdd() {
       console.log("Purchase Response:", res);
 
       const resData = res?.data || res;
+      // =======================================================
+      // 8. Handle response
+      // =======================================================
+      if (!resData?.success) {
+        toast.error("Failed to add new purchase");
+        return;
+      }
 
       // =======================================================
-      // 8. Invalidate RTK Query caches
+      // 9. Invalidate RTK Query caches
       // =======================================================
+      dispatch(
+        reportApi.util.invalidateTags([
+          "DayWiseTransactions",
+        ])
+      );
       dispatch(
         itemApi.util.invalidateTags([
           { type: "Item", id: "LIST" },
@@ -1166,13 +1179,7 @@ export default function PurchaseAdd() {
         ])
       );
 
-      // =======================================================
-      // 9. Handle response
-      // =======================================================
-      if (!resData?.success) {
-        toast.error("Failed to add new purchase");
-        return;
-      }
+      
 
       toast.success(
         "New Purchase added successfully!"
