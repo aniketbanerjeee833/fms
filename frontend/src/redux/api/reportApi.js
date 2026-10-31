@@ -142,6 +142,20 @@ getDayWiseTransactionsDetails: builder.query({
 
   providesTags: ["DayWiseTransactions"],
 }),
+getDayWiseTransactionsDetailsPrint: builder.query({
+  query: ({ date, fromDate = "", toDate = "", search = "" }) => {
+    const params = new URLSearchParams();
+
+    if (date) params.append("date", date);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
+    if (search.trim()) params.append("search", search.trim());
+
+    return `report/day-wise-transactions-details-print?${params.toString()}`;
+  },
+
+  providesTags: ["DayWiseTransactions"],
+}),
 
   }),
 
@@ -156,4 +170,5 @@ useGetSalesAndPurchasesYearWiseQuery,
 // useGetPartyWiseSalesAndPurchasesDailyYearMonthWiseQuery,
 useGetPartyWiseSalesAndPurchasesOverallQuery,
 usePrintDailyReportMutation,
-useGetBalanceSheetQuery, useGetDayWiseTransactionsQuery,useGetDayWiseTransactionsDetailsQuery} = reportApi
+useGetBalanceSheetQuery, useGetDayWiseTransactionsQuery,useGetDayWiseTransactionsDetailsQuery, 
+useLazyGetDayWiseTransactionsDetailsPrintQuery} = reportApi

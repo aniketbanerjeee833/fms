@@ -5,7 +5,7 @@ import { toast } from "react-toastify";
 import { useReactToPrint } from "react-to-print";
 import { Eye, MoreVertical, Printer, PrinterIcon, Trash2, Undo2 } from "lucide-react";
 
-import { useGetDayWiseTransactionsDetailsQuery } from "../../redux/api/reportApi";
+import { useGetDayWiseTransactionsDetailsQuery, useLazyGetDayWiseTransactionsDetailsPrintQuery } from "../../redux/api/reportApi";
 import { useDeleteSaleMutation, useGetSingleSaleQuery } from "../../redux/api/saleApi";
 import { useDeletePurchaseMutation, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
 import { useDeleteSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
@@ -21,6 +21,8 @@ import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymen
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import { useDeleteExpenseMutation, useGetExpenseByIdQuery } from "../../redux/api/expenseApi";
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import SalePurchaseBulkReportPrintTemplate from "../../components/Print/SalePurchaseBulkReportPrintTemplate";
+import PaymentInOutBulkReportPrintTemplate from "../../components/Print/PaymentInOutBulkReportPrintTemplate";
 import PaymentInModal from "../../components/Modal/PaymentInModal";
 import PaymentOutModal from "../../components/Modal/PaymentOutModal";
 import PartyAddModal from "../../components/Modal/PartyAddModal";
@@ -224,6 +226,11 @@ export default function AllTransactionsDailyDetails() {
   const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
   const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const printRef = useRef(null);
+  const bulkPrintRef = useRef(null);
+  const [bulkPrintData, setBulkPrintData] = useState(null);
+  const [bulkPrintRequested, setBulkPrintRequested] = useState(false);
+  const [triggerDayPrint, { isFetching: isBulkPrintFetching }] =
+    useLazyGetDayWiseTransactionsDetailsPrintQuery();
   const [cursor, setCursor] = useState(null);
   const LIMIT = 50;
 
@@ -436,6 +443,48 @@ const handleLoadMore = () => {
   //   setPrint({ mode: "generic", rows, title: `${label} - ${date}` });
   // };
 
+  /* ---------- combined day-wise bulk print ---------- */
+  const handleBulkPrint = useReactToPrint({
+    contentRef: bulkPrintRef,
+    documentTitle: `Day-Wise-Transactions-${date || "report"}`,
+    onAfterPrint: () => {
+      setBulkPrintRequested(false);
+      setBulkPrintData(null);
+    },
+  });
+
+  const handleBulkPrintClick = async () => {
+    if (!date) {
+      toast.info("Please select a date to print.");
+      return;
+    }
+
+    try {
+      const result = await triggerDayPrint({ date, fromDate: date, toDate: date }).unwrap();
+      // Accept either a direct response or a response wrapped in `data`.
+      setBulkPrintData(result?.data ?? result);
+      setBulkPrintRequested(true);
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to load day-wise print report");
+    }
+  };
+
+  useEffect(() => {
+    if (bulkPrintRequested && bulkPrintData) {
+      // Wait one frame so all hidden print templates are mounted before printing.
+      const timer = requestAnimationFrame(() => handleBulkPrint());
+      return () => cancelAnimationFrame(timer);
+    }
+  }, [bulkPrintRequested, bulkPrintData, handleBulkPrint]);
+
+  const getPrintRecords = (report, ...keys) => {
+    if (Array.isArray(report)) return report;
+    for (const key of keys) {
+      if (Array.isArray(report?.[key])) return report[key];
+    }
+    return [];
+  };
+
   /* ---------- delete ---------- */
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -555,12 +604,27 @@ const handleLoadMore = () => {
           </div>
 
           {/* FILTER CHIPS */}
-          <div className="flex gap-2 mt-3 overflow-x-auto pb-1">
-            {chip("all", "All", allRows.length, "#4CA1AF")}
-            {TXN_TYPES.map((c) =>
-              chip(c.key, c.plural, totalsByType[c.key].count, c.color)
-            )}
-          </div>
+          <div className="flex gap-2 mt-3 overflow-x-auto p-1">
+  {chip("all", "All", allRows.length, "#4CA1AF")}
+
+  {TXN_TYPES.map((c) =>
+    chip(c.key, c.plural, totalsByType[c.key].count, c.color)
+  )}
+
+  {/* Print button fixed at the end */}
+  <div className="ml-auto shrink-0">
+    <button
+      type="button"
+      onClick={handleBulkPrintClick}
+      disabled={isBulkPrintFetching}
+      title="Print all transactions for this day"
+      className="flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+      aria-label="Print all day-wise transactions"
+    >
+      <PrinterIcon size={17} strokeWidth={2.2} />
+    </button>
+  </div>
+</div>
 
           {/* TOTALS STRIP */}
           <div className="flex gap-3 mt-3 overflow-x-auto pb-1">
@@ -885,6 +949,136 @@ const handleLoadMore = () => {
           isSaving={isUpdatingPaymentOut}
           PartyAddModal={PartyAddModal}
         />
+      )}
+
+      {/* COMBINED DAY-WISE BULK PRINT: reuses the existing bulk templates */}
+      {bulkPrintData && (
+        <div
+          style={{
+            position: "fixed",
+            left: "-100000px",
+            top: 0,
+            width: "100%",
+            background: "#fff",
+            zIndex: -1,
+          }}
+        >
+          <div ref={bulkPrintRef}>
+            {(() => {
+              const report = bulkPrintData?.transactions || bulkPrintData;
+              const salesReport = report?.sales;
+              const purchasesReport = report?.purchases;
+              const saleReturnsReport = report?.saleReturns;
+              const purchaseReturnsReport = report?.purchaseReturns;
+              const paymentInsReport = report?.paymentIns;
+              const paymentOutsReport = report?.paymentOuts;
+              const expensesReport = report?.expenses;
+
+              const sales = getPrintRecords(salesReport, "invoices", "sales");
+              const purchases = getPrintRecords(purchasesReport, "purchaseBills", "purchases", "bills");
+              const saleReturns = getPrintRecords(saleReturnsReport, "saleReturns", "returns", "records");
+              const purchaseReturns = getPrintRecords(purchaseReturnsReport, "purchaseReturns", "returns", "records");
+              const paymentIns = getPrintRecords(paymentInsReport, "paymentIns", "records");
+              const paymentOuts = getPrintRecords(paymentOutsReport, "paymentOuts", "records");
+
+              const expenseRecords = getPrintRecords(expensesReport, "expenseBills", "expenses", "records");
+              const expenseRows = expenseRecords.map((r, i) => ({
+                ...r,
+                _key: `expense-print-${r.Expense_Id ?? r.id ?? i}`,
+                _type: "expenses",
+                _cfg: TYPE_MAP.expenses,
+                _number: r.Expense_Number ?? r.Expense_Category ?? "N/A",
+                _amount: Number(r.Total_Amount ?? r.Amount ?? r.expenseDetails?.Total_Amount ?? 0),
+                _balance: 0,
+                Party_Name: r.Party_Name ?? r.expenseDetails?.Party_Name ?? "",
+              }));
+
+              return (
+                <div>
+                  <div
+      style={{
+        padding: "12px 0",
+        fontFamily: "Arial, sans-serif",
+        textAlign: "center",
+      }}
+    >
+      <h1
+        style={{
+          margin: "0 0 4px",
+          fontSize: 20,
+          fontWeight: 700,
+        }}
+      >
+        Day-Wise Transactions Report
+      </h1>
+
+      <div style={{ fontSize: 12 }}>Date: {prettyDate}</div>
+    </div>
+
+                  {sales.length > 0 && (
+                    <SalePurchaseBulkReportPrintTemplate
+                      type="sale"
+                      data={sales}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {purchases.length > 0 && (
+                    <SalePurchaseBulkReportPrintTemplate
+                      type="purchase"
+                      data={purchases}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {saleReturns.length > 0 && (
+                    <SalePurchaseBulkReportPrintTemplate
+                      type="credit"
+                      data={saleReturns}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {purchaseReturns.length > 0 && (
+                    <SalePurchaseBulkReportPrintTemplate
+                      type="debit"
+                      data={purchaseReturns}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {paymentIns.length > 0 && (
+                    <PaymentInOutBulkReportPrintTemplate
+                      type="in"
+                      data={paymentIns}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {paymentOuts.length > 0 && (
+                    <PaymentInOutBulkReportPrintTemplate
+                      type="out"
+                      data={paymentOuts}
+                      fromDate={date}
+                      toDate={date}
+                    />
+                  )}
+                  {expenseRows.length > 0 && (
+                    <DayTxnPrintTemplate title="Expenses Report" rows={expenseRows} />
+                  )}
+
+                  {!sales.length && !purchases.length && !saleReturns.length &&
+                    !purchaseReturns.length && !paymentIns.length && !paymentOuts.length &&
+                    !expenseRows.length && (
+                      <p style={{ padding: 20, fontFamily: "Arial, sans-serif" }}>
+                        No transactions found for this day.
+                      </p>
+                    )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
       )}
 
       {/* HIDDEN PRINT TARGETS (only one is mounted at a time) */}

@@ -1,5 +1,15 @@
 import PdfPrinter from "pdfmake";
 import db from "../config/db.js";
+import {
+  getSalesForPrint,
+  getPurchasesForPrint,
+  getSaleReturnsForPrint,
+  getPurchaseReturnsForPrint,
+  getExpensesForPrint,
+  getPaymentInsForPrint,
+  getPaymentOutsForPrint,
+} from "../helpers/printReportHelpers.js";
+
    const TAX_TYPES = {
         "GST0": "GST 0%",
         "GST0.25": "GST 0.25%",
@@ -3706,6 +3716,608 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
   }
 };
 
+
+
+
+export const getAllTransactionsDayPrintReport = async (
+  req,
+  res,
+  next
+) => {
+  let connection;
+
+  try {
+    connection = await db.getConnection();
+
+    const {
+      date,
+      fromDate,
+      toDate,
+      search = "",
+    } = req.query;
+
+    /*
+    |--------------------------------------------------------------------------
+    | DATE VALIDATION
+    |--------------------------------------------------------------------------
+    |
+    | Use either:
+    |   ?date=2026-10-31
+    |
+    | Or:
+    |   ?fromDate=2026-10-01&toDate=2026-10-31
+    |
+    */
+
+    const startDate = date || fromDate;
+    const endDate = date || toDate;
+
+    if (!startDate && !endDate) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please provide date or fromDate/toDate.",
+      });
+    }
+
+    const searchTerm = search.trim();
+    const like = `%${searchTerm}%`;
+
+    /*
+    |--------------------------------------------------------------------------
+    | SALES
+    |--------------------------------------------------------------------------
+    */
+
+    let salesWhere = "WHERE 1=1";
+    const salesParams = [];
+
+    if (searchTerm) {
+      salesWhere += `
+        AND (
+          s.Invoice_Number LIKE ?
+          OR p.Party_Name LIKE ?
+          OR CAST(s.Total_Amount AS CHAR) LIKE ?
+          OR CAST(s.Balance_Due AS CHAR) LIKE ?
+        )
+      `;
+
+      salesParams.push(
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      salesWhere += `
+        AND DATE(s.Invoice_Date) >= ?
+      `;
+
+      salesParams.push(startDate);
+    }
+
+    if (endDate) {
+      salesWhere += `
+        AND DATE(s.Invoice_Date) <= ?
+      `;
+
+      salesParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PURCHASES
+    |--------------------------------------------------------------------------
+    */
+
+    let purchasesWhere = "WHERE 1=1";
+    const purchasesParams = [];
+
+    if (searchTerm) {
+      purchasesWhere += `
+        AND (
+          p.Bill_Number LIKE ?
+          OR party.Party_Name LIKE ?
+          OR CAST(p.Total_Amount AS CHAR) LIKE ?
+          OR CAST(p.Balance_Due AS CHAR) LIKE ?
+        )
+      `;
+
+      purchasesParams.push(
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      purchasesWhere += `
+        AND DATE(p.Bill_Date) >= ?
+      `;
+
+      purchasesParams.push(startDate);
+    }
+
+    if (endDate) {
+      purchasesWhere += `
+        AND DATE(p.Bill_Date) <= ?
+      `;
+
+      purchasesParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SALE RETURNS
+    |--------------------------------------------------------------------------
+    */
+
+    let saleReturnsWhere = "WHERE 1=1";
+    const saleReturnsParams = [];
+
+    if (searchTerm) {
+      saleReturnsWhere += `
+        AND (
+          sr.Return_Number LIKE ?
+          OR sr.Invoice_Number LIKE ?
+          OR p.Party_Name LIKE ?
+          OR CAST(sr.Total_Amount AS CHAR) LIKE ?
+          OR CAST(sr.Balance_Due AS CHAR) LIKE ?
+        )
+      `;
+
+      saleReturnsParams.push(
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      saleReturnsWhere += `
+        AND DATE(sr.Return_Date) >= ?
+      `;
+
+      saleReturnsParams.push(startDate);
+    }
+
+    if (endDate) {
+      saleReturnsWhere += `
+        AND DATE(sr.Return_Date) <= ?
+      `;
+
+      saleReturnsParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PURCHASE RETURNS
+    |--------------------------------------------------------------------------
+    */
+
+    let purchaseReturnsWhere = "WHERE 1=1";
+    const purchaseReturnsParams = [];
+
+    if (searchTerm) {
+      purchaseReturnsWhere += `
+        AND (
+          pr.Return_Number LIKE ?
+          OR pr.Bill_Number LIKE ?
+          OR p.Party_Name LIKE ?
+          OR CAST(pr.Total_Amount AS CHAR) LIKE ?
+          OR CAST(pr.Balance_Due AS CHAR) LIKE ?
+        )
+      `;
+
+      purchaseReturnsParams.push(
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      purchaseReturnsWhere += `
+        AND DATE(pr.Return_Date) >= ?
+      `;
+
+      purchaseReturnsParams.push(startDate);
+    }
+
+    if (endDate) {
+      purchaseReturnsWhere += `
+        AND DATE(pr.Return_Date) <= ?
+      `;
+
+      purchaseReturnsParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | EXPENSES
+    |--------------------------------------------------------------------------
+    */
+
+    let expensesWhere = "WHERE 1=1";
+    const expensesParams = [];
+
+    if (searchTerm) {
+      expensesWhere += `
+        AND (
+          e.Expense_Number LIKE ?
+          OR p.Party_Name LIKE ?
+          OR ec.Category_Name LIKE ?
+          OR CAST(e.Total_Amount AS CHAR) LIKE ?
+          OR CAST(e.Balance_Due AS CHAR) LIKE ?
+        )
+      `;
+
+      expensesParams.push(
+        like,
+        like,
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      expensesWhere += `
+        AND DATE(e.Expense_Date) >= ?
+      `;
+
+      expensesParams.push(startDate);
+    }
+
+    if (endDate) {
+      expensesWhere += `
+        AND DATE(e.Expense_Date) <= ?
+      `;
+
+      expensesParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENT IN
+    |--------------------------------------------------------------------------
+    */
+
+    let paymentInsWhere = "WHERE 1=1";
+    const paymentInsParams = [];
+
+    if (searchTerm) {
+      paymentInsWhere += `
+        AND (
+          pi.Receipt_No LIKE ?
+          OR a.Party_Name LIKE ?
+          OR CAST(pi.Received AS CHAR) LIKE ?
+        )
+      `;
+
+      paymentInsParams.push(
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      paymentInsWhere += `
+        AND DATE(pi.Payment_Date) >= ?
+      `;
+
+      paymentInsParams.push(startDate);
+    }
+
+    if (endDate) {
+      paymentInsWhere += `
+        AND DATE(pi.Payment_Date) <= ?
+      `;
+
+      paymentInsParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | PAYMENT OUT
+    |--------------------------------------------------------------------------
+    */
+
+    let paymentOutsWhere = "WHERE 1=1";
+    const paymentOutsParams = [];
+
+    if (searchTerm) {
+      paymentOutsWhere += `
+        AND (
+          po.Receipt_No LIKE ?
+          OR a.Party_Name LIKE ?
+          OR CAST(po.Paid AS CHAR) LIKE ?
+        )
+      `;
+
+      paymentOutsParams.push(
+        like,
+        like,
+        like
+      );
+    }
+
+    if (startDate) {
+      paymentOutsWhere += `
+        AND DATE(po.Payment_Date) >= ?
+      `;
+
+      paymentOutsParams.push(startDate);
+    }
+
+    if (endDate) {
+      paymentOutsWhere += `
+        AND DATE(po.Payment_Date) <= ?
+      `;
+
+      paymentOutsParams.push(endDate);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | FETCH ALL SEVEN TRANSACTION TYPES
+    |--------------------------------------------------------------------------
+    |
+    | These calls reuse your existing print helpers.
+    |
+    */
+
+    const [
+      salesResult,
+      purchasesResult,
+      saleReturnsResult,
+      purchaseReturnsResult,
+      expensesResult,
+      paymentInsResult,
+      paymentOutsResult,
+    ] = await Promise.all([
+      getSalesForPrint(
+        connection,
+        salesWhere,
+        salesParams
+      ),
+
+      getPurchasesForPrint(
+        connection,
+        purchasesWhere,
+        purchasesParams
+      ),
+
+      getSaleReturnsForPrint(
+        connection,
+        saleReturnsWhere,
+        saleReturnsParams
+      ),
+
+      getPurchaseReturnsForPrint(
+        connection,
+        purchaseReturnsWhere,
+        purchaseReturnsParams
+      ),
+
+      getExpensesForPrint(
+        connection,
+        expensesWhere,
+        expensesParams
+      ),
+
+      getPaymentInsForPrint(
+        connection,
+        paymentInsWhere,
+        paymentInsParams
+      ),
+
+      getPaymentOutsForPrint(
+        connection,
+        paymentOutsWhere,
+        paymentOutsParams
+      ),
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | NORMALIZE RESULTS
+    |--------------------------------------------------------------------------
+    |
+    | Some of your existing helpers return [] when no records exist,
+    | while others return an object containing arrays and summaries.
+    |
+    */
+
+    const sales =
+      salesResult && !Array.isArray(salesResult)
+        ? salesResult
+        : {
+            invoices: [],
+            summary: {
+              totalAmount: 0,
+              totalReceived: 0,
+              totalBalanceDue: 0,
+            },
+          };
+
+    const purchases =
+      purchasesResult && !Array.isArray(purchasesResult)
+        ? purchasesResult
+        : {
+            purchaseBills: [],
+            summary: {
+              totalAmount: 0,
+              totalPaid: 0,
+              totalBalanceDue: 0,
+              totalDiscount: 0,
+            },
+          };
+
+    const saleReturns =
+      saleReturnsResult || {
+        saleReturns: [],
+        summary: {
+          totalAmount: 0,
+          totalPaid: 0,
+          totalDue: 0,
+          totalDiscount: 0,
+        },
+      };
+
+    const purchaseReturns =
+      purchaseReturnsResult || {
+        purchaseReturns: [],
+        summary: {
+          totalAmount: 0,
+          totalReceived: 0,
+          totalDue: 0,
+          totalDiscount: 0,
+        },
+      };
+
+    const expenses =
+      expensesResult || {
+        expenseBills: [],
+        summary: {
+          totalAmount: 0,
+          totalPaid: 0,
+          totalDue: 0,
+          totalDiscount: 0,
+        },
+      };
+
+    const paymentIns =
+      paymentInsResult || {
+        paymentIns: [],
+        summary: {
+          totalReceived: 0,
+        },
+      };
+
+    const paymentOuts =
+      paymentOutsResult || {
+        paymentOuts: [],
+        summary: {
+          totalPaid: 0,
+        },
+      };
+
+    /*
+    |--------------------------------------------------------------------------
+    | TRANSACTION COUNTS
+    |--------------------------------------------------------------------------
+    */
+
+    const transactionCounts = {
+      sales: sales.invoices?.length || 0,
+
+      purchases:
+        purchases.purchaseBills?.length || 0,
+
+      saleReturns:
+        saleReturns.saleReturns?.length || 0,
+
+      purchaseReturns:
+        purchaseReturns.purchaseReturns?.length || 0,
+
+      expenses:
+        expenses.expenseBills?.length || 0,
+
+      paymentIns:
+        paymentIns.paymentIns?.length || 0,
+
+      paymentOuts:
+        paymentOuts.paymentOuts?.length || 0,
+    };
+
+    const totalTransactions =
+      Object.values(transactionCounts).reduce(
+        (total, count) => total + count,
+        0
+      );
+
+    /*
+    |--------------------------------------------------------------------------
+    | RESPONSE
+    |--------------------------------------------------------------------------
+    */
+
+    return res.status(200).json({
+      success: true,
+
+      filters: {
+        fromDate: startDate,
+        toDate: endDate,
+        search: searchTerm,
+      },
+
+      totalTransactions,
+
+      transactionCounts,
+
+      sales: {
+        invoices: sales.invoices || [],
+        summary: sales.summary || {},
+      },
+
+      purchases: {
+        purchaseBills:
+          purchases.purchaseBills || [],
+        summary: purchases.summary || {},
+      },
+
+      saleReturns: {
+        saleReturns:
+          saleReturns.saleReturns || [],
+        summary: saleReturns.summary || {},
+      },
+
+      purchaseReturns: {
+        purchaseReturns:
+          purchaseReturns.purchaseReturns || [],
+        summary: purchaseReturns.summary || {},
+      },
+
+      expenses: {
+        expenseBills:
+          expenses.expenseBills || [],
+        summary: expenses.summary || {},
+      },
+
+      paymentIns: {
+        paymentIns:
+          paymentIns.paymentIns || [],
+        summary: paymentIns.summary || {},
+      },
+
+      paymentOuts: {
+        paymentOuts:
+          paymentOuts.paymentOuts || [],
+        summary: paymentOuts.summary || {},
+      },
+    });
+  } catch (error) {
+    console.error(
+      "All Transactions Day Print Report Error:",
+      error
+    );
+
+    return next(error);
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+};
 export {getSalesNewSalesPurchasesEachDay,
   getSalesNewSalesPurchasesInDateRange,
   getSalesAndPurchasesDailyYearMonthWise,

@@ -240,6 +240,7 @@ return {
 
 // helpers/salesPrintHelper.js
 
+
 export const getSalesForPrint = async (
   connection,
   whereClause,

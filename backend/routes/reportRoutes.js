@@ -6,7 +6,8 @@ import { getSalesAndPurchasesDailyYearMonthWise, getSalesAndPurchasesMonthWise, 
      getBalanceSheet,
     
      getDayWiseTransactionsCount,
-     getDayWiseTransactionsDetails} from "../controllers/reportsController.js";
+     getDayWiseTransactionsDetails,
+     getAllTransactionsDayPrintReport} from "../controllers/reportsController.js";
 import userAuth from "../middleware/userAuth.js";
 
 const router = express.Router();
@@ -31,4 +32,5 @@ router.post("/print-daily-report",userAuth,printDailyReport)
       router.get("/balance-sheet", userAuth, getBalanceSheet);
       router.get("/day-wise-transactions-count",userAuth,getDayWiseTransactionsCount);
       router.get("/day-wise-transactions-details",userAuth,getDayWiseTransactionsDetails)
+      router.get("/day-wise-transactions-details-print",userAuth,getAllTransactionsDayPrintReport);
 export default router;
