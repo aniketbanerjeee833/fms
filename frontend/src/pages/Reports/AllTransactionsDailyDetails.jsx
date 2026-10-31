@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, forwardRef } from "react";
-import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { useReactToPrint } from "react-to-print";
@@ -16,11 +16,17 @@ import DeleteConfirmModal from "../../components/Modal/DeleteConfirmModal";
 import InvoicePrintTemplate from "../../components/InvoicePrintTemplate";
 import CreditDebitNotePrintTemplate from "../../components/CreditDebitNotePrintTemplate";
 import VirtualScrollList from "../../components/VirtualScrollList";
-import { useDeletePaymentInMutation, useGetPaymentInByIdQuery } from "../../redux/api/paymentInApi";
-import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery } from "../../redux/api/paymentOutApi";
+import { useDeletePaymentInMutation, useGetPaymentInByIdQuery, useUpdatePaymentInMutation } from "../../redux/api/paymentInApi";
+import { useDeletePaymentOutMutation, useGetPaymentOutByIdQuery, useUpdatePaymentOutMutation } from "../../redux/api/paymentOutApi";
 import PaymentInOutPrintTemplate from "../../components/PaymentInOutPrintTemplate";
 import { useDeleteExpenseMutation, useGetExpenseByIdQuery } from "../../redux/api/expenseApi";
 import ExpensePrintTemplate from "../../components/ExpensePrintTemplate";
+import PaymentInModal from "../../components/Modal/PaymentInModal";
+import PaymentOutModal from "../../components/Modal/PaymentOutModal";
+import PartyAddModal from "../../components/Modal/PartyAddModal";
+import { useGetAllPartiesQuery } from "../../redux/api/partyAPi";
+import { useGetAllBankAccountsQuery, bankAccountApi } from "../../redux/api/bankAccountApi";
+import { cashInHandApi } from "../../redux/api/cashInHandApi";
 
 /* ------------------------------------------------------------------ */
 /*  TRANSACTION TYPE CONFIG                                            */
@@ -203,43 +209,27 @@ export default function AllTransactionsDailyDetails() {
   const dispatch = useDispatch();
 
   const [activeType, setActiveType] = useState("all");
-  // const [search, setSearch] = useState("");
+  const [search, setSearch] = useState("");
   const [rowMenuOpen, setRowMenuOpen] = useState(null);
   const [clickHighlightId, setClickHighlightId] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [print, setPrint] = useState(null); // { mode, id?, rows?, title? }
+  const [transactionModal, setTransactionModal] = useState({
+    open: false,
+    type: null,
+    id: null,
+  });
+  const { data: partiesList } = useGetAllPartiesQuery();
+  const { data: banks = [] } = useGetAllBankAccountsQuery();
+  const [updatePaymentIn, { isLoading: isUpdatingPaymentIn }] = useUpdatePaymentInMutation();
+  const [updatePaymentOut, { isLoading: isUpdatingPaymentOut }] = useUpdatePaymentOutMutation();
   const printRef = useRef(null);
   const [cursor, setCursor] = useState(null);
   const LIMIT = 50;
 
-const [searchParams, setSearchParams] = useSearchParams();
-
-const search = searchParams.get("search") || "";
-
-const [debouncedSearch, setDebouncedSearch] = useState(search);
-const handleSearchChange = (e) => {
-  const value = e.target.value;
-  const params = new URLSearchParams(searchParams);
-
-  if (value) {
-    params.set("search", value);
-  } else {
-    params.delete("search");
-  }
-
-  params.delete("cursor");
-  setSearchParams(params);
-};
-useEffect(() => {
-  const timer = setTimeout(() => {
-    setDebouncedSearch(search.trim());
-  }, 300);
-
-  return () => clearTimeout(timer);
-}, [search]);
   // const { data, isLoading, isFetching, isError, refetch } =
   //   useGetDayWiseTransactionsDetailsQuery(date, { skip: !date });
-const {
+  const {
   data: alltransactionDailyDetails,
   isLoading,
   isFetching,
@@ -250,7 +240,6 @@ const {
     date,
     cursor,
     limit: LIMIT,
-    search: debouncedSearch,
   },
   { skip: !date }
 );
@@ -261,9 +250,6 @@ const handleLoadMore = () => {
 
   setCursor(alltransactionDailyDetails.nextCursor);
 };
-useEffect(() => {
-  setCursor(null);
-}, [date, debouncedSearch]);
   /* ---------- delete mutations (only sale & purchase wired) ---------- */
   const [deleteSale, { isLoading: deletingSale }] = useDeleteSaleMutation();
   const [deletePurchase, { isLoading: deletingPurchase }] = useDeletePurchaseMutation();
@@ -304,28 +290,17 @@ useEffect(() => {
     );
   }, [alltransactionDailyDetails]);
 
-  // const rows = useMemo(() => {
-  //   const q = search.trim().toLowerCase();
-  //   return allRows.filter((r) => {
-  //     if (activeType !== "all" && r._type !== activeType) return false;
-  //     if (!q) return true;
-  //     return (
-  //       String(r.Party_Name || "").toLowerCase().includes(q) ||
-  //       String(r._number || "").toLowerCase().includes(q)
-  //     );
-  //   });
-  // }, [allRows, activeType, search]);
- 
-const rows = useMemo(() => {
-  return allRows.filter((r) => {
-    if (activeType !== "all" && r._type !== activeType) {
-      return false;
-    }
-
-    return true;
-  });
-}, [allRows, activeType]);
-
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return allRows.filter((r) => {
+      if (activeType !== "all" && r._type !== activeType) return false;
+      if (!q) return true;
+      return (
+        String(r.Party_Name || "").toLowerCase().includes(q) ||
+        String(r._number || "").toLowerCase().includes(q)
+      );
+    });
+  }, [allRows, activeType, search]);
 
   const totalsByType = useMemo(() => {
     const out = {};
@@ -344,6 +319,54 @@ const rows = useMemo(() => {
     return () => document.removeEventListener("click", close);
   }, []);
 
+
+  /* ---------- Payment In / Payment Out modal details ---------- */
+  const { currentData: paymentInModalData, isFetching: isFetchingPaymentInModal } =
+    useGetPaymentInByIdQuery(transactionModal.id, {
+      skip: !transactionModal.open || transactionModal.type !== "paymentIns" || !transactionModal.id,
+    });
+  const { currentData: paymentOutModalData, isFetching: isFetchingPaymentOutModal } =
+    useGetPaymentOutByIdQuery(transactionModal.id, {
+      skip: !transactionModal.open || transactionModal.type !== "paymentOuts" || !transactionModal.id,
+    });
+
+  const closeTransactionModal = () =>
+    setTransactionModal({ open: false, type: null, id: null });
+
+  const openTransaction = (row) => {
+    if (row._type === "paymentIns" || row._type === "paymentOuts") {
+      setRowMenuOpen(null);
+      setTransactionModal({ open: true, type: row._type, id: row._id });
+      return;
+    }
+    navigate(row._cfg.editPath(row._id), { state: { from: "day-wise-report" } });
+  };
+
+  const handleSavePaymentIn = async (formData) => {
+    try {
+      await updatePaymentIn({ id: transactionModal.id, ...formData }).unwrap();
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+      toast.success("Payment In updated successfully");
+      closeTransactionModal();
+      refetch();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to update Payment In");
+    }
+  };
+
+  const handleSavePaymentOut = async (formData) => {
+    try {
+      await updatePaymentOut({ id: transactionModal.id, ...formData }).unwrap();
+      dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+      dispatch(bankAccountApi.util.invalidateTags(["BankAccount"]));
+      toast.success("Payment Out updated successfully");
+      closeTransactionModal();
+      refetch();
+    } catch (err) {
+      toast.error(err?.data?.message || "Failed to update Payment Out");
+    }
+  };
 
   /* ---------- printing ---------- */
   const { currentData: saleData } = useGetSingleSaleQuery(print?.id, {
@@ -524,8 +547,7 @@ const rows = useMemo(() => {
                   type="text"
                   placeholder="Search ..."
                   value={search}
-                  onChange={handleSearchChange}
-                  //onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => setSearch(e.target.value)}
                   className="w-full sm:w-56"
                 />
               </div>
@@ -635,9 +657,7 @@ const rows = useMemo(() => {
                         <div
                           key={row._key}
                           onClick={() => setClickHighlightId(row._key)}
-                          onDoubleClick={() =>
-                            navigate(cfg.editPath(row._id), { state: { from: "day-wise-report" } })
-                          }
+                          onDoubleClick={() => openTransaction(row)}
                           style={{
                             display: "grid",
                             gridTemplateColumns: GRID_COLS,
@@ -744,18 +764,32 @@ const rows = useMemo(() => {
                                   overflow: "hidden",
                                 }}
                               >
-                                <NavLink
-                                  to={cfg.editPath(row._id)}
-                                  state={{ from: "day-wise-report" }}
-                                  className="row-menu-item"
-                                  onClick={() => {
-                                    setClickHighlightId(null);
-                                    setRowMenuOpen(null);
-                                  }}
-                                >
-                                  <Eye size={13} style={{ color: "#4CA1AF" }} />
-                                  <span>View / Edit</span>
-                                </NavLink>
+                                {(row._type === "paymentIns" || row._type === "paymentOuts") ? (
+                                  <button
+                                    type="button"
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      openTransaction(row);
+                                    }}
+                                  >
+                                    <Eye size={13} style={{ color: "#4CA1AF" }} />
+                                    <span>View / Edit</span>
+                                  </button>
+                                ) : (
+                                  <NavLink
+                                    to={cfg.editPath(row._id)}
+                                    state={{ from: "day-wise-report" }}
+                                    className="row-menu-item"
+                                    onClick={() => {
+                                      setClickHighlightId(null);
+                                      setRowMenuOpen(null);
+                                    }}
+                                  >
+                                    <Eye size={13} style={{ color: "#4CA1AF" }} />
+                                    <span>View / Edit</span>
+                                  </NavLink>
+                                )}
 
                                 {/* Return only for sale & purchase */}
                                 {cfg.canReturn && (
@@ -817,6 +851,39 @@ const rows = useMemo(() => {
           onClose={() => setDeleteTarget(null)}
           onConfirm={handleConfirmDelete}
           isDeleting={isDeleting}
+        />
+      )}
+
+      {/* PAYMENT IN / PAYMENT OUT EDIT MODALS */}
+      {transactionModal.open && (isFetchingPaymentInModal || isFetchingPaymentOutModal) && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40">
+          <div className="rounded-lg bg-white px-6 py-4 shadow-xl">Loading transaction...</div>
+        </div>
+      )}
+
+      {transactionModal.open && transactionModal.type === "paymentIns" && paymentInModalData?.paymentIn && (
+        <PaymentInModal
+          mode="edit"
+          initialData={paymentInModalData.paymentIn}
+          parties={partiesList}
+          banks={banks}
+          onClose={closeTransactionModal}
+          onSave={handleSavePaymentIn}
+          isSaving={isUpdatingPaymentIn}
+          PartyAddModal={PartyAddModal}
+        />
+      )}
+
+      {transactionModal.open && transactionModal.type === "paymentOuts" && paymentOutModalData?.paymentOut && (
+        <PaymentOutModal
+          mode="edit"
+          initialData={paymentOutModalData.paymentOut}
+          parties={partiesList}
+          banks={banks}
+          onClose={closeTransactionModal}
+          onSave={handleSavePaymentOut}
+          isSaving={isUpdatingPaymentOut}
+          PartyAddModal={PartyAddModal}
         />
       )}
 
