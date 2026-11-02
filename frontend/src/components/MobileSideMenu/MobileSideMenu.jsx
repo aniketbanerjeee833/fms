@@ -64,10 +64,12 @@ const MobileSideMenu = ({ onClose }) => {
 
     }
   
-    if (currentPath.startsWith("/reports/sales-purchases-report") ||
-      currentPath.startsWith("/reports/balance-sheet")) {
+      if(currentPath.startsWith("/reports/sales-purchases-report") ||
+    currentPath.startsWith("/reports/balance-sheet") ||
+    currentPath.startsWith("/reports/all-transactions") )
+     {
       setOpenMenu("Reports");
-
+      
     }
 
   }, [location]);
@@ -151,10 +153,13 @@ const MobileSideMenu = ({ onClose }) => {
 
     if (cleanLink === "/financial-year/add" && current.startsWith("/financial-year/add"))
       return true;
-    if ((cleanLink === "/reports/sales-purchases-report" &&
-      current.startsWith("/reports/sales-purchases-report")) ||
-      (cleanLink === "/reports/balance-sheet" && current.startsWith("/reports/balance-sheet")))
+
+   if((cleanLink==="/reports/sales-purchases-report" && 
+      current.startsWith("/reports/sales-purchases-report"))||
+      (cleanLink==="/reports/balance-sheet" && current.startsWith("/reports/balance-sheet"))||
+      (cleanLink==="/reports/all-transactions" && current.startsWith("/reports/all-transactions")))
       return true;
+
     return false;
   };
   // const handleDashBoardClick = () => {
@@ -464,6 +469,7 @@ const MobileSideMenu = ({ onClose }) => {
                   [
                     // { to: "/reports/sales-purchases-report", text: "Sales & Purchases Report" },
                      { to: "/reports/balance-sheet", text: "Balance Sheet" },
+                     { to: "/reports/all-transactions", text: "All Transactions" },
                   ]
                 )} 
           </ul>

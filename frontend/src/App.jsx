@@ -90,7 +90,7 @@ const Transactions= lazy(() => import('./pages/Settings/Transactions'));
 const SalesPurchasesReport= lazy(() => import('./pages/Reports/SalesPurchasesReport'));
 const BalanceSheet = lazy(() => import('./pages/Reports/BalanceSheet'));
 const AllTransactions = lazy(() => import('./pages/Reports/AllTransactions'));
-const AllTransactionsDailyDetails= lazy(() => import('./pages/Reports/AllTransactionsDailyDetails'));
+const AllTransactionsDetails= lazy(() => import('./pages/Reports/AllTransactionsDetails'));
 
 // ==========================================
 // 🔒 Auth Route Guards
@@ -529,15 +529,25 @@ function RouterWrapper() {
                 </Layout>
               }
             />
-            <Route
-              path="/reports/all-transactions-details-day-wise/:date"
-              element={
-                 <Layout>
-                  <AllTransactionsDailyDetails/>
-                  </Layout>
-                
-              }
-            />
+            {/* Single-day report */}
+<Route
+  path="/reports/all-transactions-details-day-wise/:date"
+  element={
+    <Layout>
+      <AllTransactionsDetails />
+    </Layout>
+  }
+/>
+
+{/* Date-range report */}
+<Route
+  path="/reports/all-transactions-details-day-wise"
+  element={
+    <Layout>
+      <AllTransactionsDetails />
+    </Layout>
+  }
+/>
               <Route
               path="/day-wise-report/:date"
               element={

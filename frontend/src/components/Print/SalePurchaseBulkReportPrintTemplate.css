@@ -150,3 +150,13 @@
   size: A4;
   margin: 10mm;
 }
+/* Reduce heading-to-content gap for the expense report only */
+.bulk-report-subtitle.bulk-expense-subtitle {
+  margin-bottom: 4px !important;
+  padding-bottom: 0 !important;
+}
+
+/* Remove extra top margin from the first expense record */
+.bulk-print .bulk-invoice-block > div:first-child > div:first-child {
+  margin-top: 0 !important;
+}

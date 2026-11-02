@@ -10,24 +10,24 @@ import {
   getPaymentOutsForPrint,
 } from "../helpers/printReportHelpers.js";
 
-   const TAX_TYPES = {
-        "GST0": "GST 0%",
-        "GST0.25": "GST 0.25%",
-        "GST3": "GST 3%",
-        GST5: "GST 5%",
-        GST12: "GST 12%",
-        GST18: "GST 18%",
-        GST28: "GST 28%",
-        GST40: "GST 40%",
-        "IGST0": "IGST 0%",
-        "IGST0.25": "IGST 0.25%",
-        "IGST3": "IGST 3%",
-        IGST5: "IGST 5%",
-        IGST12: "IGST 12%",
-        IGST18: "IGST 18%",
-        IGST28: "IGST 28%",
-        IGST40: "IGST 40%"
-    }
+const TAX_TYPES = {
+  "GST0": "GST 0%",
+  "GST0.25": "GST 0.25%",
+  "GST3": "GST 3%",
+  GST5: "GST 5%",
+  GST12: "GST 12%",
+  GST18: "GST 18%",
+  GST28: "GST 28%",
+  GST40: "GST 40%",
+  "IGST0": "IGST 0%",
+  "IGST0.25": "IGST 0.25%",
+  "IGST3": "IGST 3%",
+  IGST5: "IGST 5%",
+  IGST12: "IGST 12%",
+  IGST18: "IGST 18%",
+  IGST28: "IGST 28%",
+  IGST40: "IGST 40%"
+}
 
 
 //DAILY SALES AND PURCHASES
@@ -38,7 +38,7 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
   try {
     connection = await db.getConnection();
 
-        const { date } = req.query;
+    const { date } = req.query;
 
     if (!date) {
       connection.release();
@@ -69,10 +69,10 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
     );
 
     // Sales: single JOIN query — no second round trip for items
-    
-      queries.push(
-        connection.query(
-          `SELECT
+
+    queries.push(
+      connection.query(
+        `SELECT
              s.Sale_Id, s.Invoice_Number, s.Invoice_Date,
              s.State_Of_Supply, s.Payment_Type, s.Reference_Number,
              s.Total_Amount, s.Total_Received, s.Balance_Due,
@@ -88,29 +88,29 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
            LEFT JOIN add_item i ON si.Item_Id = i.Item_Id
            WHERE  DATE(s.Invoice_Date) = ?
            ORDER BY s.Invoice_Date ASC, s.Sale_Id`,
-          [ fullDate]
-        )
-      );
+        [fullDate]
+      )
+    );
 
-      // Sales totals
-      queries.push(
-        connection.query(
-          `SELECT
+    // Sales totals
+    queries.push(
+      connection.query(
+        `SELECT
              COALESCE(SUM(Total_Amount), 0)   AS totalSalesAmount,
              COALESCE(SUM(Total_Received), 0) AS totalSalesReceivedAmount,
              COALESCE(SUM(Balance_Due), 0)    AS totalSalesBalanceDue
            FROM add_sale
            WHERE  DATE(Invoice_Date) = ?`,
-          [ fullDate]
-        )
-      );
-    
+        [fullDate]
+      )
+    );
+
 
     // Purchases: same single JOIN approach
-    
-      queries.push(
-        connection.query(
-          `SELECT
+
+    queries.push(
+      connection.query(
+        `SELECT
              pu.Purchase_Id, pu.Bill_Number, pu.Bill_Date,
              pu.State_Of_Supply, pu.Payment_Type, pu.Reference_Number,
              pu.Total_Amount, pu.Total_Paid, pu.Balance_Due,
@@ -126,23 +126,23 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
            LEFT JOIN add_item i ON pi.Item_Id = i.Item_Id
             WHERE DATE(pu.Bill_Date) = ?
            ORDER BY pu.Bill_Date ASC, pu.Purchase_Id`,
-          [ fullDate]
-        )
-      );
+        [fullDate]
+      )
+    );
 
-      // Purchase totals
-      queries.push(
-        connection.query(
-          `SELECT
+    // Purchase totals
+    queries.push(
+      connection.query(
+        `SELECT
              COALESCE(SUM(Total_Amount), 0) AS totalPurchasesAmount,
              COALESCE(SUM(Total_Paid), 0)   AS totalPurchasePaidAmount,
              COALESCE(SUM(Balance_Due), 0)  AS totalPurchasesBalanceDue
            FROM add_purchase
             WHERE DATE(Bill_Date) = ?`,
-          [ fullDate]
-        )
-      );
-    
+        [fullDate]
+      )
+    );
+
 
     // 🔥 ALL queries fire at the same time
     const results = await Promise.all(queries);
@@ -151,102 +151,102 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
        1️⃣ UNPACK RESULTS IN ORDER
     --------------------------------------------------- */
     let idx = 0;
-    const [fyRows]          = results[idx++];
-    const activeFY          = fyRows[0]?.Financial_Year || null;
+    const [fyRows] = results[idx++];
+    const activeFY = fyRows[0]?.Financial_Year || null;
 
-    let salesWithItems      = [];
-    let salesTotals         = { totalSalesAmount: 0, totalSalesReceivedAmount: 0, totalSalesBalanceDue: 0 };
-    let purchasesWithItems  = [];
-    let purchaseTotals      = { totalPurchasesAmount: 0, totalPurchasePaidAmount: 0, totalPurchasesBalanceDue: 0 };
+    let salesWithItems = [];
+    let salesTotals = { totalSalesAmount: 0, totalSalesReceivedAmount: 0, totalSalesBalanceDue: 0 };
+    let purchasesWithItems = [];
+    let purchaseTotals = { totalPurchasesAmount: 0, totalPurchasePaidAmount: 0, totalPurchasesBalanceDue: 0 };
 
-    
-      const [saleJoinRows]  = results[idx++];
-      const [saleTotalRows] = results[idx++];
-      salesTotals = saleTotalRows[0];
 
-      // ── Group flat JOIN rows → parent + items map (one pass, O(n))
-      const saleMap = new Map();
-      for (const row of saleJoinRows) {
-        if (!saleMap.has(row.Sale_Id)) {
-          saleMap.set(row.Sale_Id, {
-            sale_id:        row.Sale_Id,
-            Party_Name:     row.Party_Name,
-            GSTIN:          row.GSTIN,
-            Invoice_Number: row.Invoice_Number,
-            Invoice_Date:   formatIndianDate(row.Invoice_Date),
-            State_Of_Supply:row.State_Of_Supply,
-            Payment_Type:   row.Payment_Type,
-            Reference_Number: row.Reference_Number,
-            Total_Received: row.Total_Received,
-            Balance_Due:    row.Balance_Due,
-            Total_Amount:   row.Total_Amount,
-            items: [],
-          });
-        }
-        if (row.Sale_Items_Id) {
-          saleMap.get(row.Sale_Id).items.push({
-            Sale_Items_Id:              row.Sale_Items_Id,
-            Item_Id:                    row.Item_Id,
-            Item_Name:                  row.Item_Name,
-            Item_HSN:                   row.Item_HSN,
-            Item_Category:              row.Item_Category,
-            Item_Unit:                  row.Item_Unit,
-            Quantity:                   row.Quantity,
-            Sale_Price:                 row.Sale_Price,
-            Discount_On_Sale_Price:     row.Discount_On_Sale_Price,
-            Discount_Type_On_Sale_Price:row.Discount_Type_On_Sale_Price,
-            Tax_Type:                   row.Tax_Type,
-            Tax_Amount:                 row.Tax_Amount,
-            Amount:                     row.Item_Amount,
-          });
-        }
+    const [saleJoinRows] = results[idx++];
+    const [saleTotalRows] = results[idx++];
+    salesTotals = saleTotalRows[0];
+
+    // ── Group flat JOIN rows → parent + items map (one pass, O(n))
+    const saleMap = new Map();
+    for (const row of saleJoinRows) {
+      if (!saleMap.has(row.Sale_Id)) {
+        saleMap.set(row.Sale_Id, {
+          sale_id: row.Sale_Id,
+          Party_Name: row.Party_Name,
+          GSTIN: row.GSTIN,
+          Invoice_Number: row.Invoice_Number,
+          Invoice_Date: formatIndianDate(row.Invoice_Date),
+          State_Of_Supply: row.State_Of_Supply,
+          Payment_Type: row.Payment_Type,
+          Reference_Number: row.Reference_Number,
+          Total_Received: row.Total_Received,
+          Balance_Due: row.Balance_Due,
+          Total_Amount: row.Total_Amount,
+          items: [],
+        });
       }
-      salesWithItems = [...saleMap.values()];
-  
-
-    
-      const [purJoinRows]   = results[idx++];
-      const [purTotalRows]  = results[idx++];
-      purchaseTotals = purTotalRows[0];
-
-      const purchaseMap = new Map();
-      for (const row of purJoinRows) {
-        if (!purchaseMap.has(row.Purchase_Id)) {
-          purchaseMap.set(row.Purchase_Id, {
-            purchase_id:    row.Purchase_Id,
-            Party_Name:     row.Party_Name,
-            GSTIN:          row.GSTIN,
-            Bill_Number:    row.Bill_Number,
-            Bill_Date:      formatIndianDate(row.Bill_Date),
-            State_Of_Supply:row.State_Of_Supply,
-            Payment_Type:   row.Payment_Type,
-            Reference_Number: row.Reference_Number,
-            Total_Paid:     row.Total_Paid,
-            Balance_Due:    row.Balance_Due,
-            Total_Amount:   row.Total_Amount,
-            items: [],
-          });
-        }
-        if (row.Purchase_items_Id) {
-          purchaseMap.get(row.Purchase_Id).items.push({
-            Purchase_items_Id:                  row.Purchase_items_Id,
-            Item_Id:                            row.Item_Id,
-            Item_Name:                          row.Item_Name,
-            Item_HSN:                           row.Item_HSN,
-            Item_Category:                      row.Item_Category,
-            Item_Unit:                          row.Item_Unit,
-            Quantity:                           row.Quantity,
-            Purchase_Price:                     row.Purchase_Price,
-            Discount_On_Purchase_Price:         row.Discount_On_Purchase_Price,
-            Discount_Type_On_Purchase_Price:    row.Discount_Type_On_Purchase_Price,
-            Tax_Type:                           row.Tax_Type,
-            Tax_Amount:                         row.Tax_Amount,
-            Amount:                             row.Item_Amount,
-          });
-        }
+      if (row.Sale_Items_Id) {
+        saleMap.get(row.Sale_Id).items.push({
+          Sale_Items_Id: row.Sale_Items_Id,
+          Item_Id: row.Item_Id,
+          Item_Name: row.Item_Name,
+          Item_HSN: row.Item_HSN,
+          Item_Category: row.Item_Category,
+          Item_Unit: row.Item_Unit,
+          Quantity: row.Quantity,
+          Sale_Price: row.Sale_Price,
+          Discount_On_Sale_Price: row.Discount_On_Sale_Price,
+          Discount_Type_On_Sale_Price: row.Discount_Type_On_Sale_Price,
+          Tax_Type: row.Tax_Type,
+          Tax_Amount: row.Tax_Amount,
+          Amount: row.Item_Amount,
+        });
       }
-      purchasesWithItems = [...purchaseMap.values()];
-   
+    }
+    salesWithItems = [...saleMap.values()];
+
+
+
+    const [purJoinRows] = results[idx++];
+    const [purTotalRows] = results[idx++];
+    purchaseTotals = purTotalRows[0];
+
+    const purchaseMap = new Map();
+    for (const row of purJoinRows) {
+      if (!purchaseMap.has(row.Purchase_Id)) {
+        purchaseMap.set(row.Purchase_Id, {
+          purchase_id: row.Purchase_Id,
+          Party_Name: row.Party_Name,
+          GSTIN: row.GSTIN,
+          Bill_Number: row.Bill_Number,
+          Bill_Date: formatIndianDate(row.Bill_Date),
+          State_Of_Supply: row.State_Of_Supply,
+          Payment_Type: row.Payment_Type,
+          Reference_Number: row.Reference_Number,
+          Total_Paid: row.Total_Paid,
+          Balance_Due: row.Balance_Due,
+          Total_Amount: row.Total_Amount,
+          items: [],
+        });
+      }
+      if (row.Purchase_items_Id) {
+        purchaseMap.get(row.Purchase_Id).items.push({
+          Purchase_items_Id: row.Purchase_items_Id,
+          Item_Id: row.Item_Id,
+          Item_Name: row.Item_Name,
+          Item_HSN: row.Item_HSN,
+          Item_Category: row.Item_Category,
+          Item_Unit: row.Item_Unit,
+          Quantity: row.Quantity,
+          Purchase_Price: row.Purchase_Price,
+          Discount_On_Purchase_Price: row.Discount_On_Purchase_Price,
+          Discount_Type_On_Purchase_Price: row.Discount_Type_On_Purchase_Price,
+          Tax_Type: row.Tax_Type,
+          Tax_Amount: row.Tax_Amount,
+          Amount: row.Item_Amount,
+        });
+      }
+    }
+    purchasesWithItems = [...purchaseMap.values()];
+
 
     /* ---------------------------------------------------
        FINAL RESPONSE
@@ -255,24 +255,24 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
       success: true,
       date: fullDate,
       financialYear: activeFY,
-      
+
       data: {
-       
-          sales: {
-            items: salesWithItems,
-            totalSalesAmount:         salesTotals.totalSalesAmount,
-            totalSalesReceivedAmount: salesTotals.totalSalesReceivedAmount,
-            totalSalesBalanceDue:     salesTotals.totalSalesBalanceDue,
-          },
-       
-        
-          purchases: {
-            items: purchasesWithItems,
-            totalPurchasesAmount:     purchaseTotals.totalPurchasesAmount,
-            totalPurchasePaidAmount:  purchaseTotals.totalPurchasePaidAmount,
-            totalPurchasesBalanceDue: purchaseTotals.totalPurchasesBalanceDue,
-          },
-        
+
+        sales: {
+          items: salesWithItems,
+          totalSalesAmount: salesTotals.totalSalesAmount,
+          totalSalesReceivedAmount: salesTotals.totalSalesReceivedAmount,
+          totalSalesBalanceDue: salesTotals.totalSalesBalanceDue,
+        },
+
+
+        purchases: {
+          items: purchasesWithItems,
+          totalPurchasesAmount: purchaseTotals.totalPurchasesAmount,
+          totalPurchasePaidAmount: purchaseTotals.totalPurchasePaidAmount,
+          totalPurchasesBalanceDue: purchaseTotals.totalPurchasesBalanceDue,
+        },
+
       },
     });
   } catch (err) {
@@ -355,7 +355,7 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
 //     )
 //     const saleIds = sales.map((s) => s.Sale_Id);
 
- 
+
 //     if (saleIds.length > 0) {
 //       const [items] = await connection.query(
 //         `SELECT si.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
@@ -462,7 +462,7 @@ const getSalesNewSalesPurchasesEachDay = async (req, res, next) => {
 
 //     const purchaseIds = purchases.map((p) => p.Purchase_Id);
 
-   
+
 //     if (purchaseIds.length > 0) {
 //       const [items] = await connection.query(
 //         `SELECT pu.*, i.Item_Name, i.Item_HSN, i.Item_Category, i.Item_Unit
@@ -939,16 +939,16 @@ const getSalesNewSalesPurchasesInDateRange = async (req, res, next) => {
        1️⃣ UNPACK RESULTS IN ORDER
     --------------------------------------------------- */
     let idx = 0;
-    const [fyRows]          = results[idx++];
-    const activeFY          = fyRows[0]?.Financial_Year || null;
+    const [fyRows] = results[idx++];
+    const activeFY = fyRows[0]?.Financial_Year || null;
 
-    let salesWithItems      = [];
-    let salesTotals         = { totalSalesAmount: 0, totalSalesReceivedAmount: 0, totalSalesBalanceDue: 0 };
-    let purchasesWithItems  = [];
-    let purchaseTotals      = { totalPurchasesAmount: 0, totalPurchasePaidAmount: 0, totalPurchasesBalanceDue: 0 };
+    let salesWithItems = [];
+    let salesTotals = { totalSalesAmount: 0, totalSalesReceivedAmount: 0, totalSalesBalanceDue: 0 };
+    let purchasesWithItems = [];
+    let purchaseTotals = { totalPurchasesAmount: 0, totalPurchasePaidAmount: 0, totalPurchasesBalanceDue: 0 };
 
     if (fetchSales) {
-      const [saleJoinRows]  = results[idx++];
+      const [saleJoinRows] = results[idx++];
       const [saleTotalRows] = results[idx++];
       salesTotals = saleTotalRows[0];
 
@@ -957,35 +957,35 @@ const getSalesNewSalesPurchasesInDateRange = async (req, res, next) => {
       for (const row of saleJoinRows) {
         if (!saleMap.has(row.Sale_Id)) {
           saleMap.set(row.Sale_Id, {
-            sale_id:        row.Sale_Id,
-            Party_Name:     row.Party_Name,
-            GSTIN:          row.GSTIN,
+            sale_id: row.Sale_Id,
+            Party_Name: row.Party_Name,
+            GSTIN: row.GSTIN,
             Invoice_Number: row.Invoice_Number,
-            Invoice_Date:   formatIndianDate(row.Invoice_Date),
-            State_Of_Supply:row.State_Of_Supply,
-            Payment_Type:   row.Payment_Type,
+            Invoice_Date: formatIndianDate(row.Invoice_Date),
+            State_Of_Supply: row.State_Of_Supply,
+            Payment_Type: row.Payment_Type,
             Reference_Number: row.Reference_Number,
             Total_Received: row.Total_Received,
-            Balance_Due:    row.Balance_Due,
-            Total_Amount:   row.Total_Amount,
+            Balance_Due: row.Balance_Due,
+            Total_Amount: row.Total_Amount,
             items: [],
           });
         }
         if (row.Sale_Items_Id) {
           saleMap.get(row.Sale_Id).items.push({
-            Sale_Items_Id:              row.Sale_Items_Id,
-            Item_Id:                    row.Item_Id,
-            Item_Name:                  row.Item_Name,
-            Item_HSN:                   row.Item_HSN,
-            Item_Category:              row.Item_Category,
-            Item_Unit:                  row.Item_Unit,
-            Quantity:                   row.Quantity,
-            Sale_Price:                 row.Sale_Price,
-            Discount_On_Sale_Price:     row.Discount_On_Sale_Price,
-            Discount_Type_On_Sale_Price:row.Discount_Type_On_Sale_Price,
-            Tax_Type:                   row.Tax_Type,
-            Tax_Amount:                 row.Tax_Amount,
-            Amount:                     row.Item_Amount,
+            Sale_Items_Id: row.Sale_Items_Id,
+            Item_Id: row.Item_Id,
+            Item_Name: row.Item_Name,
+            Item_HSN: row.Item_HSN,
+            Item_Category: row.Item_Category,
+            Item_Unit: row.Item_Unit,
+            Quantity: row.Quantity,
+            Sale_Price: row.Sale_Price,
+            Discount_On_Sale_Price: row.Discount_On_Sale_Price,
+            Discount_Type_On_Sale_Price: row.Discount_Type_On_Sale_Price,
+            Tax_Type: row.Tax_Type,
+            Tax_Amount: row.Tax_Amount,
+            Amount: row.Item_Amount,
           });
         }
       }
@@ -993,43 +993,43 @@ const getSalesNewSalesPurchasesInDateRange = async (req, res, next) => {
     }
 
     if (fetchPurchases) {
-      const [purJoinRows]   = results[idx++];
-      const [purTotalRows]  = results[idx++];
+      const [purJoinRows] = results[idx++];
+      const [purTotalRows] = results[idx++];
       purchaseTotals = purTotalRows[0];
 
       const purchaseMap = new Map();
       for (const row of purJoinRows) {
         if (!purchaseMap.has(row.Purchase_Id)) {
           purchaseMap.set(row.Purchase_Id, {
-            purchase_id:    row.Purchase_Id,
-            Party_Name:     row.Party_Name,
-            GSTIN:          row.GSTIN,
-            Bill_Number:    row.Bill_Number,
-            Bill_Date:      formatIndianDate(row.Bill_Date),
-            State_Of_Supply:row.State_Of_Supply,
-            Payment_Type:   row.Payment_Type,
+            purchase_id: row.Purchase_Id,
+            Party_Name: row.Party_Name,
+            GSTIN: row.GSTIN,
+            Bill_Number: row.Bill_Number,
+            Bill_Date: formatIndianDate(row.Bill_Date),
+            State_Of_Supply: row.State_Of_Supply,
+            Payment_Type: row.Payment_Type,
             Reference_Number: row.Reference_Number,
-            Total_Paid:     row.Total_Paid,
-            Balance_Due:    row.Balance_Due,
-            Total_Amount:   row.Total_Amount,
+            Total_Paid: row.Total_Paid,
+            Balance_Due: row.Balance_Due,
+            Total_Amount: row.Total_Amount,
             items: [],
           });
         }
         if (row.Purchase_items_Id) {
           purchaseMap.get(row.Purchase_Id).items.push({
-            Purchase_items_Id:                  row.Purchase_items_Id,
-            Item_Id:                            row.Item_Id,
-            Item_Name:                          row.Item_Name,
-            Item_HSN:                           row.Item_HSN,
-            Item_Category:                      row.Item_Category,
-            Item_Unit:                          row.Item_Unit,
-            Quantity:                           row.Quantity,
-            Purchase_Price:                     row.Purchase_Price,
-            Discount_On_Purchase_Price:         row.Discount_On_Purchase_Price,
-            Discount_Type_On_Purchase_Price:    row.Discount_Type_On_Purchase_Price,
-            Tax_Type:                           row.Tax_Type,
-            Tax_Amount:                         row.Tax_Amount,
-            Amount:                             row.Item_Amount,
+            Purchase_items_Id: row.Purchase_items_Id,
+            Item_Id: row.Item_Id,
+            Item_Name: row.Item_Name,
+            Item_HSN: row.Item_HSN,
+            Item_Category: row.Item_Category,
+            Item_Unit: row.Item_Unit,
+            Quantity: row.Quantity,
+            Purchase_Price: row.Purchase_Price,
+            Discount_On_Purchase_Price: row.Discount_On_Purchase_Price,
+            Discount_Type_On_Purchase_Price: row.Discount_Type_On_Purchase_Price,
+            Tax_Type: row.Tax_Type,
+            Tax_Amount: row.Tax_Amount,
+            Amount: row.Item_Amount,
           });
         }
       }
@@ -1049,16 +1049,16 @@ const getSalesNewSalesPurchasesInDateRange = async (req, res, next) => {
         ...(fetchSales && {
           sales: {
             items: salesWithItems,
-            totalSalesAmount:         salesTotals.totalSalesAmount,
+            totalSalesAmount: salesTotals.totalSalesAmount,
             totalSalesReceivedAmount: salesTotals.totalSalesReceivedAmount,
-            totalSalesBalanceDue:     salesTotals.totalSalesBalanceDue,
+            totalSalesBalanceDue: salesTotals.totalSalesBalanceDue,
           },
         }),
         ...(fetchPurchases && {
           purchases: {
             items: purchasesWithItems,
-            totalPurchasesAmount:     purchaseTotals.totalPurchasesAmount,
-            totalPurchasePaidAmount:  purchaseTotals.totalPurchasePaidAmount,
+            totalPurchasesAmount: purchaseTotals.totalPurchasesAmount,
+            totalPurchasePaidAmount: purchaseTotals.totalPurchasePaidAmount,
             totalPurchasesBalanceDue: purchaseTotals.totalPurchasesBalanceDue,
           },
         }),
@@ -1279,9 +1279,9 @@ const getSalesAndPurchasesWeeklyYearMonthWise = async (req, res, next) => {
 const getSalesAndPurchasesMonthWise = async (req, res, next) => {
   let connection;
   try {
-    const year = parseInt(req.query.year)|| new Date().getFullYear();
+    const year = parseInt(req.query.year) || new Date().getFullYear();
     console.log("📅 Year received:", year);
-  connection = await db.getConnection();
+    connection = await db.getConnection();
     // 🟦 Fetch monthly total sales
     // const [sales] = await db.query(
     //   `
@@ -1295,7 +1295,7 @@ const getSalesAndPurchasesMonthWise = async (req, res, next) => {
     //   `,
     //   [year]
     // );
-        const [sales] = await db.query(
+    const [sales] = await db.query(
       `
       SELECT 
         MONTH(Invoice_Date) AS month, 
@@ -1321,7 +1321,7 @@ const getSalesAndPurchasesMonthWise = async (req, res, next) => {
     //   `,
     //   [year]
     // );
-   const [purchases] = await db.query(
+    const [purchases] = await db.query(
       `
       SELECT 
         MONTH(Bill_Date) AS month, 
@@ -1378,11 +1378,11 @@ const getSalesAndPurchasesMonthWise = async (req, res, next) => {
       data: combinedData,
     });
   } catch (err) {
-      if (connection) connection.release();
+    if (connection) connection.release();
     console.error("❌ Error getting all sales and purchases year wise:", err);
     next(err);
     // return res.status(500).json({ message: "Internal Server Error" });
-  }finally {
+  } finally {
     if (connection) connection.release();
   }
 };
@@ -1454,7 +1454,7 @@ const getSalesAndPurchasesMonthWise = async (req, res, next) => {
 //     );
 
 //     return res.status(200).json({
-    
+
 //       data: combinedData,
 //     });
 
@@ -2163,7 +2163,7 @@ const printDailyReport = async (req, res) => {
     // Accept BOTH daily OR range
     const {
       sales = [],
-    
+
       purchases = [],
 
       date,        // for single-day
@@ -2174,7 +2174,7 @@ const printDailyReport = async (req, res) => {
       totalSalesReceivedAmount,
       totalSalesBalanceDue,
 
-     
+
 
       totalPurchasesAmount,
       totalPurchasesPaidAmount,
@@ -2187,7 +2187,7 @@ const printDailyReport = async (req, res) => {
       totalSalesReceivedAmount: totalSalesReceivedAmount || 0,
       totalSalesBalanceDue: totalSalesBalanceDue || 0,
 
-     
+
 
       totalPurchasesAmount: totalPurchasesAmount || 0,
       totalPurchasesPaidAmount: totalPurchasesPaidAmount || 0,
@@ -2196,133 +2196,133 @@ const printDailyReport = async (req, res) => {
 
     const safe = (v) => (v !== undefined && v !== null ? v : "N/A");
 
-  
-  const buildSection = (title, list, type) => {
-  if (!list || list.length === 0) return [];
 
-  let rows = [
-    {
-      text: title.toUpperCase(),
-      style: "sectionHeader",
-      alignment: "center",
-      margin: [0, 20, 0, 10]
-    }
-  ];
+    const buildSection = (title, list, type) => {
+      if (!list || list.length === 0) return [];
 
-  list.forEach((entry, idx) => {
-    rows.push({
-      unbreakable: true,  // 🔥🔥🔥 THE MAGIC FIX
-      stack: [
+      let rows = [
         {
-          text: `${title.slice(0, -1)} ${idx + 1}`,
-          style: "subTitle",
-          alignment: "left",
-          margin: [0, 0, 0, 5]
-        },
+          text: title.toUpperCase(),
+          style: "sectionHeader",
+          alignment: "center",
+          margin: [0, 20, 0, 10]
+        }
+      ];
 
-        // PARTY DETAILS
-        {
-          columns: [
+      list.forEach((entry, idx) => {
+        rows.push({
+          unbreakable: true,  // 🔥🔥🔥 THE MAGIC FIX
+          stack: [
             {
-              width: "48%",
-              stack: [
-                { text: "Party Name", style: "label" },
-                { text: safe(entry.Party_Name), style: "value" },
-
-                { text: "GSTIN", style: "label" },
-                { text: safe(entry.GSTIN), style: "value" }
-              ]
+              text: `${title.slice(0, -1)} ${idx + 1}`,
+              style: "subTitle",
+              alignment: "left",
+              margin: [0, 0, 0, 5]
             },
-            {
-              width: "48%",
-              alignment: "right",
-              stack: [
-                {
-                  text: type === "purchase" ? "Bill Number" : "Invoice Number",
-                  style: "label"
-                },
-                {
-                  text: safe(entry.Bill_Number|| entry.Invoice_Number),
-                  style: "value"
-                },
 
+            // PARTY DETAILS
+            {
+              columns: [
                 {
-                  text: type === "purchase" ? "Bill Date" : "Invoice Date",
-                  style: "label"
+                  width: "48%",
+                  stack: [
+                    { text: "Party Name", style: "label" },
+                    { text: safe(entry.Party_Name), style: "value" },
+
+                    { text: "GSTIN", style: "label" },
+                    { text: safe(entry.GSTIN), style: "value" }
+                  ]
                 },
                 {
-                  text: safe(entry.Bill_Date|| entry.Invoice_Date),
-                  style: "value"
+                  width: "48%",
+                  alignment: "right",
+                  stack: [
+                    {
+                      text: type === "purchase" ? "Bill Number" : "Invoice Number",
+                      style: "label"
+                    },
+                    {
+                      text: safe(entry.Bill_Number || entry.Invoice_Number),
+                      style: "value"
+                    },
+
+                    {
+                      text: type === "purchase" ? "Bill Date" : "Invoice Date",
+                      style: "label"
+                    },
+                    {
+                      text: safe(entry.Bill_Date || entry.Invoice_Date),
+                      style: "value"
+                    }
+                  ]
                 }
-              ]
-            }
-          ],
-          columnGap: 20,
-          margin: [0, 0, 0, 10]
-        },
-
-        // TABLE
-        {
-          style: "tableSmall",
-          table: {
-            headerRows: 1,
-            widths: ["auto", "*", "*", "*", "*", "*", "*", "*"],
-            body: [
-              [
-                { text: "Sl", style: "tableHeader" },
-                { text: "Category", style: "tableHeader" },
-                { text: "Item", style: "tableHeader" },
-                { text: "HSN", style: "tableHeader" },
-                { text: "Qty", style: "tableHeader" },
-                { text: "Price", style: "tableHeader" },
-                { text: "Tax", style: "tableHeader" },
-                { text: "Amount", style: "tableHeader" }
               ],
+              columnGap: 20,
+              margin: [0, 0, 0, 10]
+            },
 
-              ...entry.items.map((it, i) => [
-                i + 1,
-                safe(it.Item_Category),
-                safe(it.Item_Name),
-                safe(it.Item_HSN),
-                safe(it.Quantity + " " + safe(it.Item_Unit)),
-                safe(it.Sale_Price || it.Purchase_Price),
-                safe(TAX_TYPES[it.Tax_Type] || it.Tax_Type),
-                Number(it.Amount || 0).toFixed(2)
-              ])
-            ]
-          },
-          layout: "lightHorizontalLines",
-          margin: [0, 0, 0, 8]
-        },
-
-        // TOTALS SECTION
-        {
-          columns: [
-            { width: "*", text: "" },
+            // TABLE
             {
-              width: "40%",
+              style: "tableSmall",
               table: {
-                widths: ["*", "auto"],
+                headerRows: 1,
+                widths: ["auto", "*", "*", "*", "*", "*", "*", "*"],
                 body: [
-                  ["Total Amount", safe(entry.Total_Amount)],
                   [
-                    type === "purchase" ? "Paid" : "Received",
-                    safe(entry.Total_Paid || entry.Total_Received)
+                    { text: "Sl", style: "tableHeader" },
+                    { text: "Category", style: "tableHeader" },
+                    { text: "Item", style: "tableHeader" },
+                    { text: "HSN", style: "tableHeader" },
+                    { text: "Qty", style: "tableHeader" },
+                    { text: "Price", style: "tableHeader" },
+                    { text: "Tax", style: "tableHeader" },
+                    { text: "Amount", style: "tableHeader" }
                   ],
-                  ["Balance Due", safe(entry.Balance_Due)]
+
+                  ...entry.items.map((it, i) => [
+                    i + 1,
+                    safe(it.Item_Category),
+                    safe(it.Item_Name),
+                    safe(it.Item_HSN),
+                    safe(it.Quantity + " " + safe(it.Item_Unit)),
+                    safe(it.Sale_Price || it.Purchase_Price),
+                    safe(TAX_TYPES[it.Tax_Type] || it.Tax_Type),
+                    Number(it.Amount || 0).toFixed(2)
+                  ])
                 ]
               },
-              layout: "noBordersBox"
-            }
-          ],
-          margin: [0, 0, 0, 15]
-        }
-      ]
-    });
-  });
+              layout: "lightHorizontalLines",
+              margin: [0, 0, 0, 8]
+            },
 
-  return rows;
-};
+            // TOTALS SECTION
+            {
+              columns: [
+                { width: "*", text: "" },
+                {
+                  width: "40%",
+                  table: {
+                    widths: ["*", "auto"],
+                    body: [
+                      ["Total Amount", safe(entry.Total_Amount)],
+                      [
+                        type === "purchase" ? "Paid" : "Received",
+                        safe(entry.Total_Paid || entry.Total_Received)
+                      ],
+                      ["Balance Due", safe(entry.Balance_Due)]
+                    ]
+                  },
+                  layout: "noBordersBox"
+                }
+              ],
+              margin: [0, 0, 0, 15]
+            }
+          ]
+        });
+      });
+
+      return rows;
+    };
 
     // HEADER TITLE
     let headerTitle = "";
@@ -2333,40 +2333,40 @@ const printDailyReport = async (req, res) => {
       headerTitle = `DAILY REPORT`;
     }
 
-    
-const docDefinition = {
-  pageMargins: [18, 18, 18, 30],
-  defaultStyle: { font: "Helvetica" },
 
-  footer: (p, pc) => ({
-    text: `Page ${p} of ${pc}`,
-    alignment: "center",
-    margin: [10, 10, 10, 10]
-  }),
+    const docDefinition = {
+      pageMargins: [18, 18, 18, 30],
+      defaultStyle: { font: "Helvetica" },
 
-  content: [
-    {
-      text: headerTitle,
-      style: "header",
-      alignment: "center",
-      margin: [0, 0, 0, 10]
-    },
+      footer: (p, pc) => ({
+        text: `Page ${p} of ${pc}`,
+        alignment: "center",
+        margin: [10, 10, 10, 10]
+      }),
 
-    ...buildSection("Purchases", purchases, "purchase"),
-    ...buildSection("Sales", sales, "sale"),
-    
-  ],
+      content: [
+        {
+          text: headerTitle,
+          style: "header",
+          alignment: "center",
+          margin: [0, 0, 0, 10]
+        },
 
-  styles: {
-    header: { fontSize: 20, bold: true },
-    sectionHeader: { fontSize: 15, bold: true },
-    subTitle: { fontSize: 12, bold: true },
-    label: { bold: true, fontSize: 10 },
-    value: { fontSize: 10 },
-    tableHeader: { bold: true, fillColor: "#eee" },
-    tableSmall: { fontSize: 9 }
-  }
-};
+        ...buildSection("Purchases", purchases, "purchase"),
+        ...buildSection("Sales", sales, "sale"),
+
+      ],
+
+      styles: {
+        header: { fontSize: 20, bold: true },
+        sectionHeader: { fontSize: 15, bold: true },
+        subTitle: { fontSize: 12, bold: true },
+        label: { bold: true, fontSize: 10 },
+        value: { fontSize: 10 },
+        tableHeader: { bold: true, fillColor: "#eee" },
+        tableSmall: { fontSize: 9 }
+      }
+    };
 
     const pdfDoc = printer.createPdfKitDocument(docDefinition);
     const chunks = [];
@@ -2504,14 +2504,14 @@ const docDefinition = {
 //     //     message: "Query params 'fromDate' and 'toDate' are required (YYYY-MM-DD)",
 //     //   });
 //     // }
- 
+
 //     // ── helpers ────────────────────────────────────────────────────────────
 //     const n = (val) => parseFloat(val || 0);
- 
+
 //     // ══════════════════════════════════════════════════════════════════════
 //     //  ASSETS
 //     // ══════════════════════════════════════════════════════════════════════
- 
+
 //     // ── 1. SUNDRY DEBTORS
 //     //    Sales billed up toDate `toDate` whose Balance_Due > 0
 //     const [debtorRows] = await db.execute(
@@ -2521,7 +2521,7 @@ const docDefinition = {
 //       [toDate]
 //     );
 //     const sundryDebtors = n(debtorRows[0].amount);
- 
+
 //     // ── 2. CASH IN HAND
 //     //    Cash received fromDate sales  minus  cash paid for purchases  minus  cash expenses
 //     const [cashSaleRows] = await db.execute(
@@ -2536,7 +2536,7 @@ const docDefinition = {
 //        WHERE Bill_Date <= ? AND Payment_Type = 'Cash'`,
 //       [toDate]
 //     );
-    
+
 //    const cashAccounts =
 //       n(cashSaleRows[0].amount) -
 //       n(cashPurRows[0].amount)
@@ -2554,11 +2554,11 @@ const docDefinition = {
 //        WHERE Bill_Date <= ? AND Payment_Type IN ('Neft','Cheque')`,
 //       [toDate]
 //     );
-   
+
 //         const bankAccounts =
 //       n(bankSaleRows[0].amount) -
 //       n(bankPurRows[0].amount)
- 
+
 //     // ── 4. INPUT GST (GST paid on purchases — claimable ITC)
 //     //    SUM of Tax_Amount on purchase items within period
 //     const [inputGSTRows] = await db.execute(
@@ -2570,7 +2570,7 @@ const docDefinition = {
 //       [toDate]
 //     );
 //     const inputDutiesAndTaxes = n(inputGSTRows[0].amount);
- 
+
 //     // ── 5. CLOSING STOCK VALUE
 //     //    Current Stock_Quantity × last Purchase_Price per item
 //     //    (Uses the most recent purchase price recorded in add_purchase_items)
@@ -2597,7 +2597,7 @@ const docDefinition = {
 //         closingStock += n(row.Stock_Quantity) * n(row.last_price);
 //       }
 //     }
- 
+
 //     // ── Total Current Assets
 //     const currentAssetsTotal =
 //       sundryDebtors +
@@ -2605,14 +2605,14 @@ const docDefinition = {
 //       bankAccounts +
 //       cashAccounts +
 //       closingStock;
- 
+
 //     // ── Total Assets (no fixed/non-current assets in this DB)
 //     const totalAssets = currentAssetsTotal;
- 
+
 //     // ══════════════════════════════════════════════════════════════════════
 //     //  EQUITIES & LIABILITIES
 //     // ══════════════════════════════════════════════════════════════════════
- 
+
 //     // ── 6. SUNDRY CREDITORS (purchase bills with outstanding balance)
 //     const [creditorRows] = await db.execute(
 //       `SELECT COALESCE(SUM(Balance_Due), 0) AS amount
@@ -2621,7 +2621,7 @@ const docDefinition = {
 //       [toDate]
 //     );
 //     const sundryCreditors = n(creditorRows[0].amount);
- 
+
 //     // ── 7. OUTPUT GST PAYABLE (GST collected on sales)
 //     const [outputGSTRows] = await db.execute(
 //       `SELECT COALESCE(SUM(si.Tax_Amount), 0) AS amount
@@ -2660,10 +2660,10 @@ const docDefinition = {
 //       n(revenueRows[0].amount) -
 //       n(cogsRows[0].amount) -
 //       n(expenseRows[0].amount);
- 
+
 //     // ── Total Current Liabilities
 //     const currentLiabTotal = sundryCreditors + dutiesAndTaxes;
- 
+
 //     // ── Owner's Equity = Total Assets − Total Liabilities − Retained Earnings
 //     //    (Back-calculated since there is no capital_transactions table)
 //     // const ownerEquity =
@@ -2671,7 +2671,7 @@ const docDefinition = {
 //  const ownerEquity = totalAssets - currentLiabTotal;
 //     const totalEquities =
 //       ownerEquity + retainedEarnings + currentLiabTotal;
- 
+
 //     // ══════════════════════════════════════════════════════════════════════
 //     //  RESPONSE
 //     // ══════════════════════════════════════════════════════════════════════
@@ -2680,7 +2680,7 @@ const docDefinition = {
 //       data: {
 //         asOf: toDate,
 //         period: { fromDate, toDate },
- 
+
 //         equities: {
 //           capitalAccount: {
 //             ownerEquity: parseFloat(ownerEquity.toFixed(2)),
@@ -2698,7 +2698,7 @@ const docDefinition = {
 //           },
 //           total: parseFloat(totalEquities.toFixed(2)),
 //         },
- 
+
 //         assets: {
 //           fixedAssets: 0,
 //           nonCurrentAssets: 0,
@@ -3103,43 +3103,43 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
       Replace them with your actual database table and column names.
     */
 
-   const transactions = [
-  {
-    key: "total_sales",
-    table: "add_sale",
-    dateColumn: "Invoice_Date",
-  },
-  {
-    key: "total_purchases",
-    table: "add_purchase",
-    dateColumn: "Bill_Date",
-  },
-  {
-    key: "total_sales_returns",
-    table: "sale_return",
-    dateColumn: "Invoice_Date",
-  },
-  {
-    key: "total_purchase_returns",
-    table: "purchase_return",
-    dateColumn: "Bill_Date",
-  },
-  {
-    key: "total_expenses",
-    table: "expenses",
-    dateColumn: "Expense_Date",
-  },
-  {
-    key: "total_payments_in",
-    table: "payment_in",
-    dateColumn: "Payment_Date",
-  },
-  {
-    key: "total_payments_out",
-    table: "payment_out",
-    dateColumn: "Payment_Date",
-  },
-];
+    const transactions = [
+      {
+        key: "total_sales",
+        table: "add_sale",
+        dateColumn: "Invoice_Date",
+      },
+      {
+        key: "total_purchases",
+        table: "add_purchase",
+        dateColumn: "Bill_Date",
+      },
+      {
+        key: "total_sales_returns",
+        table: "sale_return",
+        dateColumn: "Invoice_Date",
+      },
+      {
+        key: "total_purchase_returns",
+        table: "purchase_return",
+        dateColumn: "Bill_Date",
+      },
+      {
+        key: "total_expenses",
+        table: "expenses",
+        dateColumn: "Expense_Date",
+      },
+      {
+        key: "total_payments_in",
+        table: "payment_in",
+        dateColumn: "Payment_Date",
+      },
+      {
+        key: "total_payments_out",
+        table: "payment_out",
+        dateColumn: "Payment_Date",
+      },
+    ];
 
     // Optional date filtering
     const dateCondition = startDate
@@ -3157,11 +3157,10 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
             DATE_FORMAT(\`${dateColumn}\`, '%Y-%m-%d') AS transaction_date,
             COUNT(*) AS total
           FROM \`${table}\`
-          ${
-            startDate
-              ? `WHERE \`${dateColumn}\` >= ?
+          ${startDate
+            ? `WHERE \`${dateColumn}\` >= ?
                  AND \`${dateColumn}\` < DATE_ADD(?, INTERVAL 1 DAY)`
-              : ""
+            : ""
           }
           GROUP BY DATE(\`${dateColumn}\`)
           ORDER BY DATE(\`${dateColumn}\`) ASC
@@ -3219,40 +3218,589 @@ const getDayWiseTransactionsCount = async (req, res, next) => {
 
 
 
-const getDayWiseTransactionsDetails = async (req, res, next) => {
+// const getDayWiseTransactionsDetails = async (req, res, next) => {
+//   let connection;
+
+//   try {
+//     const { date, cursor = null } = req.query;
+//     const search = String(req.query.search || "").trim();
+
+//     // Default page size: 50. Maximum: 100.
+//     const parsedLimit = Number.parseInt(req.query.limit, 10);
+//     const limit = Number.isInteger(parsedLimit)
+//       ? Math.min(Math.max(parsedLimit, 1), 100)
+//       : 50;
+
+//     // Validate date format.
+//     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please provide a valid date in YYYY-MM-DD format.",
+//       });
+//     }
+
+//     const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+//     if (
+//       Number.isNaN(parsedDate.getTime()) ||
+//       parsedDate.toISOString().slice(0, 10) !== date
+//     ) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Invalid calendar date.",
+//       });
+//     }
+
+//     // Decode and validate the pagination cursor.
+//     let cursorData = null;
+
+//     if (cursor) {
+//       try {
+//         cursorData = JSON.parse(
+//           Buffer.from(cursor, "base64url").toString("utf8")
+//         );
+
+//         if (
+//           typeof cursorData.date !== "string" ||
+//           !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(
+//             cursorData.date
+//           ) ||
+//           !Number.isInteger(cursorData.rank) ||
+//           cursorData.rank < 1 ||
+//           cursorData.rank > 7 ||
+//           cursorData.id === undefined ||
+//           cursorData.id === null
+//         ) {
+//           throw new Error("Invalid cursor fields");
+//         }
+//       } catch {
+//         return res.status(400).json({
+//           success: false,
+//           message: "Invalid pagination cursor.",
+//         });
+//       }
+//     }
+
+//     connection = await db.getConnection();
+
+//     /*
+//      * IMPORTANT:
+//      * Verify numberColumns and amountColumns against your database.
+//      *
+//      * Global ordering:
+//      * 1. Transaction date DESC
+//      * 2. Category rank ASC
+//      * 3. Transaction ID DESC
+//      */
+//     const transactionTypes = [
+//       {
+//         key: "sales",
+//         table: "add_sale",
+//         alias: "s",
+//         dateColumn: "Invoice_Date",
+//         rank: 1,
+//         label: "sales",
+//         numberColumns: ["Invoice_Number"],
+//         amountColumns: ["Total_Amount", "Balance_Due"],
+//       },
+//       {
+//         key: "purchases",
+//         table: "add_purchase",
+//         alias: "p",
+//         dateColumn: "Bill_Date",
+//         rank: 2,
+//         label: "purchases",
+//         numberColumns: ["Bill_Number"],
+//         amountColumns: ["Total_Amount", "Balance_Due"],
+//       },
+//       {
+//         key: "saleReturns",
+//         table: "sale_return",
+//         alias: "sr",
+//         dateColumn: "Invoice_Date",
+//         rank: 3,
+//         label: "sale returns",
+//         numberColumns: ["Return_Number"],
+//         amountColumns: ["Total_Amount"],
+//       },
+//       {
+//         key: "purchaseReturns",
+//         table: "purchase_return",
+//         alias: "pr",
+//         dateColumn: "Bill_Date",
+//         rank: 4,
+//         label: "purchase returns",
+//         numberColumns: ["Return_Number"],
+//         amountColumns: ["Total_Amount"],
+//       },
+//       {
+//         key: "expenses",
+//         table: "expenses",
+//         alias: "e",
+//         dateColumn: "Expense_Date",
+//         rank: 5,
+//         label: "expenses",
+//         numberColumns: ["Expense_Number"],
+//         amountColumns: ["Total_Amount"],
+//       },
+//       {
+//         key: "paymentIns",
+//         table: "payment_in",
+//         alias: "pi",
+//         dateColumn: "Payment_Date",
+//         rank: 6,
+//         label: "payment in",
+//         numberColumns: ["Receipt_No"],
+//         //amountColumns: ["Amount", "Total_Amount"],
+//       },
+//       {
+//         key: "paymentOuts",
+//         table: "payment_out",
+//         alias: "po",
+//         dateColumn: "Payment_Date",
+//         rank: 7,
+//         label: "payment out",
+//         numberColumns: ["Receipt_No"],
+//         //amountColumns: ["Amount", "Total_Amount"],
+//       },
+//     ];
+
+//     /*
+//      * Build the search condition for a transaction category.
+//      *
+//      * Searches:
+//      * - Party name
+//      * - Database transaction ID
+//      * - Invoice/bill/return/receipt/payment numbers
+//      * - Expense category, if that column exists
+//      * - Transaction amounts
+//      * - Transaction category label
+//      */
+//     const buildSearchCondition = (type) => {
+//       if (!search) {
+//         return {
+//           sql: "",
+//           params: [],
+//         };
+//       }
+
+//       const {
+//         alias,
+//         label,
+//         numberColumns = [],
+//         amountColumns = [],
+//       } = type;
+
+//       const searchPattern = `%${search}%`;
+
+//       const conditions = [
+//         `CAST(${alias}.id AS CHAR) LIKE ?`,
+//         `a.Party_Name LIKE ?`,
+//       ];
+
+//       const params = [searchPattern, searchPattern];
+
+//       // Search transaction number columns.
+//       for (const column of numberColumns) {
+//         conditions.push(
+//           `CAST(${alias}.${column} AS CHAR) LIKE ?`
+//         );
+
+//         params.push(searchPattern);
+//       }
+
+//       // Search amounts using partial text matching.
+//       for (const column of amountColumns) {
+//         conditions.push(
+//           `CAST(${alias}.${column} AS CHAR) LIKE ?`
+//         );
+
+//         params.push(searchPattern);
+//       }
+
+//       // Searching "sales", "purchases", etc. matches the category.
+//       if (label.includes(search.toLowerCase())) {
+//         conditions.push("1 = 1");
+//       }
+
+//       return {
+//         sql: `AND (${conditions.join(" OR ")})`,
+//         params,
+//       };
+//     };
+
+//     // Fetch transaction candidates for one category.
+//     const fetchTransactionPage = async (type) => {
+//       const {
+//         key,
+//         table,
+//         alias,
+//         dateColumn,
+//         rank,
+//       } = type;
+
+//       // Parameters follow the placeholder order in the SQL query.
+//       const params = [date, date];
+
+//       let cursorCondition = "";
+
+//       if (cursorData) {
+//         cursorCondition = `
+//           AND (
+//             ${alias}.${dateColumn} < ?
+//             OR (
+//               ${alias}.${dateColumn} = ?
+//               AND (
+//                 ${rank} > ?
+//                 OR (
+//                   ${rank} = ?
+//                   AND ${alias}.id < ?
+//                 )
+//               )
+//             )
+//           )
+//         `;
+
+//         params.push(
+//           cursorData.date,
+//           cursorData.date,
+//           cursorData.rank,
+//           cursorData.rank,
+//           cursorData.id
+//         );
+//       }
+
+//       const searchCondition = buildSearchCondition(type);
+
+//       params.push(...searchCondition.params);
+
+//       // Fetch one extra candidate to determine whether another page exists.
+//       params.push(limit + 1);
+
+//       const sql = `
+//         SELECT
+//           ${alias}.*,
+//           a.Party_Name,
+//           DATE_FORMAT(
+//             ${alias}.${dateColumn},
+//             '%Y-%m-%d %H:%i:%s.%f'
+//           ) AS _cursorDate,
+//           ${rank} AS _typeRank,
+//           '${key}' AS _transactionType
+//         FROM ${table} ${alias}
+//         LEFT JOIN add_party a
+//           ON a.Party_Id = ${alias}.Party_Id
+//         WHERE ${alias}.${dateColumn} >= ?
+//           AND ${alias}.${dateColumn} < DATE_ADD(?, INTERVAL 1 DAY)
+//           ${cursorCondition}
+//           ${searchCondition.sql}
+//         ORDER BY
+//           ${alias}.${dateColumn} DESC,
+//           ${alias}.id DESC
+//         LIMIT ?
+//       `;
+
+//       const [rows] = await connection.query(sql, params);
+
+//       return rows;
+//     };
+
+//     // Count matching transactions per category.
+//     // Counts use the search filter but do not use the pagination cursor.
+//     const fetchTransactionCount = async (type) => {
+//       const {
+//         table,
+//         alias,
+//         dateColumn,
+//       } = type;
+
+//       const searchCondition = buildSearchCondition(type);
+
+//       const params = [
+//         date,
+//         date,
+//         ...searchCondition.params,
+//       ];
+
+//       const sql = `
+//         SELECT COUNT(*) AS total
+//         FROM ${table} ${alias}
+//         LEFT JOIN add_party a
+//           ON a.Party_Id = ${alias}.Party_Id
+//         WHERE ${alias}.${dateColumn} >= ?
+//           AND ${alias}.${dateColumn} < DATE_ADD(?, INTERVAL 1 DAY)
+//           ${searchCondition.sql}
+//       `;
+
+//       const [rows] = await connection.query(sql, params);
+
+//       return Number(rows[0].total);
+//     };
+
+//     // Fetch transaction candidates and matching counts concurrently.
+//     const [categoryResults, countResults] = await Promise.all([
+//       Promise.all(
+//         transactionTypes.map((type) =>
+//           fetchTransactionPage(type)
+//         )
+//       ),
+
+//       Promise.all(
+//         transactionTypes.map((type) =>
+//           fetchTransactionCount(type)
+//         )
+//       ),
+//     ]);
+
+//     /*
+//      * Merge all category candidates into one globally ordered list.
+//      * Each category supplies at most limit + 1 rows.
+//      */
+//     const combinedRows = categoryResults
+//       .flat()
+//       .sort((a, b) => {
+//         // Newest transaction first.
+//         const dateComparison = b._cursorDate.localeCompare(
+//           a._cursorDate
+//         );
+
+//         if (dateComparison !== 0) {
+//           return dateComparison;
+//         }
+
+//         // Stable category order when timestamps match.
+//         if (Number(a._typeRank) !== Number(b._typeRank)) {
+//           return Number(a._typeRank) - Number(b._typeRank);
+//         }
+
+//         // Newest transaction ID first within the same category.
+//         return Number(b.id) - Number(a.id);
+//       });
+
+//     const hasMore = combinedRows.length > limit;
+//     const pageRows = combinedRows.slice(0, limit);
+
+//     // Group the current page by category.
+//     const transactions = {
+//       sales: [],
+//       purchases: [],
+//       saleReturns: [],
+//       purchaseReturns: [],
+//       expenses: [],
+//       paymentIns: [],
+//       paymentOuts: [],
+//     };
+
+//     for (const row of pageRows) {
+//       transactions[row._transactionType].push(row);
+//     }
+
+//     /*
+//      * Attach payment splits to payment-in and payment-out records.
+//      */
+//     const attachPaymentSplits = async (rows, sourceType) => {
+//       if (!rows.length) {
+//         return;
+//       }
+
+//       const paymentIds = rows.map((row) => row.id);
+//       const placeholders = paymentIds.map(() => "?").join(",");
+
+//       const [splits] = await connection.query(
+//         `
+//           SELECT
+//             ps.Source_Id,
+//             ps.Payment_Type,
+//             ps.Bank_Account_Id,
+//             ps.Reference_Number,
+//             ps.Amount,
+//             ba.Account_Display_Name
+//           FROM payment_splits ps
+//           LEFT JOIN bank_accounts ba
+//             ON ba.id = ps.Bank_Account_Id
+//           WHERE ps.Source_Type = ?
+//             AND ps.Source_Id IN (${placeholders})
+//         `,
+//         [sourceType, ...paymentIds]
+//       );
+
+//       const splitMap = new Map();
+
+//       for (const split of splits) {
+//         const sourceId = String(split.Source_Id);
+
+//         if (!splitMap.has(sourceId)) {
+//           splitMap.set(sourceId, []);
+//         }
+
+//         splitMap.get(sourceId).push({
+//           Payment_Type: split.Payment_Type,
+//           Bank_Account_Id: split.Bank_Account_Id,
+//           Reference_Number: split.Reference_Number,
+//           Amount: Number(split.Amount),
+//           Bank_Display_Name: split.Account_Display_Name,
+//         });
+//       }
+
+//       for (const row of rows) {
+//         row.splits = splitMap.get(String(row.id)) || [];
+
+//         row.Payment_Type_Display =
+//           row.splits
+//             .map((split) =>
+//               split.Payment_Type === "Bank"
+//                 ? split.Bank_Display_Name
+//                 : split.Payment_Type
+//             )
+//             .filter(Boolean)
+//             .join(", ") || "—";
+//       }
+//     };
+
+//     await Promise.all([
+//       attachPaymentSplits(
+//         transactions.paymentIns,
+//         "Payment_In"
+//       ),
+
+//       attachPaymentSplits(
+//         transactions.paymentOuts,
+//         "Payment_Out"
+//       ),
+//     ]);
+
+//     // Category counts for the selected date and search term.
+//     const counts = {};
+
+//     transactionTypes.forEach((type, index) => {
+//       counts[type.key] = countResults[index];
+//     });
+
+//     // Create the next cursor from the last returned row.
+//     let nextCursor = null;
+
+//     if (hasMore && pageRows.length > 0) {
+//       const lastRow = pageRows[pageRows.length - 1];
+
+//       nextCursor = Buffer.from(
+//         JSON.stringify({
+//           date: lastRow._cursorDate,
+//           rank: Number(lastRow._typeRank),
+//           id: lastRow.id,
+//         })
+//       ).toString("base64url");
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       date,
+//       search,
+//       limit,
+//       transactions,
+//       counts,
+//       hasMore,
+//       nextCursor,
+//     });
+//   } catch (err) {
+//     console.error(
+//       "Error fetching transactions by date:",
+//       err
+//     );
+
+//     next(err);
+//   } finally {
+//     if (connection) {
+//       connection.release();
+//     }
+//   }
+// };
+const getTransactionsDetails = async (req, res, next) => {
   let connection;
 
   try {
-    const { date, cursor = null } = req.query;
+    const {
+      date,
+      fromDate,
+      toDate,
+      cursor = null,
+      reportType = "",
+    } = req.query;
+
     const search = String(req.query.search || "").trim();
 
-    // Default page size: 50. Maximum: 100.
+    // Support both a single date and a date range.
+    const startDate = date || fromDate;
+    const endDate = date || toDate;
+
+    // Pagination limit.
     const parsedLimit = Number.parseInt(req.query.limit, 10);
     const limit = Number.isInteger(parsedLimit)
       ? Math.min(Math.max(parsedLimit, 1), 100)
       : 50;
 
-    // Validate date format.
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    // Validate dates.
+    if (!startDate || !endDate) {
       return res.status(400).json({
         success: false,
-        message: "Please provide a valid date in YYYY-MM-DD format.",
+        message:
+          "Provide either date or both fromDate and toDate in YYYY-MM-DD format.",
       });
     }
 
-    const parsedDate = new Date(`${date}T00:00:00.000Z`);
+    const isValidDate = (value) => {
+      if (
+        typeof value !== "string" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(value)
+      ) {
+        return false;
+      }
+
+      const parsedDate = new Date(`${value}T00:00:00.000Z`);
+
+      return (
+        !Number.isNaN(parsedDate.getTime()) &&
+        parsedDate.toISOString().slice(0, 10) === value
+      );
+    };
+
+    if (!isValidDate(startDate) || !isValidDate(endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid date. Use YYYY-MM-DD.",
+      });
+    }
+
+    if (endDate < startDate) {
+      return res.status(400).json({
+        success: false,
+        message: "toDate must be on or after fromDate.",
+      });
+    }
+
+    // Supported report types.
+    const allowedReportTypes = [
+      "sales",
+      "purchases",
+      "saleReturns",
+      "purchaseReturns",
+      "expenses",
+      "paymentIns",
+      "paymentOuts",
+    ];
+
+    const normalizedReportType = String(reportType).trim();
 
     if (
-      Number.isNaN(parsedDate.getTime()) ||
-      parsedDate.toISOString().slice(0, 10) !== date
+      normalizedReportType &&
+      !allowedReportTypes.includes(normalizedReportType)
     ) {
       return res.status(400).json({
         success: false,
-        message: "Invalid calendar date.",
+        message: `Invalid reportType. Allowed values: ${allowedReportTypes.join(", ")}.`,
       });
     }
 
-    // Decode and validate the pagination cursor.
+    // Decode pagination cursor.
     let cursorData = null;
 
     if (cursor) {
@@ -3284,21 +3832,14 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
 
     connection = await db.getConnection();
 
-    /*
-     * IMPORTANT:
-     * Verify numberColumns and amountColumns against your database.
-     *
-     * Global ordering:
-     * 1. Transaction date DESC
-     * 2. Category rank ASC
-     * 3. Transaction ID DESC
-     */
+    // Transaction configuration.
     const transactionTypes = [
       {
         key: "sales",
         table: "add_sale",
         alias: "s",
         dateColumn: "Invoice_Date",
+        summaryAmountColumn: "Total_Amount",
         rank: 1,
         label: "sales",
         numberColumns: ["Invoice_Number"],
@@ -3309,6 +3850,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         table: "add_purchase",
         alias: "p",
         dateColumn: "Bill_Date",
+        summaryAmountColumn: "Total_Amount",
         rank: 2,
         label: "purchases",
         numberColumns: ["Bill_Number"],
@@ -3319,6 +3861,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         table: "sale_return",
         alias: "sr",
         dateColumn: "Invoice_Date",
+        summaryAmountColumn: "Total_Amount",
         rank: 3,
         label: "sale returns",
         numberColumns: ["Return_Number"],
@@ -3329,6 +3872,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         table: "purchase_return",
         alias: "pr",
         dateColumn: "Bill_Date",
+        summaryAmountColumn: "Total_Amount",
         rank: 4,
         label: "purchase returns",
         numberColumns: ["Return_Number"],
@@ -3339,6 +3883,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         table: "expenses",
         alias: "e",
         dateColumn: "Expense_Date",
+        summaryAmountColumn: "Total_Amount",
         rank: 5,
         label: "expenses",
         numberColumns: ["Expense_Number"],
@@ -3349,34 +3894,33 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         table: "payment_in",
         alias: "pi",
         dateColumn: "Payment_Date",
+        summaryAmountColumn: "Received",
         rank: 6,
         label: "payment in",
         numberColumns: ["Receipt_No"],
-        //amountColumns: ["Amount", "Total_Amount"],
+        amountColumns: ["Received"],
       },
       {
         key: "paymentOuts",
         table: "payment_out",
         alias: "po",
         dateColumn: "Payment_Date",
+        summaryAmountColumn: "Paid",
         rank: 7,
         label: "payment out",
         numberColumns: ["Receipt_No"],
-        //amountColumns: ["Amount", "Total_Amount"],
+        amountColumns: ["Paid"],
       },
     ];
 
-    /*
-     * Build the search condition for a transaction category.
-     *
-     * Searches:
-     * - Party name
-     * - Database transaction ID
-     * - Invoice/bill/return/receipt/payment numbers
-     * - Expense category, if that column exists
-     * - Transaction amounts
-     * - Transaction category label
-     */
+    // No reportType means all transaction categories.
+    const selectedTransactionTypes = normalizedReportType
+      ? transactionTypes.filter(
+        (type) => type.key === normalizedReportType
+      )
+      : transactionTypes;
+
+    // Build search conditions.
     const buildSearchCondition = (type) => {
       if (!search) {
         return {
@@ -3396,12 +3940,11 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
 
       const conditions = [
         `CAST(${alias}.id AS CHAR) LIKE ?`,
-        `a.Party_Name LIKE ?`,
+        "a.Party_Name LIKE ?",
       ];
 
       const params = [searchPattern, searchPattern];
 
-      // Search transaction number columns.
       for (const column of numberColumns) {
         conditions.push(
           `CAST(${alias}.${column} AS CHAR) LIKE ?`
@@ -3410,7 +3953,6 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         params.push(searchPattern);
       }
 
-      // Search amounts using partial text matching.
       for (const column of amountColumns) {
         conditions.push(
           `CAST(${alias}.${column} AS CHAR) LIKE ?`
@@ -3419,7 +3961,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         params.push(searchPattern);
       }
 
-      // Searching "sales", "purchases", etc. matches the category.
+      // Match the transaction category name.
       if (label.includes(search.toLowerCase())) {
         conditions.push("1 = 1");
       }
@@ -3430,7 +3972,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       };
     };
 
-    // Fetch transaction candidates for one category.
+    // Fetch one category's cursor-paginated transactions.
     const fetchTransactionPage = async (type) => {
       const {
         key,
@@ -3440,8 +3982,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         rank,
       } = type;
 
-      // Parameters follow the placeholder order in the SQL query.
-      const params = [date, date];
+      const params = [startDate, endDate];
 
       let cursorCondition = "";
 
@@ -3474,8 +4015,6 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       const searchCondition = buildSearchCondition(type);
 
       params.push(...searchCondition.params);
-
-      // Fetch one extra candidate to determine whether another page exists.
       params.push(limit + 1);
 
       const sql = `
@@ -3506,25 +4045,30 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       return rows;
     };
 
-    // Count matching transactions per category.
-    // Counts use the search filter but do not use the pagination cursor.
-    const fetchTransactionCount = async (type) => {
+    // Fetch the FULL count and amount without applying the cursor.
+    const fetchTransactionSummary = async (type) => {
       const {
         table,
         alias,
         dateColumn,
+        summaryAmountColumn,
       } = type;
 
       const searchCondition = buildSearchCondition(type);
 
       const params = [
-        date,
-        date,
+        startDate,
+        endDate,
         ...searchCondition.params,
       ];
 
       const sql = `
-        SELECT COUNT(*) AS total
+        SELECT
+          COUNT(*) AS totalCount,
+          COALESCE(
+            SUM(${alias}.${summaryAmountColumn}),
+            0
+          ) AS totalAmount
         FROM ${table} ${alias}
         LEFT JOIN add_party a
           ON a.Party_Id = ${alias}.Party_Id
@@ -3535,32 +4079,31 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
 
       const [rows] = await connection.query(sql, params);
 
-      return Number(rows[0].total);
+      return {
+        count: Number(rows[0].totalCount) || 0,
+        amount: Number(rows[0].totalAmount) || 0,
+      };
     };
 
-    // Fetch transaction candidates and matching counts concurrently.
-    const [categoryResults, countResults] = await Promise.all([
+    // Fetch the current page and the full summary independently.
+    const [categoryResults, summaryResults] = await Promise.all([
       Promise.all(
-        transactionTypes.map((type) =>
+        selectedTransactionTypes.map((type) =>
           fetchTransactionPage(type)
         )
       ),
 
       Promise.all(
-        transactionTypes.map((type) =>
-          fetchTransactionCount(type)
+        selectedTransactionTypes.map((type) =>
+          fetchTransactionSummary(type)
         )
       ),
     ]);
 
-    /*
-     * Merge all category candidates into one globally ordered list.
-     * Each category supplies at most limit + 1 rows.
-     */
+    // Combine and sort transactions across categories.
     const combinedRows = categoryResults
       .flat()
       .sort((a, b) => {
-        // Newest transaction first.
         const dateComparison = b._cursorDate.localeCompare(
           a._cursorDate
         );
@@ -3569,19 +4112,18 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
           return dateComparison;
         }
 
-        // Stable category order when timestamps match.
         if (Number(a._typeRank) !== Number(b._typeRank)) {
           return Number(a._typeRank) - Number(b._typeRank);
         }
 
-        // Newest transaction ID first within the same category.
         return Number(b.id) - Number(a.id);
       });
 
+    // Fetch limit + 1 to determine whether another page exists.
     const hasMore = combinedRows.length > limit;
     const pageRows = combinedRows.slice(0, limit);
 
-    // Group the current page by category.
+    // Keep the response structure consistent for all report types.
     const transactions = {
       sales: [],
       purchases: [],
@@ -3596,9 +4138,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
       transactions[row._transactionType].push(row);
     }
 
-    /*
-     * Attach payment splits to payment-in and payment-out records.
-     */
+    // Attach payment splits to payment-in and payment-out records.
     const attachPaymentSplits = async (rows, sourceType) => {
       if (!rows.length) {
         return;
@@ -3663,21 +4203,37 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
         transactions.paymentIns,
         "Payment_In"
       ),
-
       attachPaymentSplits(
         transactions.paymentOuts,
         "Payment_Out"
       ),
     ]);
 
-    // Category counts for the selected date and search term.
-    const counts = {};
+    // Full summary for every category.
+    // Unselected categories remain zero.
+    const summary = Object.fromEntries(
+      transactionTypes.map((type) => [
+        type.key,
+        {
+          count: 0,
+          amount: 0,
+        },
+      ])
+    );
 
-    transactionTypes.forEach((type, index) => {
-      counts[type.key] = countResults[index];
+    selectedTransactionTypes.forEach((type, index) => {
+      summary[type.key] = summaryResults[index];
     });
 
-    // Create the next cursor from the last returned row.
+    // Keep counts for backward compatibility.
+    const counts = Object.fromEntries(
+      transactionTypes.map((type) => [
+        type.key,
+        summary[type.key].count,
+      ])
+    );
+
+    // Create the next-page cursor.
     let nextCursor = null;
 
     if (hasMore && pageRows.length > 0) {
@@ -3694,11 +4250,22 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
 
     return res.status(200).json({
       success: true,
-      date,
+      date: date || null,
+      fromDate: startDate,
+      toDate: endDate,
+      reportType: normalizedReportType || "all",
       search,
       limit,
-      transactions,
+
+      // Full totals for the selected date/range.
+      summary,
+
+      // Backward-compatible count property.
       counts,
+
+      // Only the current page of transactions.
+      transactions,
+
       hasMore,
       nextCursor,
     });
@@ -3719,11 +4286,7 @@ const getDayWiseTransactionsDetails = async (req, res, next) => {
 
 
 
-export const getAllTransactionsDayPrintReport = async (
-  req,
-  res,
-  next
-) => {
+const getAllTransactionsPrintReport = async (req, res, next) => {
   let connection;
 
   try {
@@ -3733,21 +4296,35 @@ export const getAllTransactionsDayPrintReport = async (
       date,
       fromDate,
       toDate,
+      reportType = "all",
       search = "",
     } = req.query;
 
-    /*
-    |--------------------------------------------------------------------------
-    | DATE VALIDATION
-    |--------------------------------------------------------------------------
-    |
-    | Use either:
-    |   ?date=2026-10-31
-    |
-    | Or:
-    |   ?fromDate=2026-10-01&toDate=2026-10-31
-    |
-    */
+    // --------------------------------------------------
+    // VALIDATE REPORT TYPE
+    // --------------------------------------------------
+
+    const allowedReportTypes = [
+      "all",
+      "sales",
+      "purchases",
+      "saleReturns",
+      "purchaseReturns",
+      "expenses",
+      "paymentIns",
+      "paymentOuts",
+    ];
+
+    if (!allowedReportTypes.includes(reportType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid report type.",
+      });
+    }
+
+    // --------------------------------------------------
+    // DATE VALIDATION
+    // --------------------------------------------------
 
     const startDate = date || fromDate;
     const endDate = date || toDate;
@@ -3755,19 +4332,23 @@ export const getAllTransactionsDayPrintReport = async (
     if (!startDate && !endDate) {
       return res.status(400).json({
         success: false,
-        message:
-          "Please provide date or fromDate/toDate.",
+        message: "Please provide date or fromDate/toDate.",
       });
     }
 
-    const searchTerm = search.trim();
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Start date cannot be after end date.",
+      });
+    }
+
+    const searchTerm = String(search || "").trim();
     const like = `%${searchTerm}%`;
 
-    /*
-    |--------------------------------------------------------------------------
-    | SALES
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // SALES
+    // --------------------------------------------------
 
     let salesWhere = "WHERE 1=1";
     const salesParams = [];
@@ -3782,35 +4363,22 @@ export const getAllTransactionsDayPrintReport = async (
         )
       `;
 
-      salesParams.push(
-        like,
-        like,
-        like,
-        like
-      );
+      salesParams.push(like, like, like, like);
     }
 
     if (startDate) {
-      salesWhere += `
-        AND DATE(s.Invoice_Date) >= ?
-      `;
-
+      salesWhere += " AND DATE(s.Invoice_Date) >= ?";
       salesParams.push(startDate);
     }
 
     if (endDate) {
-      salesWhere += `
-        AND DATE(s.Invoice_Date) <= ?
-      `;
-
+      salesWhere += " AND DATE(s.Invoice_Date) <= ?";
       salesParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PURCHASES
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // PURCHASES
+    // --------------------------------------------------
 
     let purchasesWhere = "WHERE 1=1";
     const purchasesParams = [];
@@ -3825,35 +4393,22 @@ export const getAllTransactionsDayPrintReport = async (
         )
       `;
 
-      purchasesParams.push(
-        like,
-        like,
-        like,
-        like
-      );
+      purchasesParams.push(like, like, like, like);
     }
 
     if (startDate) {
-      purchasesWhere += `
-        AND DATE(p.Bill_Date) >= ?
-      `;
-
+      purchasesWhere += " AND DATE(p.Bill_Date) >= ?";
       purchasesParams.push(startDate);
     }
 
     if (endDate) {
-      purchasesWhere += `
-        AND DATE(p.Bill_Date) <= ?
-      `;
-
+      purchasesWhere += " AND DATE(p.Bill_Date) <= ?";
       purchasesParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | SALE RETURNS
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // SALE RETURNS
+    // --------------------------------------------------
 
     let saleReturnsWhere = "WHERE 1=1";
     const saleReturnsParams = [];
@@ -3879,26 +4434,18 @@ export const getAllTransactionsDayPrintReport = async (
     }
 
     if (startDate) {
-      saleReturnsWhere += `
-        AND DATE(sr.Return_Date) >= ?
-      `;
-
+      saleReturnsWhere += " AND DATE(sr.Return_Date) >= ?";
       saleReturnsParams.push(startDate);
     }
 
     if (endDate) {
-      saleReturnsWhere += `
-        AND DATE(sr.Return_Date) <= ?
-      `;
-
+      saleReturnsWhere += " AND DATE(sr.Return_Date) <= ?";
       saleReturnsParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PURCHASE RETURNS
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // PURCHASE RETURNS
+    // --------------------------------------------------
 
     let purchaseReturnsWhere = "WHERE 1=1";
     const purchaseReturnsParams = [];
@@ -3924,26 +4471,18 @@ export const getAllTransactionsDayPrintReport = async (
     }
 
     if (startDate) {
-      purchaseReturnsWhere += `
-        AND DATE(pr.Return_Date) >= ?
-      `;
-
+      purchaseReturnsWhere += " AND DATE(pr.Return_Date) >= ?";
       purchaseReturnsParams.push(startDate);
     }
 
     if (endDate) {
-      purchaseReturnsWhere += `
-        AND DATE(pr.Return_Date) <= ?
-      `;
-
+      purchaseReturnsWhere += " AND DATE(pr.Return_Date) <= ?";
       purchaseReturnsParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | EXPENSES
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // EXPENSES
+    // --------------------------------------------------
 
     let expensesWhere = "WHERE 1=1";
     const expensesParams = [];
@@ -3969,26 +4508,18 @@ export const getAllTransactionsDayPrintReport = async (
     }
 
     if (startDate) {
-      expensesWhere += `
-        AND DATE(e.Expense_Date) >= ?
-      `;
-
+      expensesWhere += " AND DATE(e.Expense_Date) >= ?";
       expensesParams.push(startDate);
     }
 
     if (endDate) {
-      expensesWhere += `
-        AND DATE(e.Expense_Date) <= ?
-      `;
-
+      expensesWhere += " AND DATE(e.Expense_Date) <= ?";
       expensesParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PAYMENT IN
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // PAYMENT IN
+    // --------------------------------------------------
 
     let paymentInsWhere = "WHERE 1=1";
     const paymentInsParams = [];
@@ -4002,34 +4533,22 @@ export const getAllTransactionsDayPrintReport = async (
         )
       `;
 
-      paymentInsParams.push(
-        like,
-        like,
-        like
-      );
+      paymentInsParams.push(like, like, like);
     }
 
     if (startDate) {
-      paymentInsWhere += `
-        AND DATE(pi.Payment_Date) >= ?
-      `;
-
+      paymentInsWhere += " AND DATE(pi.Payment_Date) >= ?";
       paymentInsParams.push(startDate);
     }
 
     if (endDate) {
-      paymentInsWhere += `
-        AND DATE(pi.Payment_Date) <= ?
-      `;
-
+      paymentInsWhere += " AND DATE(pi.Payment_Date) <= ?";
       paymentInsParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | PAYMENT OUT
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // PAYMENT OUT
+    // --------------------------------------------------
 
     let paymentOutsWhere = "WHERE 1=1";
     const paymentOutsParams = [];
@@ -4043,37 +4562,22 @@ export const getAllTransactionsDayPrintReport = async (
         )
       `;
 
-      paymentOutsParams.push(
-        like,
-        like,
-        like
-      );
+      paymentOutsParams.push(like, like, like);
     }
 
     if (startDate) {
-      paymentOutsWhere += `
-        AND DATE(po.Payment_Date) >= ?
-      `;
-
+      paymentOutsWhere += " AND DATE(po.Payment_Date) >= ?";
       paymentOutsParams.push(startDate);
     }
 
     if (endDate) {
-      paymentOutsWhere += `
-        AND DATE(po.Payment_Date) <= ?
-      `;
-
+      paymentOutsWhere += " AND DATE(po.Payment_Date) <= ?";
       paymentOutsParams.push(endDate);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | FETCH ALL SEVEN TRANSACTION TYPES
-    |--------------------------------------------------------------------------
-    |
-    | These calls reuse your existing print helpers.
-    |
-    */
+    // --------------------------------------------------
+    // FETCH ONLY THE SELECTED REPORT TYPE
+    // --------------------------------------------------
 
     const [
       salesResult,
@@ -4084,58 +4588,66 @@ export const getAllTransactionsDayPrintReport = async (
       paymentInsResult,
       paymentOutsResult,
     ] = await Promise.all([
-      getSalesForPrint(
-        connection,
-        salesWhere,
-        salesParams
-      ),
+      reportType === "all" || reportType === "sales"
+        ? getSalesForPrint(
+            connection,
+            salesWhere,
+            salesParams
+          )
+        : Promise.resolve(null),
 
-      getPurchasesForPrint(
-        connection,
-        purchasesWhere,
-        purchasesParams
-      ),
+      reportType === "all" || reportType === "purchases"
+        ? getPurchasesForPrint(
+            connection,
+            purchasesWhere,
+            purchasesParams
+          )
+        : Promise.resolve(null),
 
-      getSaleReturnsForPrint(
-        connection,
-        saleReturnsWhere,
-        saleReturnsParams
-      ),
+      reportType === "all" || reportType === "saleReturns"
+        ? getSaleReturnsForPrint(
+            connection,
+            saleReturnsWhere,
+            saleReturnsParams
+          )
+        : Promise.resolve(null),
 
-      getPurchaseReturnsForPrint(
-        connection,
-        purchaseReturnsWhere,
-        purchaseReturnsParams
-      ),
+      reportType === "all" || reportType === "purchaseReturns"
+        ? getPurchaseReturnsForPrint(
+            connection,
+            purchaseReturnsWhere,
+            purchaseReturnsParams
+          )
+        : Promise.resolve(null),
 
-      getExpensesForPrint(
-        connection,
-        expensesWhere,
-        expensesParams
-      ),
+      reportType === "all" || reportType === "expenses"
+        ? getExpensesForPrint(
+            connection,
+            expensesWhere,
+            expensesParams
+          )
+        : Promise.resolve(null),
 
-      getPaymentInsForPrint(
-        connection,
-        paymentInsWhere,
-        paymentInsParams
-      ),
+      reportType === "all" || reportType === "paymentIns"
+        ? getPaymentInsForPrint(
+            connection,
+            paymentInsWhere,
+            paymentInsParams
+          )
+        : Promise.resolve(null),
 
-      getPaymentOutsForPrint(
-        connection,
-        paymentOutsWhere,
-        paymentOutsParams
-      ),
+      reportType === "all" || reportType === "paymentOuts"
+        ? getPaymentOutsForPrint(
+            connection,
+            paymentOutsWhere,
+            paymentOutsParams
+          )
+        : Promise.resolve(null),
     ]);
 
-    /*
-    |--------------------------------------------------------------------------
-    | NORMALIZE RESULTS
-    |--------------------------------------------------------------------------
-    |
-    | Some of your existing helpers return [] when no records exist,
-    | while others return an object containing arrays and summaries.
-    |
-    */
+    // --------------------------------------------------
+    // NORMALIZE RESULTS
+    // --------------------------------------------------
 
     const sales =
       salesResult && !Array.isArray(salesResult)
@@ -4162,60 +4674,53 @@ export const getAllTransactionsDayPrintReport = async (
             },
           };
 
-    const saleReturns =
-      saleReturnsResult || {
-        saleReturns: [],
-        summary: {
-          totalAmount: 0,
-          totalPaid: 0,
-          totalDue: 0,
-          totalDiscount: 0,
-        },
-      };
+    const saleReturns = saleReturnsResult || {
+      saleReturns: [],
+      summary: {
+        totalAmount: 0,
+        totalPaid: 0,
+        totalDue: 0,
+        totalDiscount: 0,
+      },
+    };
 
-    const purchaseReturns =
-      purchaseReturnsResult || {
-        purchaseReturns: [],
-        summary: {
-          totalAmount: 0,
-          totalReceived: 0,
-          totalDue: 0,
-          totalDiscount: 0,
-        },
-      };
+    const purchaseReturns = purchaseReturnsResult || {
+      purchaseReturns: [],
+      summary: {
+        totalAmount: 0,
+        totalReceived: 0,
+        totalDue: 0,
+        totalDiscount: 0,
+      },
+    };
 
-    const expenses =
-      expensesResult || {
-        expenseBills: [],
-        summary: {
-          totalAmount: 0,
-          totalPaid: 0,
-          totalDue: 0,
-          totalDiscount: 0,
-        },
-      };
+    const expenses = expensesResult || {
+      expenseBills: [],
+      summary: {
+        totalAmount: 0,
+        totalPaid: 0,
+        totalDue: 0,
+        totalDiscount: 0,
+      },
+    };
 
-    const paymentIns =
-      paymentInsResult || {
-        paymentIns: [],
-        summary: {
-          totalReceived: 0,
-        },
-      };
+    const paymentIns = paymentInsResult || {
+      paymentIns: [],
+      summary: {
+        totalReceived: 0,
+      },
+    };
 
-    const paymentOuts =
-      paymentOutsResult || {
-        paymentOuts: [],
-        summary: {
-          totalPaid: 0,
-        },
-      };
+    const paymentOuts = paymentOutsResult || {
+      paymentOuts: [],
+      summary: {
+        totalPaid: 0,
+      },
+    };
 
-    /*
-    |--------------------------------------------------------------------------
-    | TRANSACTION COUNTS
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // TRANSACTION COUNTS
+    // --------------------------------------------------
 
     const transactionCounts = {
       sales: sales.invoices?.length || 0,
@@ -4239,17 +4744,13 @@ export const getAllTransactionsDayPrintReport = async (
         paymentOuts.paymentOuts?.length || 0,
     };
 
-    const totalTransactions =
-      Object.values(transactionCounts).reduce(
-        (total, count) => total + count,
-        0
-      );
+    const totalTransactions = Object.values(
+      transactionCounts
+    ).reduce((total, count) => total + count, 0);
 
-    /*
-    |--------------------------------------------------------------------------
-    | RESPONSE
-    |--------------------------------------------------------------------------
-    */
+    // --------------------------------------------------
+    // RESPONSE
+    // --------------------------------------------------
 
     return res.status(200).json({
       success: true,
@@ -4257,6 +4758,7 @@ export const getAllTransactionsDayPrintReport = async (
       filters: {
         fromDate: startDate,
         toDate: endDate,
+        reportType,
         search: searchTerm,
       },
 
@@ -4270,14 +4772,12 @@ export const getAllTransactionsDayPrintReport = async (
       },
 
       purchases: {
-        purchaseBills:
-          purchases.purchaseBills || [],
+        purchaseBills: purchases.purchaseBills || [],
         summary: purchases.summary || {},
       },
 
       saleReturns: {
-        saleReturns:
-          saleReturns.saleReturns || [],
+        saleReturns: saleReturns.saleReturns || [],
         summary: saleReturns.summary || {},
       },
 
@@ -4288,20 +4788,17 @@ export const getAllTransactionsDayPrintReport = async (
       },
 
       expenses: {
-        expenseBills:
-          expenses.expenseBills || [],
+        expenseBills: expenses.expenseBills || [],
         summary: expenses.summary || {},
       },
 
       paymentIns: {
-        paymentIns:
-          paymentIns.paymentIns || [],
+        paymentIns: paymentIns.paymentIns || [],
         summary: paymentIns.summary || {},
       },
 
       paymentOuts: {
-        paymentOuts:
-          paymentOuts.paymentOuts || [],
+        paymentOuts: paymentOuts.paymentOuts || [],
         summary: paymentOuts.summary || {},
       },
     });
@@ -4318,7 +4815,8 @@ export const getAllTransactionsDayPrintReport = async (
     }
   }
 };
-export {getSalesNewSalesPurchasesEachDay,
+export {
+  getSalesNewSalesPurchasesEachDay,
   getSalesNewSalesPurchasesInDateRange,
   getSalesAndPurchasesDailyYearMonthWise,
   getSalesAndPurchasesWeeklyYearMonthWise,
@@ -4326,5 +4824,6 @@ export {getSalesNewSalesPurchasesEachDay,
   getSalesAndPurchasesYearWise,
   getPartyWiseSalesAndPurchasesOverall,
   printDailyReport,
-  getBalanceSheet,getDayWiseTransactionsCount,getDayWiseTransactionsDetails};
+  getBalanceSheet, getDayWiseTransactionsCount, getTransactionsDetails, getAllTransactionsPrintReport
+};
 

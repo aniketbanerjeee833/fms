@@ -170,30 +170,61 @@ calendarMonth: month,
     return newDate;
   });
 };
-  const handleDateRangeSubmit = () => {
-    if (dateRange.startDate && dateRange.endDate) {
-      if (new Date(dateRange.endDate) < new Date(dateRange.startDate)) {
-        alert("End date must be after start date");
-        return;
-      }
+  // const handleDateRangeSubmit = () => {
+  //   if (dateRange.startDate && dateRange.endDate) {
+  //     if (new Date(dateRange.endDate) < new Date(dateRange.startDate)) {
+  //       alert("End date must be after start date");
+  //       return;
+  //     }
 
-      let url = `/date-range-report/${dateRange.startDate}/${dateRange.endDate}`;
+  //     let url = `/date-range-report/${dateRange.startDate}/${dateRange.endDate}`;
 
-      // ✅ append only if passed
-      if (reportType) {
-        url += `?reportType=${reportType}`;
-      }
-      console.log(reportType)
-      console.log(url);
-      window.open(url, "_blank");
+  //     // ✅ append only if passed
+  //     if (reportType) {
+  //       url += `?reportType=${reportType}`;
+  //     }
+  //     console.log(reportType)
+  //     console.log(url);
+  //     window.open(url, "_blank");
 
-      setShowRangeModal(false);
-      setDateRange({ startDate: "", endDate: "" });
-      setReportType("");
-    } else {
-      toast.error("Please select both start and end dates");
-    }
-  };
+  //     setShowRangeModal(false);
+  //     setDateRange({ startDate: "", endDate: "" });
+  //     setReportType("");
+  //   } else {
+  //     toast.error("Please select both start and end dates");
+  //   }
+  // };
+
+const handleDateRangeSubmit = () => {
+  const { startDate, endDate } = dateRange;
+
+  if (!startDate || !endDate) {
+    toast.error("Please select both start and end dates");
+    return;
+  }
+
+  if (endDate < startDate) {
+    toast.error("End date must be on or after start date");
+    return;
+  }
+
+  const params = new URLSearchParams({
+    fromDate: startDate,
+    toDate: endDate,
+  });
+
+  if (reportType) {
+    params.set("reportType", reportType);
+  }
+
+  navigate(
+    `/reports/all-transactions-details-day-wise?${params.toString()}`
+  );
+
+  setShowRangeModal(false);
+  setDateRange({ startDate: "", endDate: "" });
+  setReportType("");
+};
 
 
   const renderCalendar = () => {
@@ -479,19 +510,21 @@ const totalExpenses = Number(dayTransactions?.total_expenses ?? 0);
                     >
                       ← Previous
                     </button>
-                    {/* <button style={{ backgroundColor: "#4CA1AF" }}
-                      onClick={() => setShowRangeModal(true)}
-                      className="px-4 py-2 bg-blue-600  text-white rounded-lg transition text-sm sm:text-base  flex items-center gap-2"
-                    >
-                      <Filter className="w-4 h-4" />
-                      Date Range Report
-                    </button> */}
+                   
                     <button style={{ outline: "none" }}
                       onClick={() => navigateMonth(1)}
                       className="px-3 py-1 bg-gray-200
                    rounded text-sm sm:text-base"
                     >
                       Next →
+                    </button>
+
+                     <button style={{ backgroundColor: "#4CA1AF" }}
+                      onClick={() => setShowRangeModal(true)}
+                      className="px-4 py-2 bg-blue-600  text-white rounded-lg transition text-sm sm:text-base  flex items-center gap-2"
+                    >
+                      <Filter className="w-4 h-4" />
+                      Date Range Report
                     </button>
                   </div>
 
@@ -625,15 +658,24 @@ const totalExpenses = Number(dayTransactions?.total_expenses ?? 0);
                         Report Type
                       </label>
 
-                      <select
-                        value={reportType}
-                        onChange={(e) => setReportType(e.target.value)} // ✅ CORRECT
-                        className="w-full outline-none border-b-2 text-gray-900"
-                      >
-                        <option value="">Full Report (Sales + Purchases)</option>
-                        <option value="sales">Sales Report</option>
-                        <option value="purchases">Purchases Report</option>
-                      </select>
+                      
+
+<select
+  value={reportType}
+  onChange={(e) => setReportType(e.target.value)}
+  className="w-full outline-none border-b-2 text-gray-900"
+>
+  <option value="">Full Report (All Transactions)</option>
+  <option value="sales">Sales</option>
+  <option value="purchases">Purchases</option>
+  <option value="purchaseReturns">Purchase Return</option>
+  <option value="saleReturns">Sale Return</option>
+  <option value="paymentIns">Payment In</option>
+  <option value="paymentOuts">Payment Out</option>
+  <option value="expenses">Expenses</option>
+</select>
+
+
                     </div>
 
                     <div className="flex gap-3 mt-6">

@@ -75,19 +75,34 @@ getDayWiseTransactions: builder.query({
       providesTags: ["DayWiseTransactions"],
     }),
 
-    // getDayWiseTransactionsDetails: builder.query({
-    //   query: (date) =>
-    //     `report/day-wise-transactions-details?date=${date}`,
-
-    //   providesTags: ["DayWiseTransactions"],
-    // })
-
-getDayWiseTransactionsDetails: builder.query({
-  query: ({ date, cursor = null, limit = 50, search = "" }) => {
+  
+getTransactionDetails: builder.query({
+  query: ({
+    date,
+    fromDate,
+    toDate,
+    reportType = "",
+    cursor = null,
+    limit = 50,
+    search = "",
+  }) => {
     const params = new URLSearchParams({
-      date,
       limit: String(limit),
     });
+
+    // Single-day report.
+    if (date) {
+      params.set("date", date);
+    } else {
+      // Date-range report.
+      if (fromDate) params.set("fromDate", fromDate);
+      if (toDate) params.set("toDate", toDate);
+    }
+
+    // Optional transaction category.
+    if (reportType && reportType !== "all") {
+      params.set("reportType", reportType);
+    }
 
     if (cursor) {
       params.set("cursor", cursor);
@@ -97,18 +112,21 @@ getDayWiseTransactionsDetails: builder.query({
       params.set("search", search.trim());
     }
 
-    return `report/day-wise-transactions-details?${params.toString()}`;
+    return `report/transactions-details?${params.toString()}`;
   },
 
-  // Separate cached results for each date and search term.
+  // Keep separate cache entries for different report filters.
   serializeQueryArgs: ({ queryArgs }) => ({
-    date: queryArgs.date,
+    date: queryArgs.date ?? "",
+    fromDate: queryArgs.fromDate ?? "",
+    toDate: queryArgs.toDate ?? "",
+    reportType: queryArgs.reportType ?? "",
     limit: queryArgs.limit ?? 50,
     search: queryArgs.search?.trim() ?? "",
   }),
 
   merge: (currentCache, newData, { arg }) => {
-    // Replace cached results for the first page.
+    // Replace cached data when fetching the first page.
     if (!arg.cursor) {
       return newData;
     }
@@ -136,26 +154,39 @@ getDayWiseTransactionsDetails: builder.query({
 
   forceRefetch: ({ currentArg, previousArg }) =>
     currentArg?.date !== previousArg?.date ||
+    currentArg?.fromDate !== previousArg?.fromDate ||
+    currentArg?.toDate !== previousArg?.toDate ||
+    currentArg?.reportType !== previousArg?.reportType ||
     currentArg?.cursor !== previousArg?.cursor ||
     currentArg?.limit !== previousArg?.limit ||
     currentArg?.search?.trim() !== previousArg?.search?.trim(),
 
   providesTags: ["DayWiseTransactions"],
 }),
+
+
+
 getDayWiseTransactionsDetailsPrint: builder.query({
-  query: ({ date, fromDate = "", toDate = "", search = "" }) => {
+  query: ({
+    date,
+    fromDate = "",
+    toDate = "",
+    reportType = "all",
+    search = "",
+  }) => {
     const params = new URLSearchParams();
 
     if (date) params.append("date", date);
     if (fromDate) params.append("fromDate", fromDate);
     if (toDate) params.append("toDate", toDate);
+    if (reportType) params.append("reportType", reportType);
     if (search.trim()) params.append("search", search.trim());
 
-    return `report/day-wise-transactions-details-print?${params.toString()}`;
+    return `report/transactions-details-print?${params.toString()}`;
   },
-
   providesTags: ["DayWiseTransactions"],
 }),
+
 
   }),
 
@@ -170,5 +201,5 @@ useGetSalesAndPurchasesYearWiseQuery,
 // useGetPartyWiseSalesAndPurchasesDailyYearMonthWiseQuery,
 useGetPartyWiseSalesAndPurchasesOverallQuery,
 usePrintDailyReportMutation,
-useGetBalanceSheetQuery, useGetDayWiseTransactionsQuery,useGetDayWiseTransactionsDetailsQuery, 
+useGetBalanceSheetQuery, useGetDayWiseTransactionsQuery,useGetTransactionDetailsQuery, 
 useLazyGetDayWiseTransactionsDetailsPrintQuery} = reportApi

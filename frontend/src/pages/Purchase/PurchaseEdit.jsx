@@ -1288,7 +1288,7 @@ export default function PurchaseEdit() {
   const totals = calculateTotals(itemsValues);
 
 
-  const onSubmit = async (data) => {
+   const onSubmit = async (data) => {
     console.log("Form Data (from RHF):", data);
 
     // =========================================================

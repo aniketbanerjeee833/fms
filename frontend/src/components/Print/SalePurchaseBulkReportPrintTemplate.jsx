@@ -69,12 +69,29 @@ const TYPE_CONFIG = {
         discountTypeKey: "Discount_Type_On_Purchase_Price",
         showTerms: false,
     },
+
+    expense: {
+        title: "Expenses Report",
+        docLabel: "Expense No.",
+        dateLabel: "Expense Date",
+        docNumberKey: "Expense_Number",
+        dateKey: "Expense_Date",
+        amountKey: "Total_Amount",
+        paidKey: "Total_Amount",
+        paidLabel: "Amount",
+        priceKey: "Amount",
+        mrpKey: "MRP",
+        discountKey: "Discount",
+        discountTypeKey: "Discount_Type",
+        showTerms: false,
+    },
 };
 const getDoc = (record) =>
     record.invoicePartyDetails ||
     record.saleReturnDetails ||
     record.purchaseReturnDetails ||
     record.billPurchaseDetails ||
+    record.expenseDetails ||
     record;
 
 const getGstRate = (taxType) => {
@@ -103,9 +120,17 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
 
         const records = Array.isArray(data)
             ? data
-            : data?.invoices || data?.purchases || data?.saleReturns || data?.purchaseReturns || [];
+            : data?.invoices ||
+              data?.purchases ||
+              data?.saleReturns ||
+              data?.purchaseReturns ||
+              data?.expenses?.expenseBills ||
+              data?.expenses ||
+              data?.expenseBills ||
+              [];
 
         const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.sale;
+        const isExpense = type === "expense";
 
         const money = (v) =>
             Number(v || 0).toLocaleString("en-IN", {
@@ -120,30 +145,187 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                 })
                 : "-";
 
+        const getRecordAmount = (record) => {
+            const doc = getDoc(record);
+            return Number(
+                doc[cfg.amountKey] ??
+                doc.Amount ??
+                doc.Expense_Amount ??
+                doc.Total_Expense ??
+                0
+            );
+        };
+
         const grandTotal = records.reduce(
-            (sum, r) => sum + Number(getDoc(r)[cfg.amountKey] || 0), 0
+            (sum, record) => sum + getRecordAmount(record), 0
         );
         const grandPaid = records.reduce(
-            (sum, r) => sum + Number(getDoc(r)[cfg.paidKey] || 0), 0
+            (sum, record) =>
+                sum + Number(
+                    getDoc(record)[cfg.paidKey] ??
+                    getDoc(record).Amount ??
+                    getDoc(record).Expense_Amount ??
+                    0
+                ), 0
         );
         const grandBalance = records.reduce(
-            (sum, r) => sum + Number(getDoc(r).Balance_Due || 0), 0
+            (sum, record) => sum + Number(getDoc(record).Balance_Due || 0), 0
         );
 
         return (
             <div ref={ref} className="bulk-print">
                 <div className="bulk-report-title" />
-                <div className="bulk-report-subtitle">
+                <div
+  className={`bulk-report-subtitle ${
+    isExpense ? "bulk-expense-subtitle" : ""
+  }`}
+>
+  {cfg.title}
+
+  {fromDate && toDate && (
+    <div style={{ fontSize: 12, fontWeight: 400, marginTop: 2 }}>
+      {formatDate(fromDate)} - {formatDate(toDate)}
+    </div>
+  )}
+</div>
+                {/* <div className="bulk-report-subtitle">
                     {cfg.title}
                     {fromDate && toDate && (
                         <div style={{ fontSize: 12, fontWeight: 400, marginTop: 2 }}>
                             {formatDate(fromDate)} - {formatDate(toDate)}
                         </div>
                     )}
-                </div>
+                </div> */}
 
                 {records.length === 0 ? (
                     <div className="bulk-empty">No records found for this period.</div>
+                ) : isExpense ? (
+                    <div className="bulk-invoice-block">
+                        {records.map((record, billIndex) => {
+                            const expense = getDoc(record);
+                            const items = Array.isArray(record.items)
+                                ? record.items
+                                : Array.isArray(expense.items)
+                                    ? expense.items
+                                    : [];
+                            const splits = Array.isArray(record.splits)
+                                ? record.splits
+                                : Array.isArray(expense.splits)
+                                    ? expense.splits
+                                    : [];
+                            const expenseDate =
+                                expense[cfg.dateKey] ??
+                                expense.Date ??
+                                expense.created_at
+                            const expenseNumber =
+                                expense[cfg.docNumberKey] ??
+                                expense.Expense_Id ??
+                                expense.Expense_ID ??
+                                expense.id ??
+                                "-";
+                            const expenseTotal = getRecordAmount(record);
+                            const expensePaid = Number(
+                                expense.Total_Paid ?? expense.Total_Amount ??
+                                expense.Amount ?? expense.Expense_Amount ?? 0
+                            );
+                            const expenseBalance = Number(expense.Balance_Due ?? 0);
+                            const itemColumns = enableHSNCode ? 7 : 6;
+
+                            return (
+                                <div key={expense.Expense_Id ?? expense.id ?? expenseNumber ?? billIndex}
+                                     style={{ marginBottom: 18, marginTop: 0, pageBreakInside: "avoid" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, margin: "0 0 6px" }}>
+                                        <div>
+                                            <strong>Expense No.:</strong> {expenseNumber}
+                                            <span style={{ marginLeft: 18 }}><strong>Date:</strong> {formatDate(expenseDate)}</span>
+                                        </div>
+                                        <div>
+                                            <strong>Category:</strong> {expense.Category_Name ?? expense.Expense_Category ?? expense.Category ?? "-"}
+                                        </div>
+                                    </div>
+                                    {(expense.Party_Name || expense.GSTIN) && (
+                                        <div style={{ marginBottom: 8, fontSize: 12 }}>
+                                            {expense.Party_Name && <span><strong>Party:</strong> {expense.Party_Name}</span>}
+                                            {expense.GSTIN && <span style={{ marginLeft: 16 }}><strong>GSTIN:</strong> {expense.GSTIN}</span>}
+                                        </div>
+                                    )}
+                                    <table className="bulk-items-table">
+                                        <thead>
+                                            <tr>
+                                                <th className="bulk-center">#</th>
+                                                <th>Expense Item</th>
+                                                {enableHSNCode && <th>HSN/SAC</th>}
+                                                <th className="bulk-right">Qty</th>
+                                                <th className="bulk-right">Price</th>
+                                                <th className="bulk-right">Discount</th>
+                                                <th className="bulk-right">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {items.length > 0 && items.map((item, itemIndex) => {
+                                                const quantity = Number(item.Quantity ?? item.quantity ?? 0);
+                                                const price = Number(item.Price ?? item.Amount_Per_Unit ?? item.Unit_Price ?? item.price ?? 0);
+                                                const discountValue = Number(item.Discount_On_Price ?? item.Discount_Amount ?? item.Discount ?? 0);
+                                                const discountType = item.Discount_Type_On_Price ?? item.Discount_Type ?? "";
+                                                const discountLabel = discountValue
+                                                    ? `${money(discountValue)}${String(discountType).toLowerCase().includes("percent") ? "%" : ""}`
+                                                    : "-";
+                                                const amount = Number(item.Amount ?? item.Total_Amount ?? item.amount ?? (quantity * price));
+                                                return (
+                                                    <tr key={item.id ?? item.Id ?? item.Expense_Item_Id ?? itemIndex}>
+                                                        <td className="bulk-center">{itemIndex + 1}</td>
+                                                        <td>{item.Item_Name ?? item.Expense_Item_Name ?? item.Name ?? item.Description ?? "-"}</td>
+                                                        {enableHSNCode && <td>{item.Item_HSN ?? item.HSN_Code ?? item.SAC_Code ?? "-"}</td>}
+                                                        <td className="bulk-right">{money(quantity)}</td>
+                                                        <td className="bulk-right">₹ {money(price)}</td>
+                                                        <td className="bulk-right">{discountLabel}</td>
+                                                        <td className="bulk-right">₹ {money(amount)}</td>
+                                                    </tr>
+                                                );
+                                            }) 
+                                            //: (
+                                                // <tr>
+                                                //     <td colSpan={itemColumns} style={{ textAlign: "center" }}>
+                                                //         No item details returned for this expense.
+                                                //     </td>
+                                                // </tr>
+                                            //)
+                                        }
+                                        </tbody>
+                                        {items.length > 0 && (
+                                            <tfoot>
+                                                <tr>
+                                                    <td colSpan={itemColumns - 1} className="bulk-right bulk-bold">Items Total</td>
+                                                    <td className="bulk-right bulk-bold">₹ {money(items.reduce((sum, item) => sum + Number(item.Amount ?? item.Total_Amount ?? item.amount ?? (Number(item.Quantity ?? item.quantity ?? 0) * Number(item.Price ?? item.Amount_Per_Unit ?? item.Unit_Price ?? item.price ?? 0))), 0))}</td>
+                                                </tr>
+                                            </tfoot>
+                                        )}
+                                    </table>
+                                    {splits.length > 0 && (
+                                        <div style={{ marginTop: 6, fontSize: 12 }}>
+                                            <strong>Payment:</strong> {splits.map((split, i) =>
+                                                `${split.Payment_Type ?? split.paymentType ?? "Payment"} ₹${money(split.Amount ?? split.amount ?? 0)}`
+                                            ).join(" | ")}
+                                        </div>
+                                    )}
+                                    <div style={{ display: "flex", justifyContent: "flex-end", gap: 24, marginTop: 8, fontSize: 12 }}>
+                                        <span><strong>Total:</strong> ₹ {money(expenseTotal)}</span>
+                                        <span><strong>Paid:</strong> ₹ {money(expensePaid)}</span>
+                                        <span><strong>Balance:</strong> ₹ {money(expenseBalance)}</span>
+                                    </div>
+                                    {billIndex < records.length - 1 && <hr style={{ margin: "16px 0", borderTop: "1px solid #999" }} />}
+                                </div>
+                            );
+                        })}
+                        {/* <table className="bulk-items-table">
+                            <tfoot>
+                                <tr>
+                                    <td className="bulk-right bulk-bold">Total Expenses</td>
+                                    <td className="bulk-right bulk-bold">₹ {money(grandTotal)}</td>
+                                </tr>
+                            </tfoot>
+                        </table> */}
+                    </div>
                 ) : (
                     records.map((record, docIdx) => {
                         const doc = getDoc(record);
@@ -496,21 +678,25 @@ const SalePurchaseBulkReportPrintTemplate = forwardRef(
                 {records.length > 0 && (
                     <div className="bulk-summary">
                         <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                            Summary ({records.length} {cfg.docLabel.replace(" No.", "")}
+                            Summary ({records.length} {isExpense ? "Expense" : cfg.docLabel.replace(" No.", "")}
                             {records.length > 1 ? "s" : ""})
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>Total Amount</span>
+                            <span>{isExpense ? "Total Expenses" : "Total Amount"}</span>
                             <span className="bulk-bold">₹ {money(grandTotal)}</span>
                         </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>{cfg.paidLabel}</span>
-                            <span className="bulk-bold">₹ {money(grandPaid)}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>Balance Due</span>
-                            <span className="bulk-bold">₹ {money(grandBalance)}</span>
-                        </div>
+                        {!isExpense && (
+                            <>
+                                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span>{cfg.paidLabel}</span>
+                                    <span className="bulk-bold">₹ {money(grandPaid)}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                    <span>Balance Due</span>
+                                    <span className="bulk-bold">₹ {money(grandBalance)}</span>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
             </div>

@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useMemo, forwardRef } from "react";
-import { NavLink, useNavigate, useParams } from "react-router-dom";
+import { NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { toast } from "react-toastify";
 import { useReactToPrint } from "react-to-print";
 import { Eye, MoreVertical, Printer, PrinterIcon, Trash2, Undo2 } from "lucide-react";
 
-import { useGetDayWiseTransactionsDetailsQuery, useLazyGetDayWiseTransactionsDetailsPrintQuery } from "../../redux/api/reportApi";
+import { useGetTransactionDetailsQuery, useLazyGetDayWiseTransactionsDetailsPrintQuery } from "../../redux/api/reportApi";
 import { useDeleteSaleMutation, useGetSingleSaleQuery } from "../../redux/api/saleApi";
 import { useDeletePurchaseMutation, useGetSinglePurchaseQuery } from "../../redux/api/purchaseApi";
 import { useDeleteSaleReturnMutation, useGetSaleReturnByIdQuery } from "../../redux/api/saleReturnApi";
@@ -74,8 +74,8 @@ const TXN_TYPES = [
   },
   {
     key: "saleReturns",
-    label: "Sale Return",
-    plural: "Sale Returns",
+    label: "Credit Note",
+    plural: "Credit Notes",
     color: "#ea580c",
     idOf: (r) => r.Return_Id ?? r.Sale_Return_Id ?? r.id,
     numberOf: (r) => r.Return_Number ?? r.Credit_Note_Number,
@@ -84,12 +84,12 @@ const TXN_TYPES = [
     canReturn: false,
     printMode: "saleReturn",
     editPath: (id) => `/sale/return/edit/${id}`,
-    deleteMessage: "Are you sure you want to delete this sale return?",
+    deleteMessage: "Are you sure you want to delete this sale return? This action cannot be undone",
   },
   {
     key: "purchaseReturns",
-    label: "Purchase Return",
-    plural: "Purchase Returns",
+    label: "Debit Note",
+    plural: "Debit Notes",
     color: "#9333ea",
     idOf: (r) => r.Return_Id ?? r.Purchase_Return_Id ?? r.id,
     numberOf: (r) => r.Return_Number ?? r.Debit_Note_Number,
@@ -98,7 +98,7 @@ const TXN_TYPES = [
     canReturn: false,
     printMode: "purchaseReturn",
     editPath: (id) => `/purchase/return/edit/${id}`,
-    deleteMessage: "Are you sure you want to delete this purchase return?",
+    deleteMessage: "Are you sure you want to delete this purchase return? This action cannot be undone",
   },
   {
     key: "paymentIns",
@@ -138,7 +138,7 @@ const TXN_TYPES = [
     amountOf: (r) => r.Total_Amount ?? r.Amount,
     hasBalance: false,
     canReturn: false,
-   printMode: "expense",
+    printMode: "expense",
     editPath: (id) => `/expense/edit/${id}`,
     deleteMessage: "Are you sure you want to delete this expense? This action cannot be undone",
   },
@@ -146,8 +146,9 @@ const TXN_TYPES = [
 
 const TYPE_MAP = Object.fromEntries(TXN_TYPES.map((t) => [t.key, t]));
 
-const GRID_COLS = "0.6fr 1.2fr 1.2fr 2.6fr 1.5fr 1.3fr 1.2fr 0.9fr";
-
+//const GRID_COLS = "0.6fr 1.2fr 1.2fr 2.6fr 1.5fr 1.3fr 1.2fr 0.9fr";
+const GRID_COLS =
+  "0.6fr 1.2fr 1.2fr 2.6fr 1.5fr 1.3fr 1.3fr 1.2fr 0.9fr";
 const money = (v) =>
   `₹${(Number(v) || 0).toLocaleString("en-IN", {
     minimumFractionDigits: 2,
@@ -205,8 +206,30 @@ const DayTxnPrintTemplate = forwardRef(({ title, rows }, ref) => {
 /* ------------------------------------------------------------------ */
 /*  PAGE                                                               */
 /* ------------------------------------------------------------------ */
-export default function AllTransactionsDailyDetails() {
-  const { date } = useParams();
+export default function AllTransactionsDetails() {
+  // const { date } = useParams();
+  const { date: routeDate } = useParams();
+  const [searchParams] = useSearchParams();
+
+  const date = routeDate || searchParams.get("date");
+  const fromDate = searchParams.get("fromDate");
+  const toDate = searchParams.get("toDate");
+  const reportType = searchParams.get("reportType") || "all";
+
+  const isDateRange = Boolean(fromDate && toDate);
+  const hasValidReportParams = Boolean(date || isDateRange);
+
+  const displayFromDate = fromDate || date;
+  const displayToDate = toDate || date;
+
+  const formatDate = (value) => {
+    if (!value) return "";
+    return new Date(`${value}T00:00:00`).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
@@ -235,28 +258,49 @@ export default function AllTransactionsDailyDetails() {
   const LIMIT = 50;
 
   // const { data, isLoading, isFetching, isError, refetch } =
-  //   useGetDayWiseTransactionsDetailsQuery(date, { skip: !date });
-  const {
-  data: alltransactionDailyDetails,
-  isLoading,
-  isFetching,
-  isError,
-  refetch,
-} = useGetDayWiseTransactionsDetailsQuery(
-  {
-    date,
-    cursor,
-    limit: LIMIT,
-  },
-  { skip: !date }
-);
-const handleLoadMore = () => {
-  if (isFetching || !alltransactionDailyDetails?.hasMore || !alltransactionDailyDetails?.nextCursor) {
-    return;
-  }
+  //     useGetTransactionDetailsQuery(date, { skip: !date });
+  // const {
+  //   data: alltransactionDailyDetails,
+  //   isLoading,
+  //   isFetching,
+  //   isError,
+  //   refetch,
+  // } =   useGetTransactionDetailsQuery(
+  //   {
+  //     date,
+  //     cursor,
+  //     limit: LIMIT,
+  //   },
+  //   { skip: !date }
+  // );
 
-  setCursor(alltransactionDailyDetails.nextCursor);
-};
+  const {
+    data: alltransactionDailyDetails,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+  } = useGetTransactionDetailsQuery(
+    {
+      date: isDateRange ? undefined : date,
+      fromDate: isDateRange ? fromDate : undefined,
+      toDate: isDateRange ? toDate : undefined,
+      reportType,
+      cursor,
+      limit: LIMIT,
+      search,
+    },
+    {
+      skip: !hasValidReportParams,
+    }
+  );
+  const handleLoadMore = () => {
+    if (isFetching || !alltransactionDailyDetails?.hasMore || !alltransactionDailyDetails?.nextCursor) {
+      return;
+    }
+
+    setCursor(alltransactionDailyDetails.nextCursor);
+  };
   /* ---------- delete mutations (only sale & purchase wired) ---------- */
   const [deleteSale, { isLoading: deletingSale }] = useDeleteSaleMutation();
   const [deletePurchase, { isLoading: deletingPurchase }] = useDeletePurchaseMutation();
@@ -264,7 +308,7 @@ const handleLoadMore = () => {
   const [deleteSaleReturn, { isLoading: deletingSaleReturn }] = useDeleteSaleReturnMutation();
   const [deletePaymentIn, { isLoading: deletingPaymentIn }] = useDeletePaymentInMutation();
   const [deletePaymentOut, { isLoading: deletingPaymentOut }] = useDeletePaymentOutMutation();
-    const [deleteExpense, { isLoading: deletingExpense }] =useDeleteExpenseMutation();
+  const [deleteExpense, { isLoading: deletingExpense }] = useDeleteExpenseMutation();
   // To enable delete for other types, add their mutation here, e.g.
   // saleReturns: (id) => deleteSaleReturn(id).unwrap(),
   const deleteFns = {
@@ -308,16 +352,29 @@ const handleLoadMore = () => {
       );
     });
   }, [allRows, activeType, search]);
+  const summary = alltransactionDailyDetails?.summary || {};
 
   const totalsByType = useMemo(() => {
     const out = {};
-    TXN_TYPES.forEach((c) => (out[c.key] = { count: 0, amount: 0 }));
-    allRows.forEach((r) => {
-      out[r._type].count += 1;
-      out[r._type].amount += r._amount;
+
+    TXN_TYPES.forEach((c) => {
+      out[c.key] = {
+        count: Number(summary[c.key]?.count) || 0,
+        amount: Number(summary[c.key]?.amount) || 0,
+      };
     });
+
     return out;
-  }, [allRows]);
+  }, [summary]);
+  // const totalsByType = useMemo(() => {
+  //   const out = {};
+  //   TXN_TYPES.forEach((c) => (out[c.key] = { count: 0, amount: 0 }));
+  //   allRows.forEach((r) => {
+  //     out[r._type].count += 1;
+  //     out[r._type].amount += r._amount;
+  //   });
+  //   return out;
+  // }, [allRows]);
 
   /* ---------- close 3-dot menu on outside click ---------- */
   useEffect(() => {
@@ -398,11 +455,11 @@ const handleLoadMore = () => {
     }
   );
   const { currentData: expenseData } = useGetExpenseByIdQuery(
-  print?.id,
-  {
-    skip: print?.mode !== "expense",
-  }
-);
+    print?.id,
+    {
+      skip: print?.mode !== "expense",
+    }
+  );
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -422,7 +479,7 @@ const handleLoadMore = () => {
       (print.mode === "expense" && expenseData?.expense) ||
       print.mode === "generic";
     if (ready) handlePrint();
-  }, [print, saleData, purchaseData, saleReturnData, purchaseReturnData, paymentInData, paymentOutData,expenseData, handlePrint]);
+  }, [print, saleData, purchaseData, saleReturnData, purchaseReturnData, paymentInData, paymentOutData, expenseData, handlePrint]);
 
   const startRowPrint = (row) => {
     const mode = row._cfg.printMode;
@@ -446,7 +503,8 @@ const handleLoadMore = () => {
   /* ---------- combined day-wise bulk print ---------- */
   const handleBulkPrint = useReactToPrint({
     contentRef: bulkPrintRef,
-    documentTitle: `Day-Wise-Transactions-${date || "report"}`,
+    //documentTitle: `Day-Wise-Transactions-${date || "report"}`,
+    documentTitle: `Transactions-${displayFromDate || "report"}-to-${displayToDate || displayFromDate || "report"}`,
     onAfterPrint: () => {
       setBulkPrintRequested(false);
       setBulkPrintData(null);
@@ -454,20 +512,55 @@ const handleLoadMore = () => {
   });
 
   const handleBulkPrintClick = async () => {
-    if (!date) {
+    if (isDateRange) {
+      if (!fromDate || !toDate) {
+        toast.info("Please select both start and end dates.");
+        return;
+      }
+
+      if (fromDate > toDate) {
+        toast.info("Start date cannot be after end date.");
+        return;
+      }
+    } else if (!date) {
       toast.info("Please select a date to print.");
       return;
     }
 
     try {
-      const result = await triggerDayPrint({ date, fromDate: date, toDate: date }).unwrap();
-      // Accept either a direct response or a response wrapped in `data`.
+      const result = await triggerDayPrint({
+        date: isDateRange ? undefined : date,
+        fromDate: isDateRange ? fromDate : date,
+        toDate: isDateRange ? toDate : date,
+         reportType,
+        search,
+      }).unwrap();
+
       setBulkPrintData(result?.data ?? result);
       setBulkPrintRequested(true);
     } catch (err) {
-      toast.error(err?.data?.message || "Failed to load day-wise print report");
+      toast.error(
+        err?.data?.message || "Failed to load transaction print report"
+      );
     }
   };
+
+
+  // const handleBulkPrintClick = async () => {
+  //   if (!date) {
+  //     toast.info("Please select a date to print.");
+  //     return;
+  //   }
+
+  //   try {
+  //     const result = await triggerDayPrint({ date, fromDate: date, toDate: date }).unwrap();
+  //     // Accept either a direct response or a response wrapped in `data`.
+  //     setBulkPrintData(result?.data ?? result);
+  //     setBulkPrintRequested(true);
+  //   } catch (err) {
+  //     toast.error(err?.data?.message || "Failed to load day-wise print report");
+  //   }
+  // };
 
   useEffect(() => {
     if (bulkPrintRequested && bulkPrintData) {
@@ -501,14 +594,14 @@ const handleLoadMore = () => {
   };
 
   /* ---------- helpers ---------- */
-  const prettyDate = date
-    ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-    : "";
+  // const prettyDate = date
+  //   ? new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", {
+  //     weekday: "long",
+  //     day: "numeric",
+  //     month: "long",
+  //     year: "numeric",
+  //   })
+  //   : "";
 
   const chip = (key, label, count, color) => {
     const active = activeType === key;
@@ -536,7 +629,41 @@ const handleLoadMore = () => {
   };
 
   const isDeleting = deletingSale || deletingPurchase || deletingPurchaseReturn ||
-   deletingSaleReturn || deletingPaymentIn || deletingPaymentOut||deletingExpense;
+    deletingSaleReturn || deletingPaymentIn || deletingPaymentOut || deletingExpense;
+
+
+
+  const receivedPaidOf = (row) => {
+    const amount = (value) => Number(value ?? 0) || 0;
+
+    switch (row._type) {
+      case "sales":
+        return amount(row.Total_Received);
+
+      case "purchases":
+        return amount(row.Total_Paid);
+
+      case "saleReturns":
+        return amount(row.Total_Received ?? row.Received);
+
+      case "purchaseReturns":
+        return amount(row.Total_Paid ?? row.Paid);
+
+      case "paymentIns":
+        return amount(row.Received);
+
+      case "paymentOuts":
+        return amount(row.Paid);
+
+      case "expenses":
+        return amount(row.Total_Paid);
+
+      default:
+        return 0;
+    }
+  };
+
+
 
   return (
     <>
@@ -547,10 +674,41 @@ const handleLoadMore = () => {
         {/* HEADER */}
         <div className="inn-title">
           <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3">
-            <div>
+            {/* <div>
               <h4 className="text-2xl font-bold mb-1">Day Transactions</h4>
               <p className="text-gray-500 text-sm sm:text-base">{prettyDate}</p>
+            </div> */}
+
+           <div>
+  <h2 className="text-2xl font-bold">
+    {isDateRange ? "Transactions Report" : "Day Transactions"}
+  </h2>
+
+  {isDateRange && reportType && (
+    <h4 className="text-sm font-medium text-gray-500 mt-1">
+      ({reportType})
+    </h4>
+  )}
+</div>
+
+            <div className="mt-2 text-sm text-gray-600">
+              {isDateRange ? (
+                <div className="flex flex-wrap gap-4">
+                  <h4>
+                    <strong>From Date:</strong> {formatDate(fromDate)}
+                  </h4>
+
+                  <h4>
+                    <strong>To Date:</strong> {formatDate(toDate)}
+                  </h4>
+                </div>
+              ) : (
+                <h4>
+                  <strong>Date:</strong> {formatDate(date)}
+                </h4>
+              )}
             </div>
+
 
             {/* <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               {/* <div className="flex flex-col">
@@ -605,26 +763,35 @@ const handleLoadMore = () => {
 
           {/* FILTER CHIPS */}
           <div className="flex gap-2 mt-3 overflow-x-auto p-1">
-  {chip("all", "All", allRows.length, "#4CA1AF")}
+            {/* {chip("all", "All", allRows.length, "#4CA1AF")} */}
+            {chip(
+              "all",
+              "All",
+              Object.values(totalsByType).reduce(
+                (total, item) => total + item.count,
+                0
+              ),
+              "#4CA1AF"
+            )}
 
-  {TXN_TYPES.map((c) =>
-    chip(c.key, c.plural, totalsByType[c.key].count, c.color)
-  )}
+            {TXN_TYPES.map((c) =>
+              chip(c.key, c.plural, totalsByType[c.key].count, c.color)
+            )}
 
-  {/* Print button fixed at the end */}
-  <div className="ml-auto shrink-0">
-    <button
-      type="button"
-      onClick={handleBulkPrintClick}
-      disabled={isBulkPrintFetching}
-      title="Print all transactions for this day"
-      className="flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
-      aria-label="Print all day-wise transactions"
-    >
-      <PrinterIcon size={17} strokeWidth={2.2} />
-    </button>
-  </div>
-</div>
+            {/* Print button fixed at the end */}
+            <div className="ml-auto shrink-0">
+              <button
+                type="button"
+                onClick={handleBulkPrintClick}
+                disabled={isBulkPrintFetching}
+                title="Print all transactions for this day"
+                className="flex items-center gap-2 rounded-lg bg-blue-50 px-3.5 py-2 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-all duration-200 hover:bg-blue-100 hover:ring-blue-300 active:scale-95 disabled:opacity-50"
+                aria-label="Print all day-wise transactions"
+              >
+                <PrinterIcon size={17} strokeWidth={2.2} />
+              </button>
+            </div>
+          </div>
 
           {/* TOTALS STRIP */}
           <div className="flex gap-3 mt-3 overflow-x-auto pb-1">
@@ -695,6 +862,7 @@ const handleLoadMore = () => {
                   <div>Party Name</div>
                   <div>Payment Type</div>
                   <div>Amount</div>
+                  <div>Received / Paid</div>
                   <div>Balance</div>
                   <div>Action</div>
                 </div>
@@ -705,7 +873,7 @@ const handleLoadMore = () => {
                     items={rows}
                     rowHeight={52}
                     height="100%"
-                    onLoadMore={handleLoadMore }
+                    onLoadMore={handleLoadMore}
                     isFetching={isFetching}
                     hasMore={Boolean(alltransactionDailyDetails?.hasMore)}
                     getItemKey={(r) => r._key}
@@ -762,6 +930,9 @@ const handleLoadMore = () => {
                           <div className="table-desi-cell">{paymentTypeOf(row)}</div>
 
                           <div className="table-desi-cell">{money(row._amount)}</div>
+                          <div className="table-desi-cell">
+                            {money(receivedPaidOf({ ...row, _type: row._type }))}
+                          </div>
 
                           <div className="table-desi-cell">
                             {cfg.hasBalance ? money(row._balance) : "—"}
@@ -981,91 +1152,185 @@ const handleLoadMore = () => {
               const paymentIns = getPrintRecords(paymentInsReport, "paymentIns", "records");
               const paymentOuts = getPrintRecords(paymentOutsReport, "paymentOuts", "records");
 
-              const expenseRecords = getPrintRecords(expensesReport, "expenseBills", "expenses", "records");
-              const expenseRows = expenseRecords.map((r, i) => ({
-                ...r,
-                _key: `expense-print-${r.Expense_Id ?? r.id ?? i}`,
-                _type: "expenses",
-                _cfg: TYPE_MAP.expenses,
-                _number: r.Expense_Number ?? r.Expense_Category ?? "N/A",
-                _amount: Number(r.Total_Amount ?? r.Amount ?? r.expenseDetails?.Total_Amount ?? 0),
-                _balance: 0,
-                Party_Name: r.Party_Name ?? r.expenseDetails?.Party_Name ?? "",
-              }));
+              // const expenseRecords = getPrintRecords(expensesReport, "expenseBills", "expenses", "records");
+              // const expenseRows = expenseRecords.map((r, i) => ({
+              //   ...r,
+              //   _key: `expense-print-${r.Expense_Id ?? r.id ?? i}`,
+              //   _type: "expenses",
+              //   _cfg: TYPE_MAP.expenses,
+              //   _number: r.Expense_Number ?? r.Expense_Category ?? "N/A",
+              //   _amount: Number(r.Total_Amount ?? r.Amount ?? r.expenseDetails?.Total_Amount ?? 0),
+              //   _balance: 0,
+              //   Party_Name: r.Party_Name ?? r.expenseDetails?.Party_Name ?? "",
+              // }));
+              const expenseRecords = getPrintRecords(
+  expensesReport,
+  "expenseBills",
+  "expenses",
+  "records"
+);
+
+const expenseRows = expenseRecords.map((r, i) => {
+  const details = r.expenseDetails ?? r;
+
+  return {
+    ...r,
+    ...details,
+
+    Expense_Id: details.Expense_Id ?? r.Expense_Id ?? r.id,
+
+    Expense_Number:
+      details.Expense_Number ??
+      r.Expense_Number ??
+      r.Expense_Category ??
+      "N/A",
+
+    Total_Amount:
+      details.Total_Amount ??
+      r.Total_Amount ??
+      r.Amount ??
+      0,
+
+    Party_Name:
+      details.Party_Name ??
+      r.Party_Name ??
+      "",
+
+    _key: `expense-print-${details.Expense_Id ?? r.Expense_Id ?? r.id ?? i}`,
+    _type: "expenses",
+    _cfg: TYPE_MAP.expenses,
+
+    _number:
+      details.Expense_Number ??
+      r.Expense_Number ??
+      r.Expense_Category ??
+      "N/A",
+
+    _amount: Number(
+      details.Total_Amount ??
+      r.Total_Amount ??
+      r.Amount ??
+      0
+    ),
+
+    _balance: 0,
+
+    items: r.items ?? [],
+    splits: r.splits ?? [],
+  };
+});
 
               return (
                 <div>
                   <div
-      style={{
-        padding: "12px 0",
-        fontFamily: "Arial, sans-serif",
-        textAlign: "center",
-      }}
-    >
-      <h1
-        style={{
-          margin: "0 0 4px",
-          fontSize: 20,
-          fontWeight: 700,
-        }}
-      >
-        Day-Wise Transactions Report
-      </h1>
+                    style={{
+                      padding: "12px 0",
+                      fontFamily: "Arial, sans-serif",
+                      textAlign: "center",
+                    }}
+                  >
+                    {/* <h1
+                      style={{
+                        margin: "0 0 4px",
+                        fontSize: 20,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Day-Wise Transactions Report
+                    </h1>
 
-      <div style={{ fontSize: 12 }}>Date: {prettyDate}</div>
-    </div>
+                    <div style={{ fontSize: 12 }}>Date: {prettyDate}</div> */}
+                    <h1
+                      style={{
+                        margin: "0 0 4px",
+                        fontSize: 20,
+                        fontWeight: 700,
+                      }}
+                    >
+                      Transactions Report
+                    </h1>
+
+                    <div style={{ fontSize: 12 }}>
+                      {isDateRange
+                        ? `Period: ${formatDate(fromDate)} - ${formatDate(toDate)}`
+                        : `Date: ${formatDate(date)}`}
+                    </div>
+                  </div>
 
                   {sales.length > 0 && (
                     <SalePurchaseBulkReportPrintTemplate
                       type="sale"
                       data={sales}
-                      fromDate={date}
-                      toDate={date}
+                      // fromDate={date}
+                      // toDate={date}
+                      fromDate={displayFromDate}
+                      toDate={displayToDate}
                     />
                   )}
                   {purchases.length > 0 && (
                     <SalePurchaseBulkReportPrintTemplate
                       type="purchase"
                       data={purchases}
-                      fromDate={date}
-                      toDate={date}
+                      fromDate={displayFromDate}
+                      toDate={displayToDate}
+                    // fromDate={date}
+                    // toDate={date}
                     />
                   )}
                   {saleReturns.length > 0 && (
                     <SalePurchaseBulkReportPrintTemplate
                       type="credit"
                       data={saleReturns}
-                      fromDate={date}
-                      toDate={date}
+                      fromDate={displayFromDate}
+                      toDate={displayToDate}
+                    // fromDate={date}
+                    // toDate={date}
                     />
                   )}
                   {purchaseReturns.length > 0 && (
                     <SalePurchaseBulkReportPrintTemplate
                       type="debit"
                       data={purchaseReturns}
-                      fromDate={date}
-                      toDate={date}
+                      fromDate={displayFromDate}
+                      toDate={displayToDate}
+                    // fromDate={date}
+                    // toDate={date}
+                    />
+                  )}
+                  {expenseRecords.length > 0 && (
+                    <SalePurchaseBulkReportPrintTemplate
+                      type="expense"
+                       data={expenseRows}
+                      //data={expenseRecords}
+                        fromDate={displayFromDate}
+                      toDate={displayToDate}
+                      // fromDate={date}
+                      // toDate={date}
                     />
                   )}
                   {paymentIns.length > 0 && (
                     <PaymentInOutBulkReportPrintTemplate
                       type="in"
                       data={paymentIns}
-                      fromDate={date}
-                      toDate={date}
+                        fromDate={displayFromDate}
+                      toDate={displayToDate}
+                      // fromDate={date}
+                      // toDate={date}
                     />
                   )}
                   {paymentOuts.length > 0 && (
                     <PaymentInOutBulkReportPrintTemplate
                       type="out"
                       data={paymentOuts}
-                      fromDate={date}
-                      toDate={date}
+                        fromDate={displayFromDate}
+                      toDate={displayToDate}
+                      // fromDate={date}
+                      // toDate={date}
                     />
                   )}
-                  {expenseRows.length > 0 && (
+                  {/* {expenseRows.length > 0 && (
                     <DayTxnPrintTemplate title="Expenses Report" rows={expenseRows} />
-                  )}
+                  )} */}
 
                   {!sales.length && !purchases.length && !saleReturns.length &&
                     !purchaseReturns.length && !paymentIns.length && !paymentOuts.length &&
@@ -1153,13 +1418,13 @@ const handleLoadMore = () => {
         </div>
       )}
       {print?.mode === "expense" && expenseData?.expense && (
-<div style={{ display: "none" }}>
-    <ExpensePrintTemplate
-      ref={printRef}
-      expense={expenseData.expense}
-    />
-  </div>
-)}
+        <div style={{ display: "none" }}>
+          <ExpensePrintTemplate
+            ref={printRef}
+            expense={expenseData.expense}
+          />
+        </div>
+      )}
       {print?.mode === "generic" && (
         <div style={{ display: "none" }}>
           <DayTxnPrintTemplate ref={printRef} title={print.title} rows={print.rows} />
