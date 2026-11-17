@@ -671,19 +671,37 @@ const getAllPaymentOuts = async (req, res, next) => {
           Bank_Display_Name: split.Account_Display_Name,
         });
       }
+        for (const row of pageRows) {
+    row.splits = splitMap[row.id] || [];
 
-      for (const row of pageRows) {
-        row.splits = splitMap[row.id] || [];
+    row.Payment_Type_Display =
+      row.splits
+        .map((s) => {
+          const paymentType =
+            s.Payment_Type === "Bank"
+              ? s.Bank_Display_Name
+              : s.Payment_Type;
 
-        row.Payment_Type_Display =
-          row.splits
-            .map((s) =>
-              s.Payment_Type === "Bank"
-                ? s.Bank_Display_Name
-                : s.Payment_Type
-            )
-            .join(", ") || "—";
-      }
+          return s.Reference_Number
+            ? `${paymentType} (${s.Reference_Number})`
+            : paymentType;
+        })
+        .join(", ") || "—";
+  }
+
+
+      // for (const row of pageRows) {
+      //   row.splits = splitMap[row.id] || [];
+
+      //   row.Payment_Type_Display =
+      //     row.splits
+      //       .map((s) =>
+      //         s.Payment_Type === "Bank"
+      //           ? s.Bank_Display_Name
+      //           : s.Payment_Type
+      //       )
+      //       .join(", ") || "—";
+      // }
     }
 
     /*
@@ -1229,12 +1247,12 @@ const updatePaymentOut = async (req, res, next) => {
       });
     }
 
-    // if (!Array.isArray(splits) || splits.length === 0) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: "At least one payment split is required",
-    //   });
-    // }
+    if (!Array.isArray(splits) || splits.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one payment split is required",
+      });
+    }
 
     // =====================================================
     // 2. NORMALIZE SPLITS
@@ -1342,7 +1360,7 @@ const updatePaymentOut = async (req, res, next) => {
   });
 }
 
-   
+   const oldPartyId = existing.Party_Id;
 
     // =====================================================
     // 8. UPDATE HEADER
@@ -1395,7 +1413,15 @@ const updatePaymentOut = async (req, res, next) => {
     // =====================================================
     // 11. PARTY LEDGER
     // =====================================================
-
+// Reverse old supplier's ledger entry if party changed
+if (Number(oldPartyId) !== Number(Party_Id)) {
+  await reversePartyLedger({
+    connection,
+    partyId: oldPartyId,
+    txnType: "Payment_Out",
+    referenceId: id,
+  });
+}
     await recordPartyLedger({
       connection,
       partyId: Party_Id,

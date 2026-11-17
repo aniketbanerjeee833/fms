@@ -243,74 +243,6 @@ const createPaymentIn = async (req, res, next) => {
     }
   }
 };
-// const createPaymentIn = async (req, res, next) => {
-//   let connection;
-//   try {
-//     connection = await db.getConnection();
-
-//     const { Party_Id, Party_Name, Receipt_No, Payment_Date, splits } = req.body;
-
-//     if (!Party_Id || !Payment_Date) {
-//       return res.status(400).json({ success: false, message: "Party and Date are required" });
-//     }
-
-//     if (!Array.isArray(splits) || splits.length === 0) {
-//       return res.status(400).json({ success: false, message: "At least one payment split is required" });
-//     }
-
-//     // Received// Received always derived from splits — never trusted from frontend
-//     const totalReceived = splits.reduce((sum, s) => sum + (Number(s.Amount) || 0), 0);
-
-//     if (isNaN(totalReceived) || totalReceived < 0) {
-//       return res.status(400).json({ success: false, message: "Received amount must be a valid number" });
-//     }
-
-//     try {
-//       validateSplits(splits, totalReceived);
-//       // validateSplits(splits);
-//     } catch (validationErr) {
-//       return res.status(400).json({ success: false, message: validationErr.message });
-//     }
-
-//     await connection.beginTransaction();
-
-//     const [result] = await connection.query(
-//       `INSERT INTO payment_in (Party_Id, Receipt_No, Payment_Date, Received)
-//        VALUES (?, ?, ?, ?)`,
-//       [Party_Id, Receipt_No || null, Payment_Date, totalReceived]
-//     );
-
-//     const id = result.insertId;
-
-//     await insertPaymentSplits({
-//       connection,
-//       sourceType: "Payment_In",
-//       sourceId: id,
-//       partyName: Party_Name,
-//       txnDate: Payment_Date,
-//       splits,
-//     });
-
-//     await recordPartyLedger({
-//   connection,
-//   partyId: Party_Id,
-//   txnType: "Payment_In",
-//   referenceId: id,
-//   amount: totalReceived,
-//   txnDate: Payment_Date,
-//   docNumber: Receipt_No,
-//   balanceDue: null,
-// });
-
-//     await connection.commit();
-//     return res.status(201).json({ success: true, message: "Payment In created", id, totalReceived });
-//   } catch (err) {
-//     if (connection) await connection.rollback();
-//     next(err);
-//   } finally {
-//     if (connection) connection.release();
-//   }
-// };
  const deletePaymentIn = async (req, res, next) => {
   let connection;
 
@@ -588,6 +520,7 @@ if (!existing) {
   });
 }
 
+const oldPartyId = existing.Party_Id;
     // =====================================================
     // 8. UPDATE PAYMENT HEADER
     // =====================================================
@@ -641,7 +574,14 @@ if (!existing) {
     // =====================================================
     // 11. PARTY LEDGER
     // =====================================================
-
+if (Number(oldPartyId) !== Number(Party_Id)) {
+  await reversePartyLedger({
+    connection,
+    partyId: oldPartyId,
+    txnType: "Payment_In",
+    referenceId: id,
+  });
+}
     await recordPartyLedger({
       connection,
       partyId: Party_Id,
@@ -1081,19 +1021,23 @@ const getAllPaymentIns = async (req, res, next) => {
         });
       }
 
-      for (const row of pageRows) {
-        row.splits =
-          splitMap[row.id] || [];
+       for (const row of pageRows) {
+    row.splits = splitMap[row.id] || [];
 
-        row.Payment_Type_Display =
-          row.splits
-            .map((split) =>
-              split.Payment_Type === "Bank"
-                ? split.Bank_Display_Name
-                : split.Payment_Type
-            )
-            .join(", ") || "—";
-      }
+    row.Payment_Type_Display =
+      row.splits
+        .map((s) => {
+          const paymentType =
+            s.Payment_Type === "Bank"
+              ? s.Bank_Display_Name
+              : s.Payment_Type;
+
+          return s.Reference_Number
+            ? `${paymentType} (${s.Reference_Number})`
+            : paymentType;
+        })
+        .join(", ") || "—";
+  }
     }
 
     /* ---------- COUNT + TOTALS ---------- */

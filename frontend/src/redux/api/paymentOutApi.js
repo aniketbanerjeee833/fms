@@ -69,27 +69,40 @@ export const paymentOutApi = createApi({
     toDate: queryArgs.toDate,
   }),
 
+  // merge: (currentCache, newData, { arg }) => {
+  //   // First request
+  //   if (!arg.cursor) {
+  //     return newData;
+  //   }
+
+  //   // Cursor request
+  //   currentCache.paymentOuts.push(
+  //     ...newData.paymentOuts
+  //   );
+
+  //   currentCache.hasMore = newData.hasMore;
+  //   currentCache.nextCursor = newData.nextCursor;
+
+  //   if (newData.totals) {
+  //     currentCache.totals = newData.totals;
+  //   }
+
+  //   currentCache.totalPayments =
+  //     newData.totalPayments;
+  // },
   merge: (currentCache, newData, { arg }) => {
-    // First request
-    if (!arg.cursor) {
-      return newData;
-    }
+  if (!arg.cursor) return newData;
 
-    // Cursor request
-    currentCache.paymentOuts.push(
-      ...newData.paymentOuts
-    );
+  const existing = new Set(currentCache.paymentOuts.map((p) => String(p.Payment_Out_Id)));
+  currentCache.paymentOuts.push(
+    ...newData.paymentOuts.filter((p) => !existing.has(String(p.Payment_Out_Id)))
+  );
 
-    currentCache.hasMore = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-
-    if (newData.totals) {
-      currentCache.totals = newData.totals;
-    }
-
-    currentCache.totalPayments =
-      newData.totalPayments;
-  },
+  currentCache.hasMore = newData.hasMore;
+  currentCache.nextCursor = newData.nextCursor;
+  currentCache.totalPayments = newData.totalPayments;
+  if (newData.totals) currentCache.totals = newData.totals;
+},
 
   forceRefetch: ({
     currentArg,
@@ -101,18 +114,20 @@ export const paymentOutApi = createApi({
     currentArg?.toDate !== previousArg?.toDate ||
     currentArg?.limit !== previousArg?.limit,
 
-  providesTags: (result) =>
-    result?.paymentOuts
-      ? [
-          ...result.paymentOuts.map((p) => ({
-            type: "PaymentOut",
-            id: p.Payment_Out_Id,
-          })),
-          { type: "PaymentOut", id: "LIST" },
-        ]
-      : [
-          { type: "PaymentOut", id: "LIST" },
-        ],
+//   providesTags: (result) =>
+//     result?.paymentOuts
+//       ? [
+//           ...result.paymentOuts.map((p) => ({
+//             type: "PaymentOut",
+//             id: p.Payment_Out_Id,
+//           })),
+//           { type: "PaymentOut", id: "LIST" },
+//         ]
+//       : [
+//           { type: "PaymentOut", id: "LIST" },
+//         ],
+// }),
+  providesTags: [{ type: "PaymentOut", id: "LIST" }],
 }),
     getPaymentOutById: builder.query({
       query: (id) => `/payment-out/${id}`,
@@ -147,51 +162,96 @@ export const paymentOutApi = createApi({
     //   }),
     //   invalidatesTags: [{ type: "PaymentOut", id: "LIST" }],
     // }),
-    deletePaymentOut: builder.mutation({
+//     deletePaymentOut: builder.mutation({
+//   query: (id) => ({
+//     url: `/payment-out/${id}`,
+//     method: "DELETE",
+//   }),
+
+//   async onQueryStarted(id, { dispatch, queryFulfilled }) {
+//     const patchResult = dispatch(
+//       paymentOutApi.util.updateQueryData(
+//         "getAllPaymentOuts",
+//         {
+//           cursor: null,
+//           search: "",
+//           fromDate: "",
+//           toDate: "",
+//           limit: 10,
+//         },
+//         (draft) => {
+//           if (!draft?.paymentOuts) return;
+
+//           draft.paymentOuts = draft.paymentOuts.filter(
+//             (paymentOut) =>
+//               String(paymentOut.id) !== String(id)
+//           );
+
+//           if (draft.totalPayments != null) {
+//             draft.totalPayments = Math.max(
+//               0,
+//               draft.totalPayments - 1
+//             );
+//           }
+//         }
+//       )
+//     );
+
+//     try {
+//       await queryFulfilled;
+//     } catch {
+//       patchResult.undo();
+//     }
+//   },
+
+//   invalidatesTags: [
+//     { type: "PaymentOut", id: "LIST" },
+//   ],
+// }),
+deletePaymentOut: builder.mutation({
   query: (id) => ({
     url: `/payment-out/${id}`,
     method: "DELETE",
   }),
 
-  async onQueryStarted(id, { dispatch, queryFulfilled }) {
-    const patchResult = dispatch(
-      paymentOutApi.util.updateQueryData(
-        "getAllPaymentOuts",
-        {
-          cursor: null,
-          search: "",
-          fromDate: "",
-          toDate: "",
-          limit: 10,
-        },
-        (draft) => {
+  async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+    const cachedArgs = paymentOutApi.util.selectCachedArgsForQuery(
+      getState(),
+      "getAllPaymentOuts"
+    );
+
+    const patches = cachedArgs.map((args) =>
+      dispatch(
+        paymentOutApi.util.updateQueryData("getAllPaymentOuts", args, (draft) => {
           if (!draft?.paymentOuts) return;
 
+          const deleted = draft.paymentOuts.find(
+            (p) => String(p.Payment_Out_Id) === String(id)
+          );
+          if (!deleted) return;
+
           draft.paymentOuts = draft.paymentOuts.filter(
-            (paymentOut) =>
-              String(paymentOut.id) !== String(id)
+            (p) => String(p.Payment_Out_Id) !== String(id)
           );
 
           if (draft.totalPayments != null) {
-            draft.totalPayments = Math.max(
-              0,
-              draft.totalPayments - 1
-            );
+            draft.totalPayments = Math.max(0, draft.totalPayments - 1);
           }
-        }
+
+          // adjust draft.totals from the row's amount field, like payment-in does
+          // e.g. draft.totals.totalPaid -= Number(deleted.Paid || 0)
+        })
       )
     );
 
     try {
       await queryFulfilled;
     } catch {
-      patchResult.undo();
+      patches.forEach((p) => p.undo());
     }
   },
 
-  invalidatesTags: [
-    { type: "PaymentOut", id: "LIST" },
-  ],
+  invalidatesTags: (result, error, id) => [{ type: "PaymentOut", id }],
 }),
     getPaymentOutPrintReport: builder.query({
   query: ({

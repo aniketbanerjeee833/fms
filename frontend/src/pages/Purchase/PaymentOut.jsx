@@ -137,28 +137,49 @@ export default function PaymentOut() {
 
 
 
-    const handleSavePaymentOut = async (formData) => {
-        try {
-            if (modal.mode === "edit") {
-                await updatePaymentOut({ id: modal.data.id, ...formData }).unwrap();
-            } else {
-                await addPaymentOut(formData).unwrap();
-            }
-            dispatch(reportApi.util.invalidateTags([
-                     "DayWiseTransactions",
-                      ]));
-            dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
-            dispatch(bankAccountApi.util.invalidateTags([
-                { type: "BankAccount", id: formData.Bank_Account_Id },
-                "BankAccount",   // ← this hits getAllBankAccounts which providesTags: ["BankAccount"]
-            ]));
-            setModal({ open: false, mode: "add", data: null });
-            toast.success("New Payment Out added")
-        } catch (err) {
-            console.error("Failed to save payment out:", err);
-            toast.error(err?.data?.message || "Failed to save payment out. Please try again.");
-        }
-    };
+  const handleSavePaymentOut = async (formData) => {
+  try {
+    if (modal.mode === "edit") {
+      await updatePaymentOut({
+        id: modal.data.id,
+        ...formData,
+      }).unwrap();
+    } else {
+      // Reset pagination for the newly added record
+      setCursor(null);
+
+      await addPaymentOut(formData).unwrap();
+    }
+
+    dispatch(
+      reportApi.util.invalidateTags(["DayWiseTransactions"])
+    );
+
+    dispatch(cashInHandApi.util.invalidateTags(["CashInHand"]));
+
+    dispatch(
+      bankAccountApi.util.invalidateTags([
+        { type: "BankAccount", id: formData.Bank_Account_Id },
+        "BankAccount",
+      ])
+    );
+
+    setModal({ open: false, mode: "add", data: null });
+
+    toast.success(
+      modal.mode === "edit"
+        ? "Payment Out updated successfully"
+        : "New Payment Out added"
+    );
+  } catch (err) {
+    console.error("Failed to save payment out:", err);
+
+    toast.error(
+      err?.data?.message ||
+      "Failed to save payment out. Please try again."
+    );
+  }
+};
     const handleConfirmDelete = async () => {
         if (!deleteTarget) return;
 
@@ -177,9 +198,9 @@ export default function PaymentOut() {
             dispatch(
                 bankAccountApi.util.invalidateTags(["BankAccount"])
             );
-             dispatch(reportApi.util.invalidateTags([
-              "DayWiseTransactions",
-                 ]));
+            dispatch(reportApi.util.invalidateTags([
+                "DayWiseTransactions",
+            ]));
 
             dispatch(
                 itemApi.util.invalidateTags([
@@ -561,8 +582,8 @@ export default function PaymentOut() {
                                 <div
                                     style={{
                                         display: "grid",
-                                        //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
-                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.8fr",
+
+                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 2fr 1.2fr 0.8fr",
                                         width: "100%",
                                         //minWidth: "850px",
                                         boxSizing: "border-box",
@@ -579,6 +600,7 @@ export default function PaymentOut() {
                                 >
                                     <div>Sl.No</div>
                                     <div>Date</div>
+                                    <div>Ref No.</div>
                                     <div>Party Name</div>
                                     <div>Payment Type</div>
                                     <div>Total Paid</div>
@@ -670,7 +692,7 @@ export default function PaymentOut() {
                                                         display: "grid",
                                                         //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
                                                         //gridTemplateColumns:"70px 120px 300px 160px 262px 50px",
-                                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.8fr",
+                                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 2fr 1.2fr 0.8fr",
                                                         alignItems: "center",
                                                         minHeight: 52,
                                                         padding: "0 8px",
@@ -705,16 +727,24 @@ export default function PaymentOut() {
                                                             )
                                                             : ""}
                                                     </div>
+                                                    <div
+                                                        className="table-desi-cell truncate"
+                                                        title={paymentOut?.Receipt_No || ""}
+
+                                                    >
+                                                        {paymentOut?.Receipt_No ||
+                                                            ""}
+                                                    </div>
 
                                                     {/* PARTY */}
 
                                                     <div
                                                         className="table-desi-cell truncate"
                                                         title={paymentOut?.Party_Name || ""}
-                                                        // style={{
-                                                        //     overflowWrap:"break-word",
-                                                        //     wordBreak:"break-word",
-                                                        // }}
+                                                    // style={{
+                                                    //     overflowWrap:"break-word",
+                                                    //     wordBreak:"break-word",
+                                                    // }}
                                                     >
                                                         {paymentOut?.Party_Name ||
                                                             ""}
@@ -936,7 +966,7 @@ export default function PaymentOut() {
                                                             }}
                                                             title="Print"
                                                         >
-                                                             <Printer
+                                                            <Printer
                                                                 size={16}
                                                                 className="text-[#4CA1AF] group-hover:text-[#374151] transition-colors"
                                                             />

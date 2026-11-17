@@ -986,6 +986,7 @@ const createSaleReturn = async (req, res, next) => {
     );
 
     if (fy.length === 0) {
+      await connection.rollback();
       return res.status(400).json({
         success: false,
         message:
@@ -2295,6 +2296,8 @@ const editSaleReturn = async (req, res, next) => {
       transactionDiscountPercentage !== null &&
       transactionDiscountPercentage > 100
     ) {
+       await connection.rollback();
+
       return res.status(400).json({
         success: false,
         message: "Transaction discount percentage cannot be greater than 100%",

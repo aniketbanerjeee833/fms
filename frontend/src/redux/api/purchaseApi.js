@@ -9,7 +9,7 @@ export const purchaseApi = createApi({
     baseUrl: "http://localhost:4000/api/",
     credentials: "include",
   }),
-  tagTypes: ["Purchase"],
+ tagTypes: ["Purchase", "PurchaseDayTotals"],
   endpoints: (builder) => ({
 
     addPurchase: builder.mutation({
@@ -81,23 +81,34 @@ export const purchaseApi = createApi({
     toDate: queryArgs.toDate,
   }),
 
+  // merge: (currentCache, newData, { arg }) => {
+  //   // First request / filters changed
+  //   if (!arg.cursor) {
+  //     return newData;
+  //   }
+
+  //   // Load next cursor page
+  //   currentCache.purchases.push(...newData.purchases);
+
+  //   currentCache.hasMore = newData.hasMore;
+  //   currentCache.nextCursor = newData.nextCursor;
+
+  //   // Keep totals updated if backend sends them
+  //   if (newData.totals) {
+  //     currentCache.totals = newData.totals;
+  //   }
+  // },
   merge: (currentCache, newData, { arg }) => {
-    // First request / filters changed
-    if (!arg.cursor) {
-      return newData;
-    }
+  if (!arg.cursor) return newData;
 
-    // Load next cursor page
-    currentCache.purchases.push(...newData.purchases);
+  const existing = new Set(currentCache.purchases.map((p) => String(p.Purchase_Id)));
+  const fresh = newData.purchases.filter((p) => !existing.has(String(p.Purchase_Id)));
+  currentCache.purchases.push(...fresh);
 
-    currentCache.hasMore = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-
-    // Keep totals updated if backend sends them
-    if (newData.totals) {
-      currentCache.totals = newData.totals;
-    }
-  },
+  currentCache.hasMore = newData.hasMore;
+  currentCache.nextCursor = newData.nextCursor;
+  if (newData.totals) currentCache.totals = newData.totals;
+},
 
   forceRefetch: ({ currentArg, previousArg }) =>
     currentArg?.cursor !== previousArg?.cursor ||
@@ -116,10 +127,14 @@ export const purchaseApi = createApi({
       ],
     }),
 
+    // getTotalPurchasesEachDay: builder.query({
+    //   query: () => `purchase/total-purchases-by-day`,
+    //   providesTags: [{ type: "Purchase", id: "LIST" }],
+    // }),
     getTotalPurchasesEachDay: builder.query({
-      query: () => `purchase/total-purchases-by-day`,
-      providesTags: [{ type: "Purchase", id: "LIST" }],
-    }),
+  query: () => `purchase/total-purchases-by-day`,
+  providesTags: ["PurchaseDayTotals"],
+}),
     uploadPurchaseBill: builder.mutation({
       query: ({ body }) => ({
         url: `purchase/upload-bill`,
@@ -127,41 +142,86 @@ export const purchaseApi = createApi({
         body,
       }),
     }),
-    deletePurchase: builder.mutation({
+//     deletePurchase: builder.mutation({
+//   query: (Purchase_Id) => ({
+//     url: `/purchase/delete-purchase/${Purchase_Id}`,
+//     method: "DELETE",
+//   }),
+
+//   async onQueryStarted(Purchase_Id, { dispatch, queryFulfilled }) {
+//     const patchResult = dispatch(
+//       purchaseApi.util.updateQueryData(
+//         "getAllPurchases",
+//         {
+//           cursor: null,
+//           search: "",
+//           fromDate: "",
+//           toDate: "",
+//           limit: 10,
+//         },
+//         (draft) => {
+//           draft.purchases = draft.purchases.filter(
+//             (p) =>
+//               String(p.Purchase_Id) !== String(Purchase_Id)
+//           );
+//         }
+//       )
+//     );
+
+//     try {
+//       await queryFulfilled;
+//     } catch {
+//       patchResult.undo();
+//     }
+//   },
+
+//   invalidatesTags: [
+//     { type: "Purchase", id: "LIST" },
+//   ],
+// }),
+deletePurchase: builder.mutation({
   query: (Purchase_Id) => ({
-    url: `/purchase/delete-purchase/${Purchase_Id}`,
+    url: `purchase/delete-purchase/${Purchase_Id}`,
     method: "DELETE",
   }),
 
-  async onQueryStarted(Purchase_Id, { dispatch, queryFulfilled }) {
-    const patchResult = dispatch(
-      purchaseApi.util.updateQueryData(
-        "getAllPurchases",
-        {
-          cursor: null,
-          search: "",
-          fromDate: "",
-          toDate: "",
-          limit: 10,
-        },
-        (draft) => {
-          draft.purchases = draft.purchases.filter(
-            (p) =>
-              String(p.Purchase_Id) !== String(Purchase_Id)
+  async onQueryStarted(Purchase_Id, { dispatch, queryFulfilled, getState }) {
+    const cachedArgs = purchaseApi.util.selectCachedArgsForQuery(getState(), "getAllPurchases");
+
+    const patches = cachedArgs.map((args) =>
+      dispatch(
+        purchaseApi.util.updateQueryData("getAllPurchases", args, (draft) => {
+          const target = draft.purchases.find(
+            (p) => String(p.Purchase_Id) === String(Purchase_Id)
           );
-        }
+          if (!target) return;
+
+          // keep the summary card in sync
+          if (draft.totals) {
+            const total = Number(target.Total_Amount) || 0;
+            const due = Number(target.Balance_Due) || 0;
+            draft.totals.totalAmount = (Number(draft.totals.totalAmount) || 0) - total;
+            draft.totals.totalUnpaid = (Number(draft.totals.totalUnpaid) || 0) - due;
+            draft.totals.totalPaid = (Number(draft.totals.totalPaid) || 0) - (total - due);
+          }
+
+          draft.purchases = draft.purchases.filter(
+            (p) => String(p.Purchase_Id) !== String(Purchase_Id)
+          );
+        })
       )
     );
 
     try {
       await queryFulfilled;
     } catch {
-      patchResult.undo();
+      patches.forEach((p) => p.undo());
     }
   },
 
-  invalidatesTags: [
-    { type: "Purchase", id: "LIST" },
+  invalidatesTags: (result, error, Purchase_Id) => [
+    { type: "Purchase", id: Purchase_Id },   // clears getSinglePurchase cache
+    "PurchaseDayTotals",                      // see below
   ],
 }),
 //     deletePurchase: builder.mutation({

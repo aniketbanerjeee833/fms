@@ -52,28 +52,41 @@ getAllPurchaseReturns: builder.query({
     toDate: queryArgs.toDate,
   }),
 
+  // merge: (currentCache, newData, { arg }) => {
+  //   // First request / filters changed
+  //   if (!arg.cursor) {
+  //     return newData;
+  //   }
+
+  //   // Load next cursor page
+  //   currentCache.purchaseReturns.push(
+  //     ...newData.purchaseReturns
+  //   );
+
+  //   currentCache.hasMore = newData.hasMore;
+  //   currentCache.nextCursor = newData.nextCursor;
+
+  //   // Keep totals updated
+  //   if (newData.totals) {
+  //     currentCache.totals = newData.totals;
+  //   }
+
+  //   currentCache.totalReturns =
+  //     newData.totalReturns;
+  // }
   merge: (currentCache, newData, { arg }) => {
-    // First request / filters changed
-    if (!arg.cursor) {
-      return newData;
-    }
+  if (!arg.cursor) return newData;
 
-    // Load next cursor page
-    currentCache.purchaseReturns.push(
-      ...newData.purchaseReturns
-    );
+  const existing = new Set(currentCache.purchaseReturns.map((r) => String(r.id)));
+  currentCache.purchaseReturns.push(
+    ...newData.purchaseReturns.filter((r) => !existing.has(String(r.id)))
+  );
 
-    currentCache.hasMore = newData.hasMore;
-    currentCache.nextCursor = newData.nextCursor;
-
-    // Keep totals updated
-    if (newData.totals) {
-      currentCache.totals = newData.totals;
-    }
-
-    currentCache.totalReturns =
-      newData.totalReturns;
-  },
+  currentCache.hasMore = newData.hasMore;
+  currentCache.nextCursor = newData.nextCursor;
+  if (newData.totals) currentCache.totals = newData.totals;
+  currentCache.totalReturns = newData.totalReturns;
+},
 
   forceRefetch: ({
     currentArg,
@@ -113,7 +126,8 @@ getAllPurchaseReturns: builder.query({
     method: "POST",
     body,
   }),
-  invalidatesTags: ["PurchaseReturn"],
+  // create
+invalidatesTags: [{ type: "PurchaseReturn", id: "LIST" }],
 }),
  
     /* EDIT */
@@ -123,27 +137,23 @@ getAllPurchaseReturns: builder.query({
         method: "PUT",
         body,
       }),
-      invalidatesTags: ["PurchaseReturn"],
+      // update
+invalidatesTags: (r, e, { Purchase_Return_Id }) => [
+  { type: "PurchaseReturn", id: Purchase_Return_Id },
+  { type: "PurchaseReturn", id: "LIST" },
+],
+      //invalidatesTags: ["PurchaseReturn"],
     }),
  
     /* DELETE */
-    // deletePurchaseReturn: builder.mutation({
-    //   query: (Purchase_Return_Id) => ({
-    //     url: `/purchase-return/${Purchase_Return_Id}`,
-    //     method: "DELETE",
-    //   }),
-    //   invalidatesTags: ["PurchaseReturn"],
-    // }),
-//       deletePurchaseReturn: builder.mutation({
-//   query: (Purchase_Return_Id) => ({
-//     url: `/purchase-return/${Purchase_Return_Id}`,
+   
+// deletePurchaseReturn: builder.mutation({
+//   query: (id) => ({
+//     url: `/purchase-return/${id}`,
 //     method: "DELETE",
 //   }),
 
-//   async onQueryStarted(
-//     Purchase_Return_Id,
-//     { dispatch, queryFulfilled }
-//   ) {
+//   async onQueryStarted(id, { dispatch, queryFulfilled }) {
 //     const patchResult = dispatch(
 //       purchaseReturnApi.util.updateQueryData(
 //         "getAllPurchaseReturns",
@@ -159,9 +169,7 @@ getAllPurchaseReturns: builder.query({
 
 //           draft.purchaseReturns =
 //             draft.purchaseReturns.filter(
-//               (item) =>
-//                 String(item.id) !==
-//                 String(Purchase_Return_Id)
+//               (item) => String(item.id) !== String(id)
 //             );
 
 //           if (draft.totalReturns != null) {
@@ -180,10 +188,6 @@ getAllPurchaseReturns: builder.query({
 //       patchResult.undo();
 //     }
 //   },
-
-//   invalidatesTags: [
-//     { type: "PurchaseReturn", id: "LIST" },
-//   ],
 // }),
 deletePurchaseReturn: builder.mutation({
   query: (id) => ({
@@ -191,41 +195,41 @@ deletePurchaseReturn: builder.mutation({
     method: "DELETE",
   }),
 
-  async onQueryStarted(id, { dispatch, queryFulfilled }) {
-    const patchResult = dispatch(
-      purchaseReturnApi.util.updateQueryData(
-        "getAllPurchaseReturns",
-        {
-          cursor: null,
-          search: "",
-          fromDate: "",
-          toDate: "",
-          limit: 10,
-        },
-        (draft) => {
+  async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+    const cachedArgs = purchaseReturnApi.util.selectCachedArgsForQuery(
+      getState(),
+      "getAllPurchaseReturns"
+    );
+
+    const patches = cachedArgs.map((args) =>
+      dispatch(
+        purchaseReturnApi.util.updateQueryData("getAllPurchaseReturns", args, (draft) => {
           if (!draft?.purchaseReturns) return;
 
-          draft.purchaseReturns =
-            draft.purchaseReturns.filter(
-              (item) => String(item.id) !== String(id)
-            );
+          const target = draft.purchaseReturns.find((r) => String(r.id) === String(id));
+          if (!target) return;
+
+          // adjust draft.totals here from the row's amount fields
+
+          draft.purchaseReturns = draft.purchaseReturns.filter(
+            (r) => String(r.id) !== String(id)
+          );
 
           if (draft.totalReturns != null) {
-            draft.totalReturns = Math.max(
-              0,
-              draft.totalReturns - 1
-            );
+            draft.totalReturns = Math.max(0, draft.totalReturns - 1);
           }
-        }
+        })
       )
     );
 
     try {
       await queryFulfilled;
     } catch {
-      patchResult.undo();
+      patches.forEach((p) => p.undo());
     }
   },
+
+  invalidatesTags: (result, error, id) => [{ type: "PurchaseReturn", id }],
 }),
     
     getPurchaseReturnPrintReport: builder.query({

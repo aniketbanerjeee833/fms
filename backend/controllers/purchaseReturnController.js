@@ -981,6 +981,8 @@ const createPurchaseReturn = async (req, res, next) => {
     );
 
     if (fy.length === 0) {
+       await connection.rollback();
+
       return res.status(400).json({
         success: false,
         message:
@@ -1294,6 +1296,7 @@ if (partyUpdates.length > 0) {
       transactionDiscountPercentage !== null &&
       transactionDiscountPercentage > 100
     ) {
+       await connection.rollback();
       return res.status(400).json({
         success: false,
         message: "Transaction discount percentage cannot be greater than 100%",
@@ -2005,28 +2008,7 @@ if (!existingParty) {
 
   party = existingParty;
 
-  // If master phone is empty but bill has phone,
-  // save the phone into Party master.
-  // if (
-  //   !existingParty.Phone_Number?.trim() &&
-  //   Phone_Number?.trim()
-  // ) {
-  //   await connection.execute(
-  //     `
-  //     UPDATE add_party
-  //     SET
-  //       Phone_Number = ?,
-  //       updated_at = NOW()
-  //     WHERE Party_Id = ?
-  //     `,
-  //     [
-  //       cleanValue(Phone_Number),
-  //       existingParty.Party_Id,
-  //     ]
-  //   );
-
-  //   party.Phone_Number = Phone_Number.trim();
-  // }
+  
   const partyUpdates = [];
 const partyParams = [];
 
@@ -2076,6 +2058,8 @@ if (partyUpdates.length > 0) {
       transactionDiscountPercentage !== null &&
       transactionDiscountPercentage > 100
     ) {
+       await connection.rollback();
+
       return res.status(400).json({
         success: false,
         message: "Transaction discount percentage cannot be greater than 100%",

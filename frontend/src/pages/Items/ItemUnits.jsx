@@ -1,143 +1,258 @@
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search, Package, Tags, Eye, Trash2, MoreVertical } from "lucide-react";
+import {
+    Search,
+    Package,
+    Tags,
+    Eye,
+    MoreVertical,
+} from "lucide-react";
 
 import {
     itemApi,
     useGetAllItemUnitsCursorQuery,
-
     useGetAllItemUnitsQuery,
-
-    useGetUnitConversionsQuery, // adjust name to match your actual endpoint
-} from "../../redux/api/itemApi"; // adjust path to wherever these live
+    useGetUnitConversionsQuery,
+} from "../../redux/api/itemApi";
 
 import AddUnitModal from "../../components/Modal/AddUnitModal";
 import SelectUnitModal from "../../components/Modal/SelectUnitModal";
+import VirtualScrollList from "../../components/VirtualScrollList";
+
 import { useDispatch } from "react-redux";
 
-/* ════════════════════════════════════════════════════════════
-   MAIN PAGE
-════════════════════════════════════════════════════════════ */
+
 export default function ItemUnits() {
+
     const dispatch = useDispatch();
+
     const [searchParams, setSearchParams] = useSearchParams();
 
     const selectedUnitId = searchParams.get("unitId") || null;
     const unitSearch = searchParams.get("q") || "";
     const conversionSearch = searchParams.get("convSearch") || "";
+
     const [unitMenuOpen, setUnitMenuOpen] = useState(null);
+
     const [showAddUnitModal, setShowAddUnitModal] = useState(false);
-    const [showSelectUnitModal, setShowSelectUnitModal] = useState(false)
-    const { data: itemUnits } = useGetAllItemUnitsQuery();
+    const [showSelectUnitModal, setShowSelectUnitModal] = useState(false);
+
     const [editingUnit, setEditingUnit] = useState(null);
-    // ── LEFT — units cursor pagination ──────────────────────────
+
+    const { data: itemUnits } = useGetAllItemUnitsQuery();
+
+
+    // =========================================================
+    // LEFT PANEL - UNITS CURSOR PAGINATION
+    // =========================================================
+
     const [resetKey, setResetKey] = useState(0);
     const [leftCursor, setLeftCursor] = useState(null);
-    const leftSentinelRef = useRef(null);
-    const leftObserverRef = useRef(null);
 
     const {
         data: unitsResponse,
-        isLoading: isUnitsLoading,
+        //isLoading: isUnitsLoading,
         isFetching: isUnitsFetching,
-         // 🔹 part of the query args now
-        //refetch: refetchUnits
-    } = useGetAllItemUnitsCursorQuery({ cursor: leftCursor, search: unitSearch, limit: 10 ,resetKey});
-    console.log(unitsResponse, "unitsResponse");
-      const [displayUnits, setDisplayUnits] = useState([]);
-  const [displayTotal, setDisplayTotal] = useState(0);
-  const [displayHasMore, setDisplayHasMore] = useState(false);
-  const [displayNextCursor, setDisplayNextCursor] = useState(null);
+    } = useGetAllItemUnitsCursorQuery({
+        cursor: leftCursor,
+        search: unitSearch,
+        limit: 10,
+        resetKey,
+    });
 
-  useEffect(() => {
-    if (!unitsResponse) return;   // don't clear on the brief undefined gap
-    setDisplayUnits(unitsResponse.units || []);
-    setDisplayTotal(unitsResponse.totalUnits || 0);
-    setDisplayHasMore(unitsResponse.hasMore ?? false);
-    setDisplayNextCursor(unitsResponse.nextCursor ?? null);
-  }, [unitsResponse]);
+    // Directly use RTK Query accumulated cache.
+    // No separate displayUnits state required.
 
-  const units            = displayUnits;
-  const totalUnits        = displayTotal;
-  const unitsHasMore      = displayHasMore;
-  const unitsNextCursor   = displayNextCursor;
-    // const units = unitsResponse?.units || [];
-    // const totalUnits = unitsResponse?.totalUnits || 0;
-    // const unitsHasMore = unitsResponse?.hasMore ?? false;
-    // const unitsNextCursor = unitsResponse?.nextCursor ?? null;
+    const units = unitsResponse?.units ?? [];
 
-    useEffect(() => { setLeftCursor(null); }, [unitSearch]);
+    const totalUnits = unitsResponse?.totalUnits ?? 0;
 
-    const handleLeftObserver = useCallback((entries) => {
-        if (entries[0].isIntersecting && unitsHasMore && unitsNextCursor && !isUnitsFetching && !isUnitsLoading) {
-            setLeftCursor(unitsNextCursor);
+    const unitsHasMore = unitsResponse?.hasMore ?? false;
+
+    const unitsNextCursor = unitsResponse?.nextCursor ?? null;
+
+
+    // Reset cursor whenever unit search changes.
+
+    useEffect(() => {
+        setLeftCursor(null);
+    }, [unitSearch]);
+
+
+    // Same pagination pattern as AllPurchaseList.
+
+    const handleLoadMore = useCallback(() => {
+
+        if (
+            !unitsHasMore ||
+            unitsNextCursor === null ||
+            unitsNextCursor === undefined ||
+            isUnitsFetching
+        ) {
+            return;
         }
-    }, [unitsHasMore, unitsNextCursor, isUnitsFetching, isUnitsLoading]);
+
+        console.log("Loading next units:", unitsNextCursor);
+
+        setLeftCursor(unitsNextCursor);
+
+    }, [
+        unitsHasMore,
+        unitsNextCursor,
+        isUnitsFetching,
+    ]);
+
+
+    // Default to first unit on initial load.
 
     useEffect(() => {
-        if (leftObserverRef.current) leftObserverRef.current.disconnect();
-        leftObserverRef.current = new IntersectionObserver(handleLeftObserver, { threshold: 0.1 });
-        if (leftSentinelRef.current) leftObserverRef.current.observe(leftSentinelRef.current);
-        return () => leftObserverRef.current?.disconnect();
-    }, [handleLeftObserver]);
 
-    // Default to first unit on initial load
-    useEffect(() => {
         if (!units.length || selectedUnitId) return;
 
         const next = new URLSearchParams(searchParams);
-        next.set("unitId", units[0].id);
-        setSearchParams(next, { replace: true });
-    }, [units, selectedUnitId, searchParams, setSearchParams]);
 
-    // ── RIGHT — conversions cursor pagination ───────────────────
+        next.set("unitId", units[0].id);
+
+        setSearchParams(next, { replace: true });
+
+    }, [
+        units,
+        selectedUnitId,
+        searchParams,
+        setSearchParams,
+    ]);
+
+
+    // =========================================================
+    // RIGHT PANEL - CONVERSIONS CURSOR PAGINATION
+    // Keeping your existing IntersectionObserver implementation.
+    // =========================================================
+
     const [rightCursor, setRightCursor] = useState(null);
+
     const rightSentinelRef = useRef(null);
     const rightObserverRef = useRef(null);
+
     const rightUnitRef = useRef(selectedUnitId);
 
-    // If the unit just changed (ref hasn't caught up yet), force cursor to null on THIS render
-    const effectiveRightCursor = rightUnitRef.current === selectedUnitId ? rightCursor : null;
+    // If selected unit changed, use null cursor immediately.
+
+    const effectiveRightCursor =
+        rightUnitRef.current === selectedUnitId
+            ? rightCursor
+            : null;
+
 
     const {
         data: conversionsResponse,
         isLoading: isConversionsLoading,
         isFetching: isConversionsFetching,
-        // refetch: refetchConversions
-    } = useGetUnitConversionsQuery({ unitId: selectedUnitId, cursor: effectiveRightCursor, search: conversionSearch });
-    console.log(conversionsResponse, "conversionsResponse");
+    } = useGetUnitConversionsQuery({
+        unitId: selectedUnitId,
+        cursor: effectiveRightCursor,
+        search: conversionSearch,
+    });
+
+
     const conversions = conversionsResponse?.conversions || [];
-    const totalConversions = conversionsResponse?.totalConversions || 0;
-    const conversionsHasMore = conversionsResponse?.hasMore ?? false;
-    const conversionsNextCursor = conversionsResponse?.nextCursor ?? null;
+
+    const totalConversions =
+        conversionsResponse?.totalConversions || 0;
+
+    const conversionsHasMore =
+        conversionsResponse?.hasMore ?? false;
+
+    const conversionsNextCursor =
+        conversionsResponse?.nextCursor ?? null;
+
+
+    // Reset conversions cursor when unit or search changes.
 
     useEffect(() => {
+
         rightUnitRef.current = selectedUnitId;
+
         setRightCursor(null);
+
     }, [selectedUnitId, conversionSearch]);
 
+
+    // Existing right-side observer.
+
     const handleRightObserver = useCallback((entries) => {
-        if (entries[0].isIntersecting && conversionsHasMore && conversionsNextCursor && !isConversionsFetching && !isConversionsLoading) {
+
+        if (
+            entries[0].isIntersecting &&
+            conversionsHasMore &&
+            conversionsNextCursor !== null &&
+            !isConversionsFetching &&
+            !isConversionsLoading
+        ) {
+
             setRightCursor(conversionsNextCursor);
+
         }
-    }, [conversionsHasMore, conversionsNextCursor, isConversionsFetching, isConversionsLoading]);
+
+    }, [
+        conversionsHasMore,
+        conversionsNextCursor,
+        isConversionsFetching,
+        isConversionsLoading,
+    ]);
+
 
     useEffect(() => {
-        if (rightObserverRef.current) rightObserverRef.current.disconnect();
-        rightObserverRef.current = new IntersectionObserver(handleRightObserver, { threshold: 0.1 });
-        if (rightSentinelRef.current) rightObserverRef.current.observe(rightSentinelRef.current);
-        return () => rightObserverRef.current?.disconnect();
+
+        if (rightObserverRef.current) {
+            rightObserverRef.current.disconnect();
+        }
+
+        rightObserverRef.current = new IntersectionObserver(
+            handleRightObserver,
+            { threshold: 0.1 }
+        );
+
+        if (rightSentinelRef.current) {
+            rightObserverRef.current.observe(rightSentinelRef.current);
+        }
+
+        return () => {
+            rightObserverRef.current?.disconnect();
+        };
+
     }, [handleRightObserver]);
 
-    // const selectedUnit = units.find((u) => u.id === selectedUnitId) || null;
-    const selectedUnit = units.find((u) => Number(u.id) === Number(selectedUnitId)) || null;
+
+    // =========================================================
+    // UNIT SELECTION
+    // =========================================================
+
+    const selectedUnit =
+        units.find(
+            (u) => Number(u.id) === Number(selectedUnitId)
+        ) || null;
+
+
     const handleSelectUnit = (unit) => {
+
         const next = new URLSearchParams(searchParams);
+
         next.set("unitId", unit.id);
+
         next.delete("convSearch");
+
         setSearchParams(next);
+
     };
+
+
+    // =========================================================
+    // CLOSE UNIT MENU ON OUTSIDE CLICK
+    // =========================================================
+
     useEffect(() => {
+
         const closeMenu = () => {
             setUnitMenuOpen(null);
         };
@@ -147,27 +262,47 @@ export default function ItemUnits() {
         return () => {
             document.removeEventListener("click", closeMenu);
         };
+
     }, []);
+
+
+    // =========================================================
+    // RENDER
+    // =========================================================
 
     return (
         <>
-            {/* <div className="flex flex-col bg-white" style={{ minHeight: "100vh" }}> */}
-  <div
-        className="flex flex-col bg-white"
-        style={{
-          height: "100%",
-          minHeight: 0,
-          overflow: "hidden",
-        }}
-      >
-                {/* ── PAGE HEADER ── */}
+
+            <div
+                className="flex flex-col bg-white"
+                style={{
+                    height: "100%",
+                    minHeight: 0,
+                    overflow: "hidden",
+                }}
+            >
+
+                {/* =================================================
+                    PAGE HEADER
+                ================================================= */}
+
                 <div className="inn-title">
+
                     <div className="flex flex-row justify-between items-center">
+
                         <div>
-                            <h4 className="text-2xl font-bold mb-1">Item Units</h4>
-                            <p className="text-gray-500 text-sm">Manage your item units and conversions</p>
+                            <h4 className="text-2xl font-bold mb-1">
+                                Item Units
+                            </h4>
+
+                            <p className="text-gray-500 text-sm">
+                                Manage your item units and conversions
+                            </p>
                         </div>
+
+
                         <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+
                             <button
                                 type="button"
                                 onClick={() => setShowAddUnitModal(true)}
@@ -181,6 +316,7 @@ export default function ItemUnits() {
                                 + Add Unit
                             </button>
 
+
                             <button
                                 type="button"
                                 onClick={() => setShowSelectUnitModal(true)}
@@ -193,42 +329,95 @@ export default function ItemUnits() {
                             >
                                 + Add Conversion
                             </button>
+
                         </div>
+
                     </div>
+
                 </div>
 
-                {/* ── SPLIT LAYOUT ── */}
+
+                {/* =================================================
+                    SPLIT LAYOUT
+                ================================================= */}
+
                 <div
                     className="flex flex-col lg:flex-row gap-0"
-                    style={{ flex: 1, borderTop: "1px solid #e2e8f0" }}
+                    style={{
+                        flex: 1,
+                        minHeight: 0,
+                        borderTop: "1px solid #e2e8f0",
+                    }}
                 >
 
-                    {/* ══ LEFT — 30% — unit list ══ */}
+
+                    {/* =============================================
+                        LEFT PANEL - UNITS
+                    ============================================= */}
+
                     <div
-                        className="w-full lg:w-[30%] overflow-y-auto overflow-x-hidden"
+                        className="w-full lg:w-[30%]"
                         style={{
                             borderRight: "1px solid #e2e8f0",
-                            minHeight: "500px",
+                            minHeight: 0,
                             maxHeight: "calc(100vh - 180px)",
+                            display: "flex",
+                            flexDirection: "column",
+                            overflow: "hidden",
                             boxSizing: "border-box",
                         }}
                     >
-                        {/* search */}
-                        <div className="p-3" style={{ borderBottom: "1px solid #f1f5f9", boxSizing: "border-box" }}>
-                            <div className="relative" style={{ width: "100%", maxWidth: 180, height: 34 }}>
+
+                        {/* SEARCH */}
+
+                        <div
+                            className="p-3 flex-shrink-0"
+                            style={{
+                                borderBottom: "1px solid #f1f5f9",
+                                boxSizing: "border-box",
+                            }}
+                        >
+
+                            <div
+                                className="relative"
+                                style={{
+                                    width: "100%",
+                                    maxWidth: 180,
+                                    height: 34,
+                                }}
+                            >
+
                                 <Search
                                     size={14}
-                                    style={{ position: "absolute", left: 9, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                                    style={{
+                                        position: "absolute",
+                                        left: 9,
+                                        top: 10,
+                                        color: "#94a3b8",
+                                        pointerEvents: "none",
+                                    }}
                                 />
+
+
                                 <input
                                     type="text"
                                     value={unitSearch}
                                     onChange={(e) => {
+
                                         const value = e.target.value;
+
                                         const next = new URLSearchParams(searchParams);
-                                        if (value) next.set("q", value);
-                                        else next.delete("q");
-                                        setSearchParams(next, { replace: true });
+
+                                        if (value) {
+                                            next.set("q", value);
+                                        } else {
+                                            next.delete("q");
+                                        }
+
+                                        setSearchParams(next, {
+                                            replace: true,
+                                        });
+
                                     }}
                                     placeholder="Search Unit"
                                     className="border rounded-md text-sm outline-none"
@@ -241,110 +430,203 @@ export default function ItemUnits() {
                                         boxSizing: "border-box",
                                     }}
                                 />
+
                             </div>
+
                         </div>
 
-                        {/* list header */}
+
+                        {/* LIST HEADER */}
+
                         <div
-                            className="px-4 py-3 flex items-center gap-2"
-                            style={{ borderBottom: "1px solid #f1f5f9", backgroundColor: "#fafafa" }}
+                            className="px-4 py-3 flex items-center gap-2 flex-shrink-0"
+                            style={{
+                                borderBottom: "1px solid #f1f5f9",
+                                backgroundColor: "#fafafa",
+                            }}
                         >
-                            <Tags size={15} style={{ color: "#4CA1AF" }} />
+
+                            <Tags
+                                size={15}
+                                style={{ color: "#4CA1AF" }}
+                            />
+
                             <span className="text-xs font-semibold text-black uppercase tracking-wider">
                                 Units ({totalUnits})
                             </span>
+
                         </div>
 
-                        {isUnitsLoading ? (
-                            <div className="p-10 text-center text-gray-400 text-sm">Loading...</div>
-                        ) : units.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center p-10 text-gray-400 gap-2">
-                                <Tags size={36} strokeWidth={1.2} />
-                                <p className="text-sm">No units found</p>
-                            </div>
-                        ) : (
-                            units.map((unit) => {
-                                const isSelected = Number(selectedUnitId) === Number(unit.id);
 
-                                return (
-                                    <div
-                                        key={unit.id}
-                                        onClick={() => handleSelectUnit(unit)}
-                                        // onDoubleClick={() => {
-                                        //     handleSelectUnit(unit);
-                                        //     setShowAddUnitModal(true);
-                                        //     setEditingUnit(unit);
-                                        //     //setShowEditItemModal(true);
-                                        //     setUnitMenuOpen(null);
-                                        // }}
-                                        onDoubleClick={() => {
-                                            //  ||  Number(unit.Is_Used) === 1
-                                            if (Number(unit.Is_System) === 1) return;
+                        {/* =========================================
+                            VIRTUAL SCROLL LIST
 
-                                            handleSelectUnit(unit);
-                                            setEditingUnit(unit);
-                                            setShowAddUnitModal(true);
-                                            setUnitMenuOpen(null);
-                                        }}
-                                        className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
-                                        style={{
-                                            backgroundColor: isSelected ? "#f0f9ff" : "transparent",
-                                            borderLeft: isSelected ? "3px solid #4CA1AF" : "3px solid transparent",
-                                            borderBottom: "1px solid #f1f5f9",
-                                        }}
-                                    >
-                                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                                            <div
-                                                className="flex items-center justify-center rounded-lg flex-shrink-0"
-                                                style={{
-                                                    width: 36,
-                                                    height: 36,
-                                                    backgroundColor: isSelected ? "#4CA1AF22" : "#f1f5f9",
-                                                }}
-                                            >
-                                                <Tags
-                                                    size={18}
+                            Same implementation as AllPurchaseList.
+                        ========================================= */}
+
+                        <div
+                            style={{
+                                flex: 1,
+                                minHeight: 0,
+                                overflow: "hidden",
+                                position: "relative",
+                            }}
+                        >
+
+                            <VirtualScrollList
+
+                                items={units}
+
+                                rowHeight={65}
+
+                                height="100%"
+
+                                onLoadMore={handleLoadMore}
+
+                                isFetching={isUnitsFetching}
+
+                                hasMore={unitsHasMore}
+
+                                getItemKey={(unit) => unit?.id}
+
+                                emptyMessage="No units found"
+
+                                endMessage="— End of units —"
+
+                                isRowActive={(unit) =>
+                                    unitMenuOpen === unit?.id
+                                }
+
+                                renderRow={(unit) => {
+
+                                    const isSelected =
+                                        Number(selectedUnitId) ===
+                                        Number(unit.id);
+
+                                    return (
+
+                                        <div
+
+                                            key={unit.id}
+
+                                            onClick={() => {
+                                                handleSelectUnit(unit);
+                                            }}
+
+                                            onDoubleClick={() => {
+
+                                                if (
+                                                    Number(unit.Is_System) === 1
+                                                ) {
+                                                    return;
+                                                }
+
+                                                handleSelectUnit(unit);
+
+                                                setEditingUnit(unit);
+
+                                                setShowAddUnitModal(true);
+
+                                                setUnitMenuOpen(null);
+
+                                            }}
+
+                                            className="relative flex items-center justify-between px-4 py-3 cursor-pointer transition-colors"
+
+                                            style={{
+
+                                                height: 65,
+
+                                                boxSizing: "border-box",
+
+                                                backgroundColor: isSelected
+                                                    ? "#f0f9ff"
+                                                    : "transparent",
+
+                                                borderLeft: isSelected
+                                                    ? "3px solid #4CA1AF"
+                                                    : "3px solid transparent",
+
+                                                borderBottom: "1px solid #f1f5f9",
+
+                                            }}
+                                        >
+
+                                            {/* UNIT DETAILS */}
+
+                                            <div className="flex items-center gap-3 flex-1 min-w-0">
+
+                                                <div
+                                                    className="flex items-center justify-center rounded-lg flex-shrink-0"
                                                     style={{
-                                                        color: isSelected ? "#4CA1AF" : "#94a3b8",
+                                                        width: 36,
+                                                        height: 36,
+                                                        backgroundColor: isSelected
+                                                            ? "#4CA1AF22"
+                                                            : "#f1f5f9",
                                                     }}
-                                                />
-                                            </div>
-
-                                            <div className="min-w-0">
-                                                <p
-                                                    className="font-semibold text-gray-800 truncate text-sm"
-                                                    style={{ margin: 0 }}
                                                 >
-                                                    {unit.Unit_Name}
-                                                </p>
 
-                                                {unit.Unit_Shorthand && (
+                                                    <Tags
+                                                        size={18}
+                                                        style={{
+                                                            color: isSelected
+                                                                ? "#4CA1AF"
+                                                                : "#94a3b8",
+                                                        }}
+                                                    />
+
+                                                </div>
+
+
+                                                <div className="min-w-0">
+
                                                     <p
-                                                        className="text-gray-400 text-xs truncate"
+                                                        className="font-semibold text-gray-800 truncate text-sm"
                                                         style={{ margin: 0 }}
                                                     >
-                                                        {unit.Unit_Shorthand}
+                                                        {unit.Unit_Name}
                                                     </p>
-                                                )}
-                                            </div>
-                                        </div>
 
-                                        {/* SHOW MENU ONLY WHEN System = 0 AND Is_Used = 0 */}
-                                        {/* Number(unit.Is_Used) === 0 && */}
-                                        {/* Number(unit.Is_Used) === 0 && */}
-                                        {Number(unit.Is_System) === 0 && 
-                                            (
+
+                                                    {unit.Unit_Shorthand && (
+
+                                                        <p
+                                                            className="text-gray-400 text-xs truncate"
+                                                            style={{ margin: 0 }}
+                                                        >
+                                                            {unit.Unit_Shorthand}
+                                                        </p>
+
+                                                    )}
+
+                                                </div>
+
+                                            </div>
+
+
+                                            {/* THREE DOT MENU */}
+
+                                            {Number(unit.Is_System) === 0 && (
+
                                                 <div
                                                     style={{ position: "relative" }}
-                                                    onClick={(e) => e.stopPropagation()}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                    }}
                                                 >
+
                                                     <button
                                                         type="button"
-                                                        onClick={() =>
+                                                        onClick={() => {
+
                                                             setUnitMenuOpen(
-                                                                unitMenuOpen === unit.id ? null : unit.id
-                                                            )
-                                                        }
+                                                                unitMenuOpen === unit.id
+                                                                    ? null
+                                                                    : unit.id
+                                                            );
+
+                                                        }}
                                                         className="p-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                                         style={{
                                                             backgroundColor: "transparent",
@@ -352,13 +634,19 @@ export default function ItemUnits() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
+
                                                         <MoreVertical
                                                             size={16}
-                                                            style={{ color: "#64748b" }}
+                                                            style={{
+                                                                color: "#64748b",
+                                                            }}
                                                         />
+
                                                     </button>
 
+
                                                     {unitMenuOpen === unit.id && (
+
                                                         <div
                                                             className="absolute bg-white shadow-lg rounded-md"
                                                             style={{
@@ -370,310 +658,370 @@ export default function ItemUnits() {
                                                                 overflow: "hidden",
                                                             }}
                                                         >
+
                                                             <button
                                                                 type="button"
                                                                 className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
                                                                 onClick={() => {
 
-                                                                    //handleEditUnit(unit);
                                                                     handleSelectUnit(unit);
+
                                                                     setEditingUnit(unit);
+
                                                                     setShowAddUnitModal(true);
+
                                                                     setUnitMenuOpen(null);
+
                                                                 }}
                                                             >
+
                                                                 <Eye
                                                                     size={13}
-                                                                    style={{ color: "#4CA1AF" }}
+                                                                    style={{
+                                                                        color: "#4CA1AF",
+                                                                    }}
                                                                 />
+
                                                                 Edit
+
                                                             </button>
-{/* 
-                                                            <button
-                                                                type="button"
-                                                                className="flex items-center gap-2 w-full text-left px-3 py-2 hover:bg-red-50 text-sm"
-                                                                style={{ color: "#dc2626" }}
-                                                                onClick={() => {
-                                                                    setUnitMenuOpen(null);
-                                                                    //handleDeleteUnit(unit);
-                                                                }}
-                                                            >
-                                                                <Trash2
-                                                                    size={13}
-                                                                    style={{ color: "#dc2626" }}
-                                                                />
-                                                                Delete
-                                                            </button> */}
+
                                                         </div>
+
                                                     )}
+
                                                 </div>
+
                                             )}
-                                    </div>
-                                );
-                            })
-                        )}
-                        <div ref={leftSentinelRef} style={{ height: 1 }} />
-                        {isUnitsFetching && leftCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
+
+                                        </div>
+
+                                    );
+
+                                }}
+
+                            />
+
+                        </div>
+
                     </div>
 
-                    {/* ══ RIGHT — 70% — conversions panel ══ */}
+
+
+                    {/* =============================================
+                        RIGHT PANEL - CONVERSIONS
+                    ============================================= */}
+
                     <div
                         className="w-full lg:w-[70%] p-1 overflow-y-auto"
-                        style={{ maxHeight: "calc(100vh - 180px)" }}
+                        style={{
+                            maxHeight: "calc(100vh - 180px)",
+                        }}
                     >
+
                         <div className="flex flex-col h-full">
 
-                            {/* ── UNIT SUMMARY CARD ── */}
+
+                            {/* UNIT SUMMARY CARD */}
+
                             <div className="rounded-xl p-2 mb-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+
                                 <div className="flex items-center gap-4">
+
                                     <div
                                         className="flex items-center justify-center rounded-xl"
-                                        style={{ width: 44, height: 44, backgroundColor: "#4CA1AF22" }}
+                                        style={{
+                                            width: 44,
+                                            height: 44,
+                                            backgroundColor: "#4CA1AF22",
+                                        }}
                                     >
-                                        <Package size={22} style={{ color: "#4CA1AF" }} />
+
+                                        <Package
+                                            size={22}
+                                            style={{ color: "#4CA1AF" }}
+                                        />
+
                                     </div>
+
 
                                     <div>
-                                        <h6 className="font-bold text-gray-900" style={{ fontSize: 18, margin: 0 }}>
+
+                                        <h6
+                                            className="font-bold text-gray-900"
+                                            style={{
+                                                fontSize: 18,
+                                                margin: 0,
+                                            }}
+                                        >
                                             {selectedUnit?.Unit_Name}
                                         </h6>
+
+
                                         <p className="text-gray-500 text-sm mt-0.5">
-                                            {totalConversions} conversion{totalConversions !== 1 ? "s" : ""}
+                                            {totalConversions} conversion
+                                            {totalConversions !== 1 ? "s" : ""}
                                         </p>
+
                                     </div>
+
                                 </div>
 
-                                {/* RIGHT — Search */}
-                                <div className="relative flex-shrink-0 w-full sm:w-auto" style={{ width: 220, height: 36 }}>
+
+
+                                {/* CONVERSION SEARCH */}
+
+                                <div
+                                    className="relative flex-shrink-0 w-full sm:w-auto"
+                                    style={{
+                                        width: 220,
+                                        height: 36,
+                                    }}
+                                >
+
                                     <Search
                                         size={16}
-                                        style={{ position: "absolute", left: 10, top: 10, color: "#94a3b8", pointerEvents: "none" }}
+                                        style={{
+                                            position: "absolute",
+                                            left: 10,
+                                            top: 10,
+                                            color: "#94a3b8",
+                                            pointerEvents: "none",
+                                        }}
                                     />
+
+
                                     <input
                                         type="text"
                                         value={conversionSearch}
                                         onChange={(e) => {
+
                                             const value = e.target.value;
+
                                             const next = new URLSearchParams(searchParams);
-                                            if (value) next.set("convSearch", value);
-                                            else next.delete("convSearch");
-                                            setSearchParams(next, { replace: true });
+
+                                            if (value) {
+                                                next.set("convSearch", value);
+                                            } else {
+                                                next.delete("convSearch");
+                                            }
+
+                                            setSearchParams(next, {
+                                                replace: true,
+                                            });
+
                                         }}
                                         placeholder="Search"
                                         className="w-full h-full border rounded-md text-sm outline-none"
-                                        style={{ height: 36, paddingLeft: 34, paddingRight: 10, borderColor: "#dbe3ea", boxSizing: "border-box" }}
+                                        style={{
+                                            height: 36,
+                                            paddingLeft: 34,
+                                            paddingRight: 10,
+                                            borderColor: "#dbe3ea",
+                                            boxSizing: "border-box",
+                                        }}
                                     />
+
                                 </div>
+
                             </div>
 
-                            {/* ── CONVERSIONS TABLE ── */}
+
+
+                            {/* CONVERSIONS TABLE */}
+
                             <div className="table-responsive table-desi">
+
                                 <table className="w-full min-w-[700px]">
-                                    {/* <thead>
-                                        <tr>
-                                            <th>Sl.No</th>
-                                            <th
-                                                className="text-left py-2 px-3 font-semibold text-black"
-                                                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
-                                            >
-                                                Converts To
-                                            </th>
-                                            <th
-                                                className="text-right py-2 px-3 font-semibold text-black"
-                                                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.05em" }}
-                                            >
-                                                Conversion Factor
-                                            </th>
-                                        </tr>
-                                    </thead> */}
+
                                     <thead>
+
                                         <tr>
                                             <th>Sl.No</th>
                                             <th>Conversion</th>
                                         </tr>
+
                                     </thead>
-                                    {/* <tbody>
-                                        {isConversionsLoading ? (
-                                            <tr>
-                                                <td colSpan={3} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                                                    Loading...
-                                                </td>
-                                            </tr>
-                                        ) : conversions.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={3} className="text-center text-gray-400" style={{ padding: "48px 0" }}>
-                                                    No conversions to show
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            conversions.map((conv, idx) => (
-                                                <tr
-                                                    key={conv.Conversion_Id}
-                                                    style={{ borderBottom: "1px solid #f1f5f9" }}
-                                                    className="hover:bg-gray-50 transition-colors"
-                                                >
-                                                    <td>{idx + 1}.</td>
-                                                    <td className="py-2 px-3 text-black">
-                                                        {conv.To_Unit_Name}
-                                                    </td>
-                                                    <td className="text-right" style={{ color: "#000000", whiteSpace: "nowrap" }}>
-                                                        {conv.Conversion_Factor}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody> */}
+
+
                                     <tbody>
+
                                         {isConversionsLoading ? (
+
                                             <tr>
-                                                <td colSpan={2} className="text-center text-gray-400 py-12">
+                                                <td
+                                                    colSpan={2}
+                                                    className="text-center text-gray-400 py-12"
+                                                >
                                                     Loading...
                                                 </td>
                                             </tr>
+
                                         ) : conversions.length === 0 ? (
+
                                             <tr>
-                                                <td colSpan={2} className="text-center text-gray-400 py-12">
+                                                <td
+                                                    colSpan={2}
+                                                    className="text-center text-gray-400 py-12"
+                                                >
                                                     No conversions to show
                                                 </td>
                                             </tr>
+
                                         ) : (
+
                                             conversions.map((conv, idx) => (
+
                                                 <tr
                                                     key={conv.id}
                                                     className="hover:bg-gray-50"
-                                                    style={{ borderBottom: "1px solid #f1f5f9" }}
+                                                    style={{
+                                                        borderBottom: "1px solid #f1f5f9",
+                                                    }}
                                                 >
+
                                                     <td>{idx + 1}</td>
 
                                                     <td className="py-3 px-3">
                                                         {`1 ${conv.Primary_Unit} = ${conv.Conversion_Rate} ${conv.Secondary_Unit}`}
                                                     </td>
+
                                                 </tr>
+
                                             ))
+
                                         )}
+
                                     </tbody>
+
                                 </table>
+
                             </div>
 
                         </div>
-                        <div ref={rightSentinelRef} style={{ height: 1 }} />
-                        {isConversionsFetching && rightCursor && <div className="text-center text-xs text-gray-400 py-2">Loading more...</div>}
-                        {!conversionsHasMore && conversions.length > 0 && <div className="text-center text-xs text-gray-300 py-2">— End of conversions —</div>}
+
+
+                        {/* RIGHT SIDE SENTINEL */}
+
+                        <div
+                            ref={rightSentinelRef}
+                            style={{ height: 1 }}
+                        />
+
+
+                        {isConversionsFetching && rightCursor && (
+
+                            <div className="text-center text-xs text-gray-400 py-2">
+                                Loading more...
+                            </div>
+
+                        )}
+
+
+                        {!conversionsHasMore && conversions.length > 0 && (
+
+                            <div className="text-center text-xs text-gray-300 py-2">
+                                — End of conversions —
+                            </div>
+
+                        )}
+
                     </div>
 
                 </div>
+
             </div>
-            {/* {showAddUnitModal && (
+
+
+
+            {/* =================================================
+                ADD / EDIT UNIT MODAL
+            ================================================= */}
+
+            {showAddUnitModal && (
+
                 <AddUnitModal
+
                     initialData={editingUnit}
+
                     onClose={() => {
+
                         setShowAddUnitModal(false);
-                        setEditingUnit(null);
-                    }}
-                    onSave={(savedUnit) => {
-                        setShowAddUnitModal(false);
+
                         setEditingUnit(null);
 
-                        if (savedUnit?.id) {
-                            const next = new URLSearchParams(searchParams);
-                            next.set("unitId", savedUnit.id);
-                            setSearchParams(next);
-                        }
-                        refetchUnits();
                     }}
-                />
-            )} */}
-            {showAddUnitModal && (
-                <AddUnitModal
-                    initialData={editingUnit}
-                    onClose={() => {
-                        setShowAddUnitModal(false);
-                        setEditingUnit(null);
-                    }}
+
                     onSave={(savedUnit) => {
+
                         setShowAddUnitModal(false);
+
                         setEditingUnit(null);
-                        dispatch(itemApi.util.invalidateTags(["Unit"]));
-                        // 🔹 reset cursor to null FIRST — forces merge() to replace, not append
+
+
+                        // Invalidate Unit cache.
+
+                        dispatch(
+                            itemApi.util.invalidateTags(["Unit"])
+                        );
+
+
+                        // Reset cursor and create a new RTK Query cache entry.
+
                         setLeftCursor(null);
-                         setResetKey((k) => k + 1);  
+
+                        setResetKey((k) => k + 1);
+
 
                         if (savedUnit?.id) {
+
                             const next = new URLSearchParams(searchParams);
+
                             next.set("unitId", savedUnit.id);
+
                             setSearchParams(next);
+
                         }
 
-                        // refetchUnits() no longer strictly needed since cursor reset
-                        // + RTK's invalidatesTags already triggers a refetch automatically —
-                        // but harmless to keep as a belt-and-suspenders call
-                        //refetchUnits();
                     }}
+
                 />
+
             )}
-            {/* 
-            {showAddUnitModal && (
-                <AddUnitModal
-                    onClose={() => setShowAddUnitModal(false)}
-                    onSave={(savedUnit) => {
-                        setShowAddUnitModal(false);
-                        if (savedUnit?.id) {
-                            const next = new URLSearchParams(searchParams);
-                            next.set("unitId", savedUnit.id);
-                            setSearchParams(next);
-                        }
-                    }}
-                />
-            )} */}
+
+
+
+            {/* =================================================
+                ADD CONVERSION MODAL
+            ================================================= */}
+
             {showSelectUnitModal && (
+
                 <SelectUnitModal
+
                     units={itemUnits || []}
-                    onClose={() => setShowSelectUnitModal(false)}
-                    // onSave={() => {
-                    //     setShowSelectUnitModal(false);
 
-                    //     // reset infinite scroll cursor
-                    //     setRightCursor(null);
+                    onClose={() => {
+                        setShowSelectUnitModal(false);
+                    }}
 
-                    //     // refetch conversions for selected unit
-                    //     refetchConversions();
-                    // }}
                     onSave={() => {
+
                         console.log("PARENT ONSAVE");
 
                         setShowSelectUnitModal(false);
+
                         rightUnitRef.current = null;
+
                         setRightCursor(null);
+
                     }}
-                // onSave={async () => {
-                //     console.log("PARENT ONSAVE");
 
-                //     setShowSelectUnitModal(false);
-
-                //     setRightCursor(null);
-
-
-                //     refetchConversions().then((res) => {
-                //         console.log("REFETCH RESULT", res);
-                //     });
-                //     // const result = await refetchConversions();
-
-                //     // console.log("REFETCH RESULT", result);
-                // }}
                 />
+
             )}
-            {/* {showSelectUnitModal && (
-                <SelectUnitModal
-                units={itemUnits || []}
-                    onClose={() => setShowSelectUnitModal(false)}
-                    onSave={()=>setShowSelectUnitModal(false)}
-                    // onSelect={(unit) => {
-                    //     //setSelectedUnit(unit); // optional
-                    //     setShowSelectUnitModal(false);
-                    //     //setShowAddConversionModal(true); // open conversion modal next
-                    // }}
-                />
-            )} */}
+
         </>
     );
+
 }

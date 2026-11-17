@@ -63,33 +63,45 @@ getAllPaymentIns: builder.query({
     toDate: queryArgs.toDate,
   }),
 
-  merge: (currentCache, newData, { arg }) => {
-    // First request / filters changed
-    if (!arg.cursor) {
-      return newData;
-    }
+  // merge: (currentCache, newData, { arg }) => {
+  //   // First request / filters changed
+  //   if (!arg.cursor) {
+  //     return newData;
+  //   }
 
-    // Load next cursor page
-    currentCache.paymentIns.push(
-      ...newData.paymentIns
-    );
+  //   // Load next cursor page
+  //   currentCache.paymentIns.push(
+  //     ...newData.paymentIns
+  //   );
 
-    currentCache.hasMore =
-      newData.hasMore;
+  //   currentCache.hasMore =
+  //     newData.hasMore;
 
-    currentCache.nextCursor =
-      newData.nextCursor;
+  //   currentCache.nextCursor =
+  //     newData.nextCursor;
 
-    // Keep totals updated
-    if (newData.totals) {
-      currentCache.totals =
-        newData.totals;
-    }
+  //   // Keep totals updated
+  //   if (newData.totals) {
+  //     currentCache.totals =
+  //       newData.totals;
+  //   }
 
-    currentCache.totalPayments =
-      newData.totalPayments;
-  },
+  //   currentCache.totalPayments =
+  //     newData.totalPayments;
+  // },
+merge: (currentCache, newData, { arg }) => {
+  if (!arg.cursor) return newData;
 
+  const existing = new Set(currentCache.paymentIns.map((p) => String(p.id)));
+  currentCache.paymentIns.push(
+    ...newData.paymentIns.filter((p) => !existing.has(String(p.id)))
+  );
+
+  currentCache.hasMore = newData.hasMore;
+  currentCache.nextCursor = newData.nextCursor;
+  currentCache.totalPayments = newData.totalPayments;
+  if (newData.totals) currentCache.totals = newData.totals;
+},
   forceRefetch: ({
     currentArg,
     previousArg,
@@ -141,80 +153,125 @@ getAllPaymentIns: builder.query({
     //   }),
     //   invalidatesTags: [{ type: "PaymentIn", id: "LIST" }],
     // }),
-    deletePaymentIn: builder.mutation({
+//     deletePaymentIn: builder.mutation({
+//   query: (id) => ({
+//     url: `/payment-in/${id}`,
+//     method: "DELETE",
+//   }),
+
+//   async onQueryStarted(
+//     id,
+//     { dispatch, queryFulfilled }
+//   ) {
+//     const patchResult = dispatch(
+//       paymentInApi.util.updateQueryData(
+//         "getAllPaymentIns",
+//         {
+//           cursor: null,
+//           search: "",
+//           fromDate: "",
+//           toDate: "",
+//           limit: 10,
+//         },
+//         (draft) => {
+//           if (!draft?.paymentIns) return;
+
+//           const deletedPayment =
+//             draft.paymentIns.find(
+//               (item) =>
+//                 String(item.id) === String(id)
+//             );
+
+//           draft.paymentIns =
+//             draft.paymentIns.filter(
+//               (item) =>
+//                 String(item.id) !== String(id)
+//             );
+
+//           if (draft.totalPayments != null) {
+//             draft.totalPayments = Math.max(
+//               0,
+//               draft.totalPayments - 1
+//             );
+//           }
+
+//           if (
+//             draft.totals?.totalReceived != null &&
+//             deletedPayment
+//           ) {
+//             draft.totals.totalReceived =
+//               Math.max(
+//                 0,
+//                 Number(
+//                   draft.totals.totalReceived
+//                 ) -
+//                   Number(
+//                     deletedPayment.Received || 0
+//                   )
+//               );
+//           }
+//         }
+//       )
+//     );
+
+//     try {
+//       await queryFulfilled;
+//     } catch {
+//       patchResult.undo();
+//     }
+//   },
+
+//   invalidatesTags: [
+//     {
+//       type: "PaymentIn",
+//       id: "LIST",
+//     },
+//   ],
+// }),
+deletePaymentIn: builder.mutation({
   query: (id) => ({
     url: `/payment-in/${id}`,
     method: "DELETE",
   }),
 
-  async onQueryStarted(
-    id,
-    { dispatch, queryFulfilled }
-  ) {
-    const patchResult = dispatch(
-      paymentInApi.util.updateQueryData(
-        "getAllPaymentIns",
-        {
-          cursor: null,
-          search: "",
-          fromDate: "",
-          toDate: "",
-          limit: 10,
-        },
-        (draft) => {
+  async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+    const cachedArgs = paymentInApi.util.selectCachedArgsForQuery(
+      getState(),
+      "getAllPaymentIns"
+    );
+
+    const patches = cachedArgs.map((args) =>
+      dispatch(
+        paymentInApi.util.updateQueryData("getAllPaymentIns", args, (draft) => {
           if (!draft?.paymentIns) return;
 
-          const deletedPayment =
-            draft.paymentIns.find(
-              (item) =>
-                String(item.id) === String(id)
-            );
+          const deleted = draft.paymentIns.find((p) => String(p.id) === String(id));
+          if (!deleted) return;
 
-          draft.paymentIns =
-            draft.paymentIns.filter(
-              (item) =>
-                String(item.id) !== String(id)
-            );
+          draft.paymentIns = draft.paymentIns.filter((p) => String(p.id) !== String(id));
 
           if (draft.totalPayments != null) {
-            draft.totalPayments = Math.max(
-              0,
-              draft.totalPayments - 1
-            );
+            draft.totalPayments = Math.max(0, draft.totalPayments - 1);
           }
 
-          if (
-            draft.totals?.totalReceived != null &&
-            deletedPayment
-          ) {
-            draft.totals.totalReceived =
-              Math.max(
-                0,
-                Number(
-                  draft.totals.totalReceived
-                ) -
-                  Number(
-                    deletedPayment.Received || 0
-                  )
-              );
+          if (draft.totals?.totalReceived != null) {
+            draft.totals.totalReceived = Math.max(
+              0,
+              Number(draft.totals.totalReceived) - Number(deleted.Received || 0)
+            );
           }
-        }
+        })
       )
     );
 
     try {
       await queryFulfilled;
     } catch {
-      patchResult.undo();
+      patches.forEach((p) => p.undo());
     }
   },
 
-  invalidatesTags: [
-    {
-      type: "PaymentIn",
-      id: "LIST",
-    },
-  ],
+  invalidatesTags: (result, error, id) => [{ type: "PaymentIn", id }],
 }),
     getPaymentInPrintReport: builder.query({
   query: ({

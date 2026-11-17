@@ -509,7 +509,7 @@ export default function PaymentIn() {
                                     style={{
                                         display: "grid",
                                         //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
-                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.8fr",
+                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 2fr 1.2fr 0.8fr",
                                         width: "100%",
                                         //minWidth: "850px",
                                         boxSizing: "border-box",
@@ -526,6 +526,7 @@ export default function PaymentIn() {
                                 >
                                     <div>Sl.No</div>
                                     <div>Date</div>
+                                     <div>Ref No.</div>
                                     <div>Party Name</div>
                                     <div>Payment Type</div>
                                     <div>Total Received</div>
@@ -611,7 +612,7 @@ export default function PaymentIn() {
                                                         display: "grid",
                                                         //gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.5fr",
                                                         //gridTemplateColumns:"70px 110px minmax(180px, 1fr) 130px 110px 110px 50px",
-                                                        gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 1.2fr 0.8fr",
+                                                       gridTemplateColumns: "0.7fr 1.2fr 3fr 1.6fr 2fr 1.2fr 0.8fr",
                                                         alignItems: "center",
                                                         minHeight: 52,
                                                         padding: "0 8px",
@@ -645,6 +646,14 @@ export default function PaymentIn() {
                                                                 }
                                                             )
                                                             : ""}
+                                                    </div>
+                                                    <div
+                                                        className="table-desi-cell truncate"
+                                                        title={paymentIn?.Receipt_No || ""}
+
+                                                    >
+                                                        {paymentIn?.Receipt_No ||
+                                                            ""}
                                                     </div>
 
                                                     {/* PARTY */}

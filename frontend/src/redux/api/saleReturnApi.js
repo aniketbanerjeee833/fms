@@ -53,31 +53,44 @@ export const saleReturnApi = createApi({
     toDate: queryArgs.toDate,
   }),
 
+  // merge: (currentCache, newData, { arg }) => {
+  //   // First request / filters changed
+  //   if (!arg.cursor) {
+  //     return newData;
+  //   }
+
+  //   // Cursor request → append next batch
+  //   currentCache.saleReturns.push(
+  //     ...newData.saleReturns
+  //   );
+
+  //   currentCache.hasMore =
+  //     newData.hasMore;
+
+  //   currentCache.nextCursor =
+  //     newData.nextCursor;
+
+  //   currentCache.totalReturns =
+  //     newData.totalReturns;
+
+  //   if (newData.totals) {
+  //     currentCache.totals =
+  //       newData.totals;
+  //   }
+  // },
   merge: (currentCache, newData, { arg }) => {
-    // First request / filters changed
-    if (!arg.cursor) {
-      return newData;
-    }
+  if (!arg.cursor) return newData;
 
-    // Cursor request → append next batch
-    currentCache.saleReturns.push(
-      ...newData.saleReturns
-    );
+  const existing = new Set(currentCache.saleReturns.map((s) => String(s.id)));
+  currentCache.saleReturns.push(
+    ...newData.saleReturns.filter((s) => !existing.has(String(s.id)))
+  );
 
-    currentCache.hasMore =
-      newData.hasMore;
-
-    currentCache.nextCursor =
-      newData.nextCursor;
-
-    currentCache.totalReturns =
-      newData.totalReturns;
-
-    if (newData.totals) {
-      currentCache.totals =
-        newData.totals;
-    }
-  },
+  currentCache.hasMore = newData.hasMore;
+  currentCache.nextCursor = newData.nextCursor;
+  currentCache.totalReturns = newData.totalReturns;
+  if (newData.totals) currentCache.totals = newData.totals;
+},
 
   forceRefetch: ({
     currentArg,
@@ -133,7 +146,12 @@ export const saleReturnApi = createApi({
     method: "POST",
     body,
   }),
-  invalidatesTags: ["SaleReturn"],
+  // create
+invalidatesTags: [
+  { type: "SaleReturn", id: "LIST" },
+  { type: "SaleReturn", id: "LATEST_RETURN" },
+],
+  //invalidatesTags: ["SaleReturn"],
 }),
 
     /* EDIT */
@@ -143,7 +161,12 @@ export const saleReturnApi = createApi({
         method: "PUT",
         body,
       }),
-      invalidatesTags: ["SaleReturn"],
+      // update
+invalidatesTags: (r, e, { Sale_Return_Id }) => [
+  { type: "SaleReturn", id: Sale_Return_Id },
+  { type: "SaleReturn", id: "LIST" },
+],
+      //invalidatesTags: ["SaleReturn"],
     }),
 
     /* DELETE */
@@ -158,50 +181,95 @@ export const saleReturnApi = createApi({
 
 
 
+// deleteSaleReturn: builder.mutation({
+//   query: (id) => ({
+//     url: `/sale-return/${id}`,
+//     method: "DELETE",
+//   }),
+
+//   async onQueryStarted(id, { dispatch, queryFulfilled }) {
+//     const patchResult = dispatch(
+//       saleReturnApi.util.updateQueryData(
+//         "getAllSaleReturns",
+//         {
+//           cursor: null,
+//           search: "",
+//           fromDate: "",
+//           toDate: "",
+//           limit: 10,
+//         },
+//         (draft) => {
+//           draft.saleReturns =
+//             draft.saleReturns.filter(
+//               (s) => String(s.id) !== String(id)
+//             );
+
+//           if (draft.totalReturns != null) {
+//             draft.totalReturns = Math.max(
+//               0,
+//               draft.totalReturns - 1
+//             );
+//           }
+//         }
+//       )
+//     );
+
+//     try {
+//       await queryFulfilled;
+//     } catch {
+//       patchResult.undo();
+//     }
+//   },
+
+//   // TEMPORARILY REMOVE THIS
+//   // invalidatesTags: [
+//   //   { type: "SaleReturn", id: "LIST" },
+//   // ],
+// }),
 deleteSaleReturn: builder.mutation({
   query: (id) => ({
     url: `/sale-return/${id}`,
     method: "DELETE",
   }),
 
-  async onQueryStarted(id, { dispatch, queryFulfilled }) {
-    const patchResult = dispatch(
-      saleReturnApi.util.updateQueryData(
-        "getAllSaleReturns",
-        {
-          cursor: null,
-          search: "",
-          fromDate: "",
-          toDate: "",
-          limit: 10,
-        },
-        (draft) => {
-          draft.saleReturns =
-            draft.saleReturns.filter(
-              (s) => String(s.id) !== String(id)
-            );
+  async onQueryStarted(id, { dispatch, queryFulfilled, getState }) {
+    const cachedArgs = saleReturnApi.util.selectCachedArgsForQuery(
+      getState(),
+      "getAllSaleReturns"
+    );
+
+    const patches = cachedArgs.map((args) =>
+      dispatch(
+        saleReturnApi.util.updateQueryData("getAllSaleReturns", args, (draft) => {
+          if (!draft?.saleReturns) return;
+
+          const target = draft.saleReturns.find((s) => String(s.id) === String(id));
+          if (!target) return;
+
+          // adjust draft.totals here from the row's amount fields
+
+          draft.saleReturns = draft.saleReturns.filter(
+            (s) => String(s.id) !== String(id)
+          );
 
           if (draft.totalReturns != null) {
-            draft.totalReturns = Math.max(
-              0,
-              draft.totalReturns - 1
-            );
+            draft.totalReturns = Math.max(0, draft.totalReturns - 1);
           }
-        }
+        })
       )
     );
 
     try {
       await queryFulfilled;
     } catch {
-      patchResult.undo();
+      patches.forEach((p) => p.undo());
     }
   },
 
-  // TEMPORARILY REMOVE THIS
-  // invalidatesTags: [
-  //   { type: "SaleReturn", id: "LIST" },
-  // ],
+  invalidatesTags: (result, error, id) => [
+    { type: "SaleReturn", id },
+    { type: "SaleReturn", id: "LATEST_RETURN" },
+  ],
 }),
     getSaleReturnPrintReport: builder.query({
       query: ({

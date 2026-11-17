@@ -385,6 +385,19 @@ const cleanTransactionDiscountAmount =
       docNumber: Bill_Number,
       balanceDue: balanceDue,
     });
+//     if (totalPaid > 0) {
+//   await recordPartyLedger({
+//     connection,
+//     partyId: Party_Id,
+//     txnType: "Purchase_Payment",
+//     referenceId: purchaseIdNumber,
+//     amount: totalPaid,
+//     txnDate: Bill_Date,
+//     docNumber: Bill_Number,
+//     balanceDue: balanceDue,
+//     directionOverride: "Debit",
+//   });
+// }
 
     // ═══════════════════════════════════════════════════════
     // ITEMS LOOP — unit resolution + snapshot logic
@@ -1333,9 +1346,11 @@ const editPurchase = async (req, res, next) => {
   [purchaseId]
 );
     if (existingPurchase.length === 0) {
+       await connection.rollback();
       return res.status(404).json({ message: "No such Purchase found." });
     }
     const purchaseIdNumber = existingPurchase[0].id;
+    const oldPartyId = existingPurchase[0].Party_Id;
 
     const cleanData = sanitizeObject(req.body);
     const validation = purchaseSchema.safeParse(cleanData);
@@ -1634,6 +1649,14 @@ const cleanTransactionDiscountAmount =
         splits: validSplits,
       });
     }
+    if (oldPartyId !== Party_Id) {
+  await reversePartyLedger({
+    connection,
+    partyId: oldPartyId,
+    txnType: "Purchase",
+    referenceId: purchaseIdNumber,
+  });
+}
 
     await recordPartyLedger({
       connection,
@@ -1645,6 +1668,17 @@ const cleanTransactionDiscountAmount =
       docNumber: Bill_Number,
       balanceDue: balanceDue,
     });
+//     await recordPartyLedger({
+//   connection,
+//   partyId: Party_Id,
+//   txnType: "Purchase_Payment",
+//   referenceId: purchaseIdNumber,
+//   amount: totalPaid,
+//   txnDate: Bill_Date,
+//   docNumber: Bill_Number,
+//   balanceDue,
+//   directionOverride: "Debit",
+// });
 
     const [oldItems] = await connection.query(
       "SELECT * FROM add_purchase_items WHERE Purchase_Id = ?",
